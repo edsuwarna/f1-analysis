@@ -2758,17 +2758,85 @@
   function showAbout() {
     currentView = 'about';
     document.getElementById('content').innerHTML = `
-      <div class="card p-8 max-w-2xl mx-auto text-center">
-        <h2 class="text-xl font-bold mb-4">🏎️ F1 Analysis 2026</h2>
-        <p style="color:var(--text-secondary)" class="mb-6">Formula 1 sector times, tyre strategy, driver comparison, and race analysis platform.</p>
-        <div class="text-left text-sm" style="color:var(--text-secondary)">
-          <p><strong>Data Source:</strong> OpenF1 API + FastAPI Backend</p>
-          <p><strong>Database:</strong> PostgreSQL 18</p>
-          <p><strong>Season:</strong> 2026</p>
-          <p><strong>Features:</strong> Sector times · Lap Distribution · Championship Standings · Qualifying Evolution · Position History · Tyre strategy · Pit stops · Weather · Driver comparison · Gap Timeline · Tyre degradation · Overtake Analysis · Pit Strategy</p>
-          <p class="mt-4"><strong>GitHub:</strong> <a href="https://github.com/edsuwarna/f1-analysis" target="_blank" style="color:var(--text-primary);text-decoration:underline">github.com/edsuwarna/f1-analysis</a></p>
+      <div class="card p-6 md:p-8 max-w-3xl mx-auto">
+        <h2 class="text-xl font-bold mb-2 text-center">🏎️ F1 Analysis 2026</h2>
+        <p class="text-sm text-center mb-6" style="color:var(--text-secondary)">Formula 1 sector times, tyre strategy, driver comparison &amp; race analysis platform</p>
+
+        <div class="grid grid-cols-2 gap-4 mb-6 text-center text-xs" style="color:var(--text-secondary)">
+          <div class="card p-3"><strong style="color:var(--text-primary)">${meetings.length || '7'}</strong> GPs</div>
+          <div class="card p-3"><strong style="color:var(--text-primary)">13</strong> sections</div>
+          <div class="card p-3"><strong style="color:var(--text-primary)">20</strong> drivers</div>
+          <div class="card p-3"><strong style="color:var(--text-primary)">10</strong> teams</div>
         </div>
-        <div class="mt-6 text-xs" style="color:var(--text-muted)">
+
+        <div class="text-sm space-y-4" style="color:var(--text-secondary)">
+          <div>
+            <h3 class="font-semibold text-sm mb-1" style="color:var(--text-primary)">⚙️ Tech Stack</h3>
+            <p>Backend: <strong>Python FastAPI</strong> · Database: <strong>PostgreSQL 18</strong> (async via SQLAlchemy)</p>
+            <p>Frontend: <strong>Vanilla JS</strong> + <strong>Tailwind CSS</strong> (CDN) + <strong>Chart.js</strong></p>
+            <p>Infra: <strong>Docker Compose</strong> (VPS) · Frontend: <strong>Cloudflare Pages</strong> (auto-deploy from GitHub)</p>
+            <p>API Proxy: <strong>Cloudflare Tunnel</strong> → VPS localhost:8000</p>
+            <p>Domain: <strong>f1-analysis.edsuwarna.id</strong></p>
+          </div>
+
+          <div>
+            <h3 class="font-semibold text-sm mb-1" style="color:var(--text-primary)">🗄️ Data Source</h3>
+            <p><a href="https://openf1.org/" target="_blank" style="color:var(--text-primary);text-decoration:underline">OpenF1 API</a> — Real-time F1 timing data, telemetry, positions, weather</p>
+            <p>Data ingested on-demand via <code>docker compose run --rm ingestion</code></p>
+          </div>
+
+          <div>
+            <h3 class="font-semibold text-sm mb-1" style="color:var(--text-primary)">📊 Feature Sections</h3>
+            <div class="grid grid-cols-2 gap-2 text-xs mt-2">
+              <div>🏆 Best Sector Times</div>
+              <div>⏱️ Qualifying Evolution (Q1→Q3)</div>
+              <div>📈 Lap Distribution</div>
+              <div>🏁 Position History</div>
+              <div>⛽ Pit Strategy Battle</div>
+              <div>🛞 Tyre Strategy Timeline</div>
+              <div>⛽ Pit Stop Analysis</div>
+              <div>🌤️ Weather Impact</div>
+              <div>🤜🤛 Driver Comparison</div>
+              <div>📊 Gap Timeline</div>
+              <div>🏁 Overtake Analysis</div>
+              <div>🛞 Tyre Degradation</div>
+              <div>🏆 Championship Standings</div>
+            </div>
+          </div>
+
+          <div>
+            <h3 class="font-semibold text-sm mb-1" style="color:var(--text-primary)">🏗️ Architecture</h3>
+            <pre style="background:var(--bg-primary);padding:12px;border-radius:8px;font-size:11px;line-height:1.6;overflow-x:auto">
+┌──────────────────────────────────────────────────┐
+│              Cloudflare Pages (CDN)              │
+│         f1-analysis-dsp.pages.dev                │
+│           Vanilla JS + Chart.js                  │
+└──────────────────────┬───────────────────────────┘
+                       │ CF Tunnel (HTTPS)
+┌──────────────────────┴───────────────────────────┐
+│              VPS (Docker Compose)                 │
+│  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
+│  │ FastAPI  │  │PostgreSQL│  │  Ingestion    │  │
+│  │  :8000   │  │  :5432   │  │ (on-demand)   │  │
+│  └────┬─────┘  └──────────┘  └───────────────┘  │
+│       │                                          │
+│  ┌────┴─────┐                                    │
+│  │ OpenF1   │ (external API)                      │
+│  │ API      │                                    │
+│  └──────────┘                                    │
+└──────────────────────────────────────────────────┘
+            </pre>
+          </div>
+
+          <div>
+            <h3 class="font-semibold text-sm mb-1" style="color:var(--text-primary)">🔗 Links</h3>
+            <p>📦 GitHub: <a href="https://github.com/edsuwarna/f1-analysis" target="_blank" style="color:var(--text-primary);text-decoration:underline">github.com/edsuwarna/f1-analysis</a></p>
+            <p>📖 API Docs: <code>https://f1-analysis.edsuwarna.id/docs</code></p>
+            <p>🗓️ Data: 2026 FIA Formula 1 World Championship</p>
+          </div>
+        </div>
+
+        <div class="mt-6 text-xs text-center" style="color:var(--text-muted)">
           F1 is a trademark of Formula One Licensing B.V. This is an unofficial data analysis project.
         </div>
       </div>

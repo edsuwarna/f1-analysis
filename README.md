@@ -1,118 +1,152 @@
-# F1 Analysis
+# F1 Analysis 2026 🏎️
 
-> **Formula 1 Telemetry & Performance Analysis Platform**
-> 
-> A comprehensive web application for analyzing Formula 1 race data — lap times,
-> sector performance, telemetry, tyre strategy, and pit stops.
+> **Real-time Formula 1 telemetry & performance analysis platform.**
+>
+> A comprehensive web application for analyzing Formula 1 race data — sector times,
+> tyre strategy, driver comparisons, pit stop analysis, qualifying evolution,
+> gap timelines, overtake analysis, and more.
 
-## 🏎️ Features
+**Live demo:** [f1-analysis.edsuwarna.id](https://f1-analysis.edsuwarna.id)
 
-- **Sector Time Analysis** — Who's fastest in each sector, every session
-- **Driver Comparison** — Head-to-head telemetry and lap time overlay
-- **Championship Standings** — Driver & Constructor points, per-race results
-- **Qualifying Evolution** — Lap progression with improvement deltas
-- **Position History** — Race position changes lap by lap
-- **Tyre Strategy** — Compound tracking, stint visualization, undercut analysis
-- **Pit Stop Data** — Pit duration, lane loss, position changes
-- **Gap Timeline** — Cumulative gaps to leader lap by lap
-- **Tyre Degradation** — Lap time vs tyre age correlation
-- **Weather Data** — Track/air temperature, humidity, rainfall correlation
-- **Full Session Reports** — Complete data for FP1-3, Qualifying, Race, Sprint
+---
+
+## 📊 Features
+
+| Section | Description |
+|---|---|
+| 🏆 **Best Sector Times** | Fastest sector 1/2/3 per driver, auto-loaded on session open |
+| ⏱️ **Qualifying Evolution** | Q1→Q2→Q3 best lap progression with driver picker chart |
+| 📈 **Lap Distribution** | Pace vs consistency scatter chart per driver |
+| 🏁 **Position History** | Lap-by-lap race position with selectable drivers |
+| ⛽ **Pit Strategy Battle** | Undercut analysis, stint comparison, net position effect |
+| 🛞 **Tyre Strategy Timeline** | Compound mapping per driver with visual timeline |
+| ⛽ **Pit Stop Analysis** | Stop times, crew performance, fast/slowest stops |
+| 🌤️ **Weather Impact** | Air/track temperature, humidity, rainfall timeline |
+| 🤜🤛 **Driver Comparison** | Side-by-side lap/sector comparison |
+| 📊 **Gap Timeline** | Cumulative gap to leader with reference driver picker |
+| 🏁 **Overtake Analysis** | Position changes per lap, net overtakes ranking |
+| 🛞 **Tyre Degradation** | Lap time vs tyre age scatter plot (2 drivers, team colors) |
+| 🏆 **Championship Standings** | Driver & Constructor points with per-GP race results |
 
 ## 🏗️ Architecture
 
 ```
-┌──────────────────────────────────────────┐
-│              Docker Compose               │
-│  ┌──────────┐  ┌──────────┐              │
-│  │PostgreSQL│  │ FastAPI  │              │
-│  │  :5432   │  │  :8000   │              │
-│  └────┬─────┘  └────┬─────┘              │
-│       │              │                   │
-│  ┌────┴──────────────┘                   │
-│  │  Ingestion (Fast-F1)                  │
-│  └───────────────────────────────────────┘
-│                                           │
-│  Frontend: Separate (Cloudflare Pages)    │
-└───────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│              Cloudflare Pages (CDN)              │
+│         f1-analysis-dsp.pages.dev                │
+│           Vanilla JS + Chart.js                  │
+└──────────────────────┬───────────────────────────┘
+                       │ CF Tunnel (HTTPS)
+┌──────────────────────┴───────────────────────────┐
+│              VPS (Docker Compose)                 │
+│  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
+│  │ FastAPI  │  │PostgreSQL│  │  Ingestion    │  │
+│  │  :8000   │  │  :5432   │  │ (on-demand)   │  │
+│  └────┬─────┘  └──────────┘  └───────────────┘  │
+│       │                                          │
+│  ┌────┴─────┐                                    │
+│  │ OpenF1   │ (external API)                      │
+│  │ API      │                                    │
+│  └──────────┘                                    │
+└──────────────────────────────────────────────────┘
 ```
+
+**Tech Stack:**
+- **Backend:** Python FastAPI (async via SQLAlchemy)
+- **Database:** PostgreSQL 18 on Alpine
+- **Frontend:** Vanilla JS + Tailwind CSS (CDN) + Chart.js
+- **Infrastructure:** Docker Compose on VPS
+- **CDN:** Cloudflare Pages (auto-deploy from GitHub main)
+- **API Proxy:** Cloudflare Tunnel → localhost:8000
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose
+- Docker & Docker Compose v2
 - Git
 
 ### Setup
 
 ```bash
-# 1. Clone & start services
+# 1. Clone the repository
 git clone https://github.com/edsuwarna/f1-analysis.git
 cd f1-analysis
-make up
 
-# 2. Ingest a race weekend
-make ingest FILTERS="--year 2025 --gp Australia"
+# 2. Start database and API server
+docker compose up -d postgres backend
 
-# 3. Open API docs
-open http://localhost:8000/docs
+# 3. Ingest a race weekend
+docker compose run --rm ingestion python -m backend.ingestion.ingest_openf1 --year 2026 --gp Australia
+
+# 4. Open the app
+open http://localhost:8000
 ```
 
 ### Commands
 
-```bash
-make up             # Start DB + API
-make down           # Stop everything
-make ingest FILTERS="--year 2025 --gp Monaco"     # Ingest race
-make ingest-all YEAR=2025                          # Ingest full season
-make list-events YEAR=2025                         # List available races
-make logs           # View logs
-make reset-db       # Wipe and recreate database
-```
+| Command | Description |
+|---|---|
+| `docker compose up -d` | Start all services |
+| `docker compose down` | Stop all services |
+| `docker compose run --rm ingestion python -m backend.ingestion.ingest_openf1 --year 2026 --gp "Monaco"` | Ingest a specific GP |
+| `docker compose run --rm ingestion python -m backend.ingestion.ingest_openf1 --year 2026 --all` | Ingest full season |
+| `docker compose run --rm ingestion python -m backend.ingestion.ingest_openf1 --year 2026 --list` | List available GPs |
+| `docker compose logs -f backend` | View backend logs |
 
 ## 📡 API Endpoints
 
-| Endpoint | Description |
-|---|---|
-| `GET /api/meetings` | List race weekends |
-| `GET /api/meetings/{id}/sessions` | Sessions per weekend |
-| `GET /api/sessions/{id}/laps` | Lap times with sectors |
-| `GET /api/sessions/{id}/sectors` | Best sector times per driver |
-| `GET /api/sessions/{id}/stints` | Tyre compound strategy |
-| `GET /api/sessions/{id}/pit-stops` | Pit stop events |
-| `GET /api/sessions/{id}/gaps` | Gap timeline (cumulative gap to leader) |
-| `GET /api/sessions/{id}/positions` | Position history (lap-by-lap race position) |
-| `GET /api/sessions/{id}/qualifying-evolution` | Qualifying lap progression (deltas, personal bests) |
-| `GET /api/sessions/{id}/telemetry/{driver}` | Car telemetry data |
-| `GET /api/sessions/{id}/compare/{d1}/{d2}` | Head-to-head comparison |
-| `GET /api/sessions/{id}/weather` | Weather timeline |
-| `GET /api/analytics/sectors?year=2025` | Season sector trends |
-| `GET /api/analytics/driver-progress/{num}` | Driver season progress |
-| `GET /api/analytics/championship?year=2025` | Driver & Constructor standings |
-| `GET /api/analytics/lap-distribution?session_id=N` | Per-driver lap stats (avg, median, stddev) |
-| `GET /api/analytics/sessions/{id}/pit-strategy` | Pit stop impact analysis (undercut deltas) |
+### Meetings
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/meetings` | List all race weekends (optional `?year=2026`) |
+| GET | `/api/meetings/{id}` | Get meeting details |
+| GET | `/api/meetings/{id}/sessions` | List sessions in a meeting (FP1-3, Qualifying, Race, Sprint) |
 
-Full API docs at `http://localhost:8000/docs`
+### Sessions
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/sessions/{id}` | Session details |
+| GET | `/api/sessions/{id}/drivers` | Drivers in session (with team colours) |
+| GET | `/api/sessions/{id}/laps` | Lap times with sectors, compound, tyre age, position |
+| GET | `/api/sessions/{id}/sectors` | Best sector 1/2/3 + theoretical best lap |
+| GET | `/api/sessions/{id}/stints` | Tyre stint information |
+| GET | `/api/sessions/{id}/pit-stops` | Pit stop events |
+| GET | `/api/sessions/{id}/gaps` | Gap timeline (cumulative to leader) |
+| GET | `/api/sessions/{id}/positions` | Position history (lap-by-lap) |
+| GET | `/api/sessions/{id}/qualifying-evolution` | Lap-by-lap qualifying progression |
+| GET | `/api/sessions/{id}/telemetry/{driver}` | Telemetry (speed, throttle, brake, DRS, RPM, gear) |
+| GET | `/api/sessions/{id}/compare/{d1}/{d2}` | Head-to-head driver comparison |
+| GET | `/api/sessions/{id}/weather` | Weather timeline (temp, humidity, pressure, wind) |
 
-## 🗄️ Database Schema
+### Analytics
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/analytics/sectors?year=2026` | Season-wide sector trends |
+| GET | `/api/analytics/driver-progress/{num}?year=2026` | Driver's season performance |
+| GET | `/api/analytics/championship?year=2026` | Driver & Constructor standings + per-GP results |
+| GET | `/api/analytics/lap-distribution?session_id=N` | Lap stats (avg, median, stddev, consistency) |
+| GET | `/api/analytics/sessions/{id}/pit-strategy` | Pit stop impact analysis (undercut deltas) |
+| GET | `/api/analytics/tyre-strategy?meeting_id=N` | Tyre strategy summary |
+| GET | `/api/analytics/qualifying-summary?meeting_id=N` | Q1→Q2→Q3 best lap progression (auto-segmented) |
 
-**Core tables:**
-- `meetings` — Race weekends
-- `sessions` — FP1/FP2/FP3/Qualifying/Race/Sprint
-- `session_drivers` — Drivers per session
-- `laps` — Lap data with sector 1/2/3 times
-- `telemetry` — High-frequency car data (speed, throttle, brake, DRS, RPM, gear)
-- `stints` — Tyre compound stints
-- `pit_stops` — Pit stop events
-- `weather` — Track conditions timeline
-- `race_control_messages` — Flags, SC, VSC, penalties
+Full interactive API docs at `/docs` (Swagger UI) when backend is running.
 
-## 📊 Data Sources
+## 🗄️ Database
 
-- **[Fast-F1](https://github.com/theOehrly/Fast-F1)** — Python library for F1 timing data & telemetry
-- **[OpenF1 API](https://openf1.org/)** — Free & open-source F1 API (supplementary)
-- **[jolpica-f1](https://api.jolpi.ca/ergast/f1/)** — Historical F1 data (Ergast replacement)
+**Core tables:** `meetings`, `sessions`, `session_drivers`, `laps`, `telemetry`, `stints`, `pit_stops`, `weather`, `race_control_messages`
+
+Data ingested from [OpenF1 API](https://openf1.org/) — free & open-source F1 timing data.
+
+## 🎨 Frontend Highlights
+
+- **Dark/Light theme** — persisted to localStorage
+- **Responsive** — mobile-first with touch targets (44px+ buttons)
+- **Floating ToC** — "Jump to Section" bottom sheet for session pages
+- **Collapsible sections** — click to expand/collapse analysis cards
+- **Driver picker** — checkbox-based filtering on Gap Timeline, Qualifying Evolution
+- **Section caching** — qualifying data cached client-side for instant re-render
+- **Auto-loaded sectors** — Best Sector Times loads immediately on session open
 
 ## 📄 License
 
-MIT License
+MIT — Endang Suwarna
