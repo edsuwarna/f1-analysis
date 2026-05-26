@@ -624,6 +624,25 @@
         </div>
       </div>`;
 
+      // ── Lap Distribution ──
+      html += `
+      <div class="card p-5 mb-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm">📈 Lap Distribution
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Pace vs consistency analysis</span>
+          </h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body closed">
+          <div id="lapdist-chart-area">
+            <div class="text-center py-8" style="color:var(--text-muted)">
+              <button onclick="loadLapDistribution(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">📈 Load Lap Distribution</button>
+              <div class="mt-2 text-xs">Scatter plot of all lap times — faster at top, wider spread = less consistent</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
       // ── Position History (Race only) ──
       html += `
       <div class="card p-5 mb-6">
@@ -930,6 +949,7 @@
   let gapChartInstance = null;
   let posChartInstance = null;
   let qevoChartInstance = null;
+  let lapdistChartInstance = null;
 
   // ── Tyre Degradation ──
   async function loadDegradation(sessionId) {
@@ -1489,6 +1509,146 @@
     }
   }
 
+  // ── Lap Distribution ──
+  async function loadLapDistribution(sessionId) {
+    const el = document.getElementById('lapdist-chart-area');
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading lap distribution...</div>';
+
+    if (lapdistChartInstance) { lapdistChartInstance.destroy(); lapdistChartInstance = null; }
+
+    try {
+      const data = await api(`/analytics/lap-distribution?session_id=${sessionId}`);
+      const drivers = data.drivers;
+
+      if (!drivers || drivers.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No lap data available</div>';
+        return;
+      }
+
+      // Stats table
+      let html = `
+        <div class="overflow-x-auto mb-4">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Driver</th><th>Team</th>
+                <th class="text-right">Laps</th>
+                <th class="text-right">Avg</th>
+                <th class="text-right">Median</th>
+                <th class="text-right">σ (StdDev)</th>
+                <th class="text-right">Best</th>
+                <th class="text-right">Range</th>
+                <th class="text-right">🎯 Consistency</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      for (let i = 0; i < drivers.length; i++) {
+        const d = drivers[i];
+        const teamC = d.team_colour ? teamColor(d.team_colour) : '#666';
+        html += `
+          <tr>
+            <td style="color:var(--text-secondary)">${i + 1}</td>
+            <td class="font-medium">${d.acronym}</td>
+            <td><span class="team-badge" style="background:${teamC};color:#fff">${d.team_name.replace(/ F1 Team$/, '').substring(0,12)}</span></td>
+            <td class="text-right" style="color:var(--text-secondary)">${d.total_laps}</td>
+            <td class="text-right font-mono">${d.avg_lap_time.toFixed(3)}s</td>
+            <td class="text-right font-mono font-bold">${d.median_lap_time.toFixed(3)}s</td>
+            <td class="text-right font-mono" style="color:${d.std_dev < 3 ? '#16a34a' : d.std_dev < 6 ? '#f59e0b' : '#dc2626'}">±${d.std_dev.toFixed(3)}s</td>
+            <td class="text-right font-mono" style="color:#a855f7;font-weight:700">${d.fastest_lap.toFixed(3)}s</td>
+            <td class="text-right font-mono" style="color:var(--text-secondary)">${d.range.toFixed(2)}s</td>
+            <td class="text-right font-mono font-bold" style="color:${d.consistency > 90 ? '#16a34a' : d.consistency > 80 ? '#f59e0b' : '#dc2626'}">${d.consistency}%</td>
+          </tr>
+        `;
+      }
+      html += `</tbody></table></div>`;
+
+      // Pace vs Consistency scatter chart
+      html += `<div class="text-xs mb-3" style="color:var(--text-muted)">
+        <strong>Pace vs Consistency</strong> — Lower & Left = Fast & Consistent 🏆 · Higher & Right = Slow & Inconsistent
+        (Hover for details)
+      </div>
+      <div class="relative" style="height:350px;margin-bottom:16px">
+        <canvas id="lapdist-chart-canvas-${sessionId}"></canvas>
+      </div>`;
+
+      el.innerHTML = html;
+
+      // Init chart
+      setTimeout(() => {
+        const canvas = document.getElementById(`lapdist-chart-canvas-${sessionId}`);
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const isLight = document.documentElement.classList.contains('light');
+        const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+        const textColor = isLight ? '#64748b' : '#8b949e';
+
+        const points = drivers.map(d => ({
+          x: d.avg_lap_time,
+          y: d.std_dev,
+          label: d.acronym,
+          consistency: d.consistency,
+          median: d.median_lap_time,
+          team: d.team_name,
+          team_colour: d.team_colour ? teamColor(d.team_colour) : '#666',
+          total_laps: d.total_laps,
+        }));
+
+        const datasets = [{
+          label: 'Drivers',
+          data: points,
+          backgroundColor: points.map(p => p.team_colour),
+          borderColor: points.map(p => p.team_colour),
+          borderWidth: 2,
+          pointRadius: 8,
+          pointHoverRadius: 12,
+        }];
+
+        lapdistChartInstance = new Chart(ctx, {
+          type: 'scatter',
+          data: { datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 400 },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    const p = ctx.parsed;
+                    const d = points[ctx.dataIndex];
+                    return [
+                      `${d.label}`,
+                      `Avg: ${p.x.toFixed(3)}s · Median: ${d.median.toFixed(3)}s`,
+                      `σ: ±${p.y.toFixed(3)}s · 🎯 ${d.consistency}%`,
+                      `Team: ${d.team} · ${d.total_laps} laps`,
+                    ];
+                  },
+                },
+              },
+            },
+            scales: {
+              x: {
+                title: { display: true, text: 'Average Lap Time (s) → Slower', color: textColor, font: { size: 11 } },
+                grid: { color: gridColor },
+                ticks: { color: textColor, font: { size: 10 } },
+              },
+              y: {
+                title: { display: true, text: 'Std Deviation (s) → Less Consistent', color: textColor, font: { size: 11 } },
+                grid: { color: gridColor },
+                ticks: { color: textColor, font: { size: 10 } },
+                beginAtZero: true,
+              },
+            },
+          },
+        });
+      }, 100);
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
+  }
+
   // ── Position History ──
   async function loadPositionHistory(sessionId) {
     const el = document.getElementById('pos-chart-area');
@@ -1920,7 +2080,7 @@
           <p><strong>Data Source:</strong> OpenF1 API + FastAPI Backend</p>
           <p><strong>Database:</strong> PostgreSQL 18</p>
           <p><strong>Season:</strong> 2026</p>
-          <p><strong>Features:</strong> Sector times · Championship Standings · Qualifying Evolution · Position History · Tyre strategy timeline · Pit stop analysis · Weather impact · Driver comparison · Gap Timeline · Tyre degradation</p>
+          <p><strong>Features:</strong> Sector times · Lap Distribution · Championship Standings · Qualifying Evolution · Position History · Tyre strategy timeline · Pit stop analysis · Weather impact · Driver comparison · Gap Timeline · Tyre degradation</p>
           <p class="mt-4"><strong>GitHub:</strong> <a href="https://github.com/edsuwarna/f1-analysis" target="_blank" style="color:var(--text-primary);text-decoration:underline">github.com/edsuwarna/f1-analysis</a></p>
         </div>
         <div class="mt-6 text-xs" style="color:var(--text-muted)">

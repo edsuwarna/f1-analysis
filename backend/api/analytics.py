@@ -4,9 +4,10 @@ Analytics API — Aggregated insights and cross-race analysis.
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from backend.core.database import get_db
+from backend.models.models import Session, SessionDriver, Lap
 
 router = APIRouter()
 
@@ -241,6 +242,106 @@ async def championship_standings(
         "driver_standings": driver_standings,
         "constructor_standings": constructor_standings,
         "races": race_list,
+    }
+
+
+@router.get("/lap-distribution")
+async def lap_distribution(
+    session_id: int = Query(None, description="Session ID (required)"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lap time distribution stats per driver for a session.
+
+    Returns per-driver statistics: avg, median, stdDev, min, max,
+    plus all individual lap times for charting. Great for consistency analysis.
+    """
+    if not session_id:
+        return {"error": "session_id query param required"}
+
+    # Get all valid laps
+    result = await db.execute(
+        select(Lap)
+        .where(
+            Lap.session_id == session_id,
+            Lap.lap_duration.isnot(None),
+            Lap.lap_duration > 10,
+        )
+        .order_by(Lap.driver_number, Lap.lap_number)
+    )
+    laps = result.scalars().all()
+
+    if not laps:
+        return {"session_id": session_id, "drivers": []}
+
+    # Fetch driver info
+    drv_result = await db.execute(
+        select(SessionDriver).where(SessionDriver.session_id == session_id)
+    )
+    driver_info = {}
+    for d in drv_result.scalars().all():
+        driver_info[d.driver_number] = {
+            "acronym": d.name_acronym,
+            "full_name": d.full_name,
+            "team_name": d.team_name,
+            "team_colour": d.team_colour,
+        }
+
+    from collections import defaultdict
+    import math
+
+    by_driver = defaultdict(list)
+    for l in laps:
+        by_driver[l.driver_number].append(l.lap_duration)
+
+    drivers_data = []
+    for dn, times in by_driver.items():
+        times.sort()
+        n = len(times)
+        avg = sum(times) / n
+        # Median
+        mid = n // 2
+        median = times[mid] if n % 2 else (times[mid - 1] + times[mid]) / 2
+        # Std dev
+        variance = sum((t - avg) ** 2 for t in times) / n
+        std_dev = math.sqrt(variance)
+        # Min/Max
+        lap_min = times[0]
+        lap_max = times[-1]
+        # Consistency score: lower std_dev / median = more consistent
+        consistency = round((1 - (std_dev / median)) * 100, 1) if median > 0 else 0
+
+        info = driver_info.get(dn, {})
+        drivers_data.append({
+            "driver_number": dn,
+            "acronym": info.get("acronym", f"#{dn}"),
+            "full_name": info.get("full_name", ""),
+            "team_name": info.get("team_name", "Unknown"),
+            "team_colour": info.get("team_colour", ""),
+            "total_laps": n,
+            "avg_lap_time": round(avg, 3),
+            "median_lap_time": round(median, 3),
+            "std_dev": round(std_dev, 3),
+            "fastest_lap": round(lap_min, 3),
+            "slowest_lap": round(lap_max, 3),
+            "range": round(lap_max - lap_min, 3),
+            "consistency": consistency,
+            "lap_times": [round(t, 3) for t in times],
+        })
+
+    # Sort by best lap
+    drivers_data.sort(key=lambda x: x["fastest_lap"])
+
+    # Determine session info
+    sess_result = await db.execute(select(Session).where(Session.id == session_id))
+    sess = sess_result.scalar_one_or_none()
+
+    return {
+        "session_id": session_id,
+        "session_name": sess.session_name if sess else None,
+        "session_type": sess.session_type if sess else None,
+        "total_drivers": len(drivers_data),
+        "total_laps": sum(d["total_laps"] for d in drivers_data),
+        "drivers": drivers_data,
     }
 
 
