@@ -51,6 +51,7 @@
   .sector-badge { font-variant-numeric: tabular-nums; }
   .team-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
   .team-badge { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; line-height: 1.4; }
+  .team-logo { display: inline-block; height: 20px; width: auto; vertical-align: middle; object-fit: contain; }
   .nav-link { color: var(--text-secondary); cursor: pointer; padding: 8px 16px; border-radius: 6px; transition: all .15s; }
   .nav-link:hover { color: var(--text-primary); background: var(--hover-bg); }
   .nav-link.active { color: #fff; background: #e10600; }
@@ -284,9 +285,26 @@
     return '#' + colour;
   }
 
-  // ── Team Badge ──
+  // ── Team Logo & Badge ──
+  const TEAM_LOGO_MAP = {
+    'Alpine': 'alpine.svg',
+    'Aston Martin': 'aston-martin.svg',
+    'Audi': 'audi.svg',
+    'Cadillac': 'cadillac.svg',
+    'Ferrari': 'ferrari.svg',
+    'Haas F1 Team': 'haas.svg',
+    'McLaren': 'mclaren.svg',
+    'Mercedes': 'mercedes.svg',
+    'Racing Bulls': 'racing-bulls.svg',
+    'Red Bull Racing': 'red-bull-racing.svg',
+    'Williams': 'williams.svg',
+  };
+
   function teamBadge(teamName, colour) {
     const c = teamColor(colour);
+    if (teamName && TEAM_LOGO_MAP[teamName]) {
+      return `<img class="team-logo" src="logos/${TEAM_LOGO_MAP[teamName]}" alt="${teamName}" title="${teamName}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block'" onload="this.style.display='inline-block';this.nextElementSibling.style.display='none'"><span class="team-badge" style="background:${c};color:#fff;border:1px solid rgba(255,255,255,0.1);display:none">${teamName.replace(/ F1 Team$/, '').replace(/ Team$/, '').substring(0, 12)}</span>`;
+    }
     const acronym = (teamName || '').replace(/ F1 Team$/, '').replace(/ Team$/, '').substring(0, 12);
     return `<span class="team-badge" style="background:${c};color:#fff;border:1px solid rgba(255,255,255,0.1)">${acronym}</span>`;
   }
@@ -796,11 +814,11 @@
           <div class="collapse-body closed">
           <div class="flex flex-wrap gap-3 items-center">
             <select id="comp-drv1">
-              ${drivers.map(d => `<option value="${d.driver_number}">${d.full_name} (${d.name_acronym})</option>`).join('')}
+              ${drivers.map(d => `<option value="${d.driver_number}"${d.driver_number === 3 ? ' selected' : ''}>${d.full_name} (${d.name_acronym})</option>`).join('')}
             </select>
             <span style="color:var(--text-secondary)">vs</span>
             <select id="comp-drv2">
-              ${drivers.map(d => `<option value="${d.driver_number}">${d.full_name} (${d.name_acronym})</option>`).join('')}
+              ${drivers.map(d => `<option value="${d.driver_number}"${d.driver_number === 44 ? ' selected' : ''}>${d.full_name} (${d.name_acronym})</option>`).join('')}
             </select>
             <button onclick="compareDrivers(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">Compare</button>
           </div>
