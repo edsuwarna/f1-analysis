@@ -810,6 +810,7 @@ async def teammate_battle(
             "driver_number": r.driver_number,
             "full_name": r.full_name or f"#{r.driver_number}",
             "acronym": r.name_acronym or f"#{r.driver_number}",
+            "team_colour": r.team_colour or "",
             "best_qual_lap": r.best_qual_lap,
             "best_race_lap": r.best_race_lap,
             "best_s1": r.best_s1,
@@ -1050,7 +1051,7 @@ async def head_to_head(
               AND s.meeting_id IN (SELECT id FROM meetings WHERE year = :year2)
         ),
         race_positions AS (
-            SELECT
+            SELECT DISTINCT ON (s.meeting_id, l.driver_number)
                 s.meeting_id,
                 l.driver_number,
                 l.position
@@ -1058,13 +1059,8 @@ async def head_to_head(
             JOIN sessions s ON s.id = l.session_id
             WHERE s.session_name = 'Race'
               AND l.position IS NOT NULL AND l.position > 0
-              AND l.lap_number = (
-                  SELECT MAX(l2.lap_number)
-                  FROM laps l2
-                  WHERE l2.session_id = l.session_id
-                    AND l2.driver_number = l.driver_number
-              )
               AND s.meeting_id IN (SELECT id FROM meetings WHERE year = :year3)
+            ORDER BY s.meeting_id, l.driver_number, l.lap_number DESC
         )
         SELECT
             ro.meeting_id,
