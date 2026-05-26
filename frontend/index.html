@@ -1063,47 +1063,57 @@
         return;
       }
 
-      const compoundColors = {
-        'SOFT': '#e10600', 'MEDIUM': '#d97706', 'HARD': '#6b7280',
-        'INTERMEDIATE': '#2d7d46', 'WET': '#1a5c7a'
-      };
       const compoundLabels = { 'SOFT': 'Soft', 'MEDIUM': 'Medium', 'HARD': 'Hard', 'INTERMEDIATE': 'Intermediate', 'WET': 'Wet' };
+      const lineDashMap = { 'SOFT': [], 'MEDIUM': [6, 4], 'HARD': [3, 6], 'INTERMEDIATE': [10, 4, 4, 4], 'WET': [4, 4, 8, 4] };
 
-      // Darken a hex color for Driver 2 differentiation
-      function darkenColor(hex, amount = 40) {
-        const c = hex.replace('#', '');
-        const r = Math.max(0, parseInt(c.substring(0,2), 16) - amount);
-        const g = Math.max(0, parseInt(c.substring(2,4), 16) - amount);
-        const b = Math.max(0, parseInt(c.substring(4,6), 16) - amount);
-        return `rgb(${r},${g},${b})`;
-      }
+      // Driver 1 team color
+      const d1color = f1.length > 0 && f1[0].team_colour ? `#${f1[0].team_colour.replace('#', '')}` : '#e10600';
+      // Driver 2 team color
+      const d2color = f2.length > 0 && f2[0].team_colour ? `#${f2[0].team_colour.replace('#', '')}` : '#16a34a';
 
       const datasets = [];
-      // Driver 1 — solid lines, full color
+
+      // Darken a driver color for Driver 2 (keeps distinct hue)
+      function driverColor(hex, darkenPct = 0) {
+        const c = hex.replace('#', '');
+        const r = Math.max(0, Math.min(255, parseInt(c.substring(0,2), 16) * (1 - darkenPct)));
+        const g = Math.max(0, Math.min(255, parseInt(c.substring(2,4), 16) * (1 - darkenPct)));
+        const b = Math.max(0, Math.min(255, parseInt(c.substring(4,6), 16) * (1 - darkenPct)));
+        return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+      }
+
+      // Driver 1 — team color, solid circle points
       for (const compound of [...new Set(f1.map(l => l.compound))]) {
         const pts = f1.filter(l => l.compound === compound);
         datasets.push({
           label: `${d1name} ${compoundLabels[compound] || compound}`,
           data: pts.map(l => ({ x: l.tyre_age, y: l.lap_duration })),
-          borderColor: compoundColors[compound] || '#666',
-          backgroundColor: compoundColors[compound] || '#666',
+          borderColor: d1color,
+          backgroundColor: d1color,
           borderWidth: 2,
-          pointRadius: 3,
+          borderDash: lineDashMap[compound] || [],
+          pointRadius: 4,
+          pointStyle: 'circle',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 1,
           tension: 0.3,
         });
       }
-      // Driver 2 — dashed lines, darkened colors for contrast
+      // Driver 2 — darker team color, square points
+      const d2colorDark = driverColor(d2color, 0.2);
       for (const compound of [...new Set(f2.map(l => l.compound))]) {
         const pts = f2.filter(l => l.compound === compound);
         datasets.push({
           label: `${d2name} ${compoundLabels[compound] || compound}`,
           data: pts.map(l => ({ x: l.tyre_age, y: l.lap_duration })),
-          borderColor: darkenColor(compoundColors[compound] || '#666', 50),
-          backgroundColor: darkenColor(compoundColors[compound] || '#666', 50),
-          borderDash: [6, 4],
+          borderColor: d2colorDark,
+          backgroundColor: d2colorDark,
           borderWidth: 2,
-          pointRadius: 4,
+          borderDash: lineDashMap[compound] || [],
+          pointRadius: 5,
           pointStyle: 'rectRot',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 1,
           tension: 0.3,
         });
       }
@@ -1125,6 +1135,11 @@
             <div class="font-bold" style="color:${drv2Meta}">${d2name}</div>
             <div>Avg: ${avg2}s · Laps: ${f2.length}</div>
           </div>
+        </div>
+        <div class="text-xs mb-2 flex flex-wrap gap-3 justify-center" style="color:var(--text-muted)">
+          <span>● <strong style="color:${drv1Meta}">${d1name}</strong> (circle · team color)</span>
+          <span>■ <strong style="color:${drv2Meta}">${d2name}</strong> (square · darker shade)</span>
+          <span>— Solid = Soft · — — = Medium · · · = Hard</span>
         </div>
         <div class="relative" style="height:350px">
           <canvas id="deg-chart-canvas"></canvas>
