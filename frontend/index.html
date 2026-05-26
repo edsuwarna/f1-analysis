@@ -644,7 +644,7 @@
       </div>`;
 
       // ── Position History (Race/Sprint only) ──
-      ${(sessionType === 'Race' || sessionName === 'Sprint' || sessionName === 'Race') ? `
+      html += `${(sessionType === 'Race' || sessionName === 'Sprint' || sessionName === 'Race') ? `
       <div class="card p-5 mb-6">
         <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
           <h3 class="font-semibold text-sm">🏁 Position History
@@ -687,7 +687,7 @@
             </div>
           </div>
         </div>
-      </div>` : ''}
+      </div>` : ''}`;
 
       // ── Tyre Strategy Timeline ──
       if (stints.length > 0) {
@@ -1286,7 +1286,7 @@
                   <tr>
                     <td style="color:var(--text-secondary)">${i + 1}</td>
                     <td class="font-medium">${s.acronym || `#${dn}`}</td>
-                    <td>${s.team_name ? `<span class="team-badge" style="background:#${s.team_colour?.replace('#', '') || '666'};color:#fff">${s.team_name.replace(/ F1 Team$/, '').replace(/ Team$/, '').substring(0, 12)}</span>` : '—'}</td>
+                    <td>${s.team_name ? teamBadge(s.team_name, s.team_colour) : '—'}</td>
                     <td class="text-right font-mono ${isLeader ? 'font-bold' : ''}" style="${isLeader ? 'color:#16a34a' : ''}">${isLeader ? '0.000s (P1)' : '+' + finalGap.toFixed(3) + 's'}</td>
                     <td class="text-right font-mono" style="color:var(--text-secondary)">${maxGap > 0 ? '+' + maxGap.toFixed(1) + 's' : '—'}</td>
                     <td class="text-right font-mono" style="color:var(--text-secondary)">${avgGap > 0 ? '+' + avgGap.toFixed(2) + 's' : '0.00s'}</td>
@@ -1378,6 +1378,21 @@
 
       let html = '';
 
+      // Per-driver lap progression
+      html += `<div class="text-xs mb-3" style="color:var(--text-muted)">
+        <span class="font-bold" style="color:#16a34a">🟢 Improvement</span> ·
+        <span class="font-bold" style="color:#dc2626">🔴 Slower</span> ·
+        <span class="font-bold" style="color:#a855f7">🟣 Personal Best</span>
+      </div>`;
+
+      // Chart: lap time evolution per driver (scatter/line)
+      const maxRuns = Math.max(...evolution.map(e => e.total_runs));
+      if (bestTimes.length >= 3) {
+        html += `<div class="relative" style="height:350px;margin-bottom:16px">
+          <canvas id="qevo-chart-canvas-${sessionId}"></canvas>
+        </div>`;
+      }
+
       // Best lap ranking
       html += `
         <div class="overflow-x-auto mb-4">
@@ -1400,7 +1415,7 @@
           <tr>
             <td style="color:var(--text-secondary)">${i + 1}</td>
             <td class="font-medium">${d.acronym}</td>
-            <td>${d.team_name ? `<span class="team-badge" style="background:${teamColor(d.team_colour)};color:#fff">${d.team_name.replace(/ F1 Team$/, '').substring(0,12)}</span>` : '—'}</td>
+            <td>${d.team_name ? teamBadge(d.team_name, d.team_colour) : '—'}</td>
             <td class="text-right font-mono font-bold">${formatTime(d.best_lap_time)}</td>
             <td class="text-right" style="color:var(--text-secondary)">${evolution.find(e => e.driver_number === d.driver_number)?.total_runs || '—'}</td>
             <td class="text-right font-mono" style="${gap > 0 ? 'color:#f59e0b' : 'color:#16a34a;font-weight:700'}">${gap > 0 ? '+' + gap.toFixed(3) + 's' : '—'}</td>
@@ -1408,21 +1423,6 @@
         `;
       }
       html += `</tbody></table></div>`;
-
-      // Per-driver lap progression
-      html += `<div class="text-xs mb-3" style="color:var(--text-muted)">
-        <span class="font-bold" style="color:#16a34a">🟢 Improvement</span> ·
-        <span class="font-bold" style="color:#dc2626">🔴 Slower</span> ·
-        <span class="font-bold" style="color:#a855f7">🟣 Personal Best</span>
-      </div>`;
-
-      // Chart: lap time evolution per driver (scatter/line)
-      const maxRuns = Math.max(...evolution.map(e => e.total_runs));
-      if (bestTimes.length >= 3) {
-        html += `<div class="relative" style="height:350px;margin-bottom:16px">
-          <canvas id="qevo-chart-canvas-${sessionId}"></canvas>
-        </div>`;
-      }
 
       // Table: per-driver lap progression with deltas
       html += `<div class="overflow-x-auto" style="max-height:600px;overflow-y:auto">
@@ -1573,8 +1573,19 @@
         return;
       }
 
-      // Stats table
+      // Pace vs Consistency scatter chart
       let html = `
+        <div class="text-xs mb-3" style="color:var(--text-muted)">
+          <strong>Pace vs Consistency</strong> — Lower & Left = Fast & Consistent 🏆 · Higher & Right = Slow & Inconsistent
+          (Hover for details)
+        </div>
+        <div class="relative" style="height:350px;margin-bottom:16px">
+          <canvas id="lapdist-chart-canvas-${sessionId}"></canvas>
+        </div>
+      `;
+
+      // Stats table
+      html += `
         <div class="overflow-x-auto mb-4">
           <table>
             <thead>
@@ -1598,7 +1609,7 @@
           <tr>
             <td style="color:var(--text-secondary)">${i + 1}</td>
             <td class="font-medium">${d.acronym}</td>
-            <td><span class="team-badge" style="background:${teamC};color:#fff">${d.team_name.replace(/ F1 Team$/, '').substring(0,12)}</span></td>
+            <td>${teamBadge(d.team_name, d.team_colour)}</td>
             <td class="text-right" style="color:var(--text-secondary)">${d.total_laps}</td>
             <td class="text-right font-mono">${d.avg_lap_time.toFixed(3)}s</td>
             <td class="text-right font-mono font-bold">${d.median_lap_time.toFixed(3)}s</td>
@@ -1610,15 +1621,6 @@
         `;
       }
       html += `</tbody></table></div>`;
-
-      // Pace vs Consistency scatter chart
-      html += `<div class="text-xs mb-3" style="color:var(--text-muted)">
-        <strong>Pace vs Consistency</strong> — Lower & Left = Fast & Consistent 🏆 · Higher & Right = Slow & Inconsistent
-        (Hover for details)
-      </div>
-      <div class="relative" style="height:350px;margin-bottom:16px">
-        <canvas id="lapdist-chart-canvas-${sessionId}"></canvas>
-      </div>`;
 
       el.innerHTML = html;
 
@@ -1751,7 +1753,20 @@
             <div>Slowest Stop (${slowestD} L${slowestL})</div>
           </div>
         </div>
+      `;
 
+      // Pit stop timing chart
+      html += `
+        <div class="text-xs mb-3" style="color:var(--text-muted)">
+          <strong>Pit Stop Duration Distribution</strong> — each dot = one stop. Green = fast (&lt;23s), Red = slow (&gt;30s).
+        </div>
+        <div class="relative" style="height:250px;margin-bottom:16px">
+          <canvas id="pitstrategy-chart-canvas-${sessionId}"></canvas>
+        </div>
+      `;
+
+      // Pit stops detail table
+      html += `
         <div class="overflow-x-auto mb-4" style="max-height:500px;overflow-y:auto">
           <table>
             <thead>
@@ -1801,16 +1816,6 @@
         `;
       }
       html += `</tbody></table></div>`;
-
-      // Pit stop timing chart
-      html += `
-        <div class="text-xs mb-3" style="color:var(--text-muted)">
-          <strong>Pit Stop Duration Distribution</strong> — each dot = one stop. Green = fast (&lt;23s), Red = slow (&gt;30s).
-        </div>
-        <div class="relative" style="height:250px;margin-bottom:16px">
-          <canvas id="pitstrategy-chart-canvas-${sessionId}"></canvas>
-        </div>
-      `;
 
       el.innerHTML = html;
 
@@ -1969,7 +1974,20 @@
             <div>Drivers</div>
           </div>
         </div>
+      `;
 
+      // Chart: per-lap overtakes (bar chart: green=gained, red=lost)
+      html += `
+        <div class="text-xs mb-3" style="color:var(--text-muted)">
+          <strong>Overtakes Per Lap</strong> — 🟢 Green bars = positions gained, 🔴 Red = positions lost. Hover for details.
+        </div>
+        <div class="relative" style="height:300px;margin-bottom:16px">
+          <canvas id="overtake-chart-canvas-${sessionId}"></canvas>
+        </div>
+      `;
+
+      // Top overtakers table
+      html += `
         <div class="overflow-x-auto mb-4">
           <table>
             <thead>
@@ -1992,16 +2010,6 @@
         `;
       });
       html += `</tbody></table></div>`;
-
-      // Chart: per-lap overtakes (bar chart: green=gained, red=lost)
-      html += `
-        <div class="text-xs mb-3" style="color:var(--text-muted)">
-          <strong>Overtakes Per Lap</strong> — 🟢 Green bars = positions gained, 🔴 Red = positions lost. Hover for details.
-        </div>
-        <div class="relative" style="height:300px;margin-bottom:16px">
-          <canvas id="overtake-chart-canvas-${sessionId}"></canvas>
-        </div>
-      `;
 
       el.innerHTML = html;
 
@@ -2096,6 +2104,8 @@
   }
 
   // ── Position History ──
+  let posSelectedDrivers = [];
+
   async function loadPositionHistory(sessionId) {
     const el = document.getElementById('pos-chart-area');
     el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading position data...</div>';
@@ -2112,7 +2122,7 @@
         return;
       }
 
-      // Group by lap
+      // Group by lap + driver map
       const lapPositions = {};
       const driverMap = {};
       for (const entry of timeline) {
@@ -2129,179 +2139,127 @@
       const allDrivers = Object.keys(driverMap).map(Number);
       const allLaps = Object.keys(lapPositions).map(Number).sort((a, b) => a - b);
 
-      // Build per-driver position series
-      const labels = [];
-      for (let i = 1; i <= maxLap; i++) labels.push(i);
+      // Initialize selection: all checked
+      if (posSelectedDrivers.length === 0) posSelectedDrivers = [...allDrivers];
 
-      // Driver colors
-      const DRIVER_COLORS = [
-        '#e10600', '#16a34a', '#3b82f6', '#f59e0b', '#8b5cf6',
-        '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16',
-        '#dc2626', '#6366f1', '#d946ef', '#22c55e', '#eab308',
-        '#64748b', '#0ea5e9', '#a855f7', '#10b981', '#9ca3af',
-      ];
-
-      let colorIdx = 0;
-      const datasets = [];
-      const sortedDrivers = [...allDrivers].sort((a, b) => {
-        // Sort by final position (lower is better)
-        const aLast = lapPositions[allLaps[allLaps.length - 1]]?.find(e => e.driver_number === a);
-        const bLast = lapPositions[allLaps[allLaps.length - 1]]?.find(e => e.driver_number === b);
-        return (aLast?.position || 99) - (bLast?.position || 99);
-      });
-
-      for (const dn of sortedDrivers) {
-        const info = driverMap[dn];
-        const color = info.team_colour
-          ? `#${info.team_colour.replace('#', '')}`
-          : DRIVER_COLORS[colorIdx % DRIVER_COLORS.length];
-        colorIdx++;
-
-        const data = [];
-        for (let i = 1; i <= maxLap; i++) {
-          const entry = lapPositions[i]?.find(e => e.driver_number === dn);
-          data.push(entry?.position || null);
-        }
-
-        datasets.push({
-          label: info.acronym || `#${dn}`,
-          data: data,
-          borderColor: color,
-          backgroundColor: color,
-          borderWidth: 2,
-          pointRadius: 1.5,
-          pointHoverRadius: 5,
-          tension: 0,
-          spanGaps: true,
-          fill: false,
-          stepped: 'before',  // step-line: position only changes at lap boundaries
-        });
-      }
-
-      // Summary stats: how many position changes, avg overtakes per lap
-      const changes = {};
-      for (const dn of allDrivers) {
-        let prevPos = null;
-        let chg = 0;
-        for (let i = 1; i <= maxLap; i++) {
-          const entry = lapPositions[i]?.find(e => e.driver_number === dn);
-          if (entry && entry.position) {
-            if (prevPos !== null && entry.position !== prevPos) chg++;
-            prevPos = entry.position;
-          }
-        }
-        changes[dn] = chg;
-      }
-      const totalChanges = Object.values(changes).reduce((s, c) => s + c, 0);
-
-      // Count distinct positions
-      const maxPos = Math.max(...timeline.map(e => e.position));
-      const posRange = maxPos;
-
-      el.innerHTML = `
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
-          <div class="card p-3 text-center">
-            <div class="font-bold" style="color:var(--text-primary)">${maxLap}</div>
-            <div>Total Laps</div>
-          </div>
-          <div class="card p-3 text-center">
-            <div class="font-bold" style="color:var(--text-primary)">${allDrivers.length}</div>
-            <div>Drivers</div>
-          </div>
-          <div class="card p-3 text-center">
-            <div class="font-bold" style="color:var(--text-primary)">${totalChanges}</div>
-            <div>Position Changes</div>
-          </div>
-          <div class="card p-3 text-center">
-            <div class="font-bold" style="color:var(--text-primary)">P1 - P${posRange}</div>
-            <div>Position Range</div>
-          </div>
+      // Driver picker + chart container
+      let html = `
+        <div class="flex flex-wrap gap-3 items-center mb-3">
+          <button onclick="posSelectAll(${sessionId})" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">✅ Select All</button>
+          <button onclick="posDeselectAll(${sessionId})" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">⬜ Clear</button>
+          <span style="color:var(--text-secondary);font-size:11px">Show drivers:</span>
+        </div>
+        <div class="flex flex-wrap gap-2 mb-3" id="pos-drivers">
+          ${allDrivers.sort((a, b) => {
+            const aLast = lapPositions[allLaps[allLaps.length - 1]]?.find(e => e.driver_number === a);
+            const bLast = lapPositions[allLaps[allLaps.length - 1]]?.find(e => e.driver_number === b);
+            return (aLast?.position || 99) - (bLast?.position || 99);
+          }).map(dn => {
+            const info = driverMap[dn];
+            const colour = info.team_colour ? teamColor(info.team_colour) : '#666';
+            const checked = posSelectedDrivers.includes(dn) ? 'checked' : '';
+            return `<label class="flex items-center gap-1.5 text-xs cursor-pointer" style="color:var(--text-primary)">
+              <input type="checkbox" class="pos-cb" value="${dn}" data-acronym="${info.acronym}" onclick="posToggleDriver(${dn}, ${sessionId})" ${checked}>
+              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colour}"></span>
+              ${info.acronym}
+            </label>`;
+          }).join('')}
         </div>
         <div class="text-xs mb-2" style="color:var(--text-muted);text-align:center">
-          Chart shows each driver's position lap by lap. Hover to see details. 
-          <strong>P1 on top</strong> — lines stepping right show position holds, 
-          crossing lines show overtakes. Enable/disable drivers via legend.
+          <strong>P1 on top</strong> — lines stepping right show position holds. Uncheck drivers to focus.
         </div>
         <div class="relative" style="height:450px">
           <canvas id="pos-chart-canvas"></canvas>
         </div>
       `;
 
-      // Render chart
-      setTimeout(() => {
-        const canvas = document.getElementById('pos-chart-canvas');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const isLight = document.documentElement.classList.contains('light');
-        const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
-        const textColor = isLight ? '#64748b' : '#8b949e';
+      el.innerHTML = html;
 
-        posChartInstance = new Chart(ctx, {
-          type: 'line',
-          data: { datasets },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: { duration: 300 },
-            interaction: {
-              mode: 'index',
-              intersect: false,
-            },
-            plugins: {
-              legend: {
-                position: 'bottom',
-                labels: {
-                  color: textColor,
-                  font: { size: 9 },
-                  boxWidth: 12,
-                  padding: 6,
-                  usePointStyle: true,
-                  pointStyle: 'line',
-                },
-              },
-              tooltip: {
-                callbacks: {
-                  title: (items) => `Lap ${items[0].label}`,
-                  label: (ctx) => {
-                    const val = ctx.parsed.y;
-                    if (val === null) return null;
-                    return `${ctx.dataset.label}: P${val}${val === 1 ? ' 🏆' : ''}`;
-                  },
-                },
-              },
-            },
-            scales: {
-              x: {
-                title: { display: true, text: 'Lap', color: textColor, font: { size: 11 } },
-                grid: { color: gridColor },
-                ticks: { color: textColor, font: { size: 10 } },
-                min: 1,
-              },
-              y: {
-                title: { display: true, text: 'Race Position', color: textColor, font: { size: 11 } },
-                grid: { color: gridColor },
-                ticks: {
-                  color: textColor,
-                  font: { size: 10 },
-                  stepSize: 1,
-                  callback: (v) => `P${v}`,
-                },
-                min: 1,
-                max: posRange + 0.5,
-                reverse: true,
-              },
-            },
-            elements: {
-              line: {
-                stepped: 'before',
-              },
-            },
-          },
+      // Build dataset for selected drivers only
+      const renderPosChart = () => {
+        if (posChartInstance) { posChartInstance.destroy(); posChartInstance = null; }
+
+        const labels = [];
+        for (let i = 1; i <= maxLap; i++) labels.push(i);
+
+        const DRIVER_COLORS = ['#e10600','#16a34a','#3b82f6','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#dc2626','#6366f1','#d946ef','#22c55e','#eab308','#64748b','#0ea5e9','#a855f7','#10b981','#9ca3af'];
+
+        const showDrivers = posSelectedDrivers.length > 0 ? allDrivers.filter(dn => posSelectedDrivers.includes(dn)) : allDrivers;
+        const sortedShown = [...showDrivers].sort((a, b) => {
+          const aLast = lapPositions[allLaps[allLaps.length - 1]]?.find(e => e.driver_number === a);
+          const bLast = lapPositions[allLaps[allLaps.length - 1]]?.find(e => e.driver_number === b);
+          return (aLast?.position || 99) - (bLast?.position || 99);
         });
-      }, 50);
+
+        let colorIdx = 0;
+        const datasets = [];
+        for (const dn of sortedShown) {
+          const info = driverMap[dn];
+          const color = info.team_colour ? `#${info.team_colour.replace('#', '')}` : DRIVER_COLORS[colorIdx % DRIVER_COLORS.length];
+          colorIdx++;
+          const data = [];
+          for (let i = 1; i <= maxLap; i++) {
+            const entry = lapPositions[i]?.find(e => e.driver_number === dn);
+            data.push(entry?.position || null);
+          }
+          datasets.push({ label: info.acronym || `#${dn}`, data, borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 1.5, pointHoverRadius: 5, tension: 0, spanGaps: true, fill: false, stepped: 'before' });
+        }
+
+        setTimeout(() => {
+          const canvas = document.getElementById('pos-chart-canvas');
+          if (!canvas) return;
+          const ctx = canvas.getContext('2d');
+          const isLight = document.documentElement.classList.contains('light');
+          const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+          const textColor = isLight ? '#64748b' : '#8b949e';
+          const maxPos = Math.max(...timeline.map(e => e.position));
+
+          posChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+              responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+              interaction: { mode: 'index', intersect: false },
+              plugins: {
+                legend: { position: 'bottom', labels: { color: textColor, font: { size: 9 }, boxWidth: 12, padding: 6, usePointStyle: true, pointStyle: 'line' } },
+                tooltip: { callbacks: { title: (items) => `Lap ${items[0].label}`, label: (ctx) => { const v = ctx.parsed.y; return v ? `${ctx.dataset.label}: P${v}${v === 1 ? ' 🏆' : ''}` : null; } } },
+              },
+              scales: {
+                x: { title: { display: true, text: 'Lap', color: textColor, font: { size: 11 } }, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } }, min: 1 },
+                y: { title: { display: true, text: 'Race Position', color: textColor, font: { size: 11 } }, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 }, stepSize: 1, callback: (v) => `P${v}` }, min: 1, max: maxPos + 0.5, reverse: true },
+              },
+              elements: { line: { stepped: 'before' } },
+            },
+          });
+        }, 50);
+      };
+
+      renderPosChart();
     } catch(e) {
       el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
     }
+  }
+
+  function posSelectAll(sessionId) {
+    document.querySelectorAll('.pos-cb').forEach(cb => cb.checked = true);
+    posSelectedDrivers = [];
+    document.querySelectorAll('.pos-cb:checked').forEach(cb => posSelectedDrivers.push(parseInt(cb.value)));
+    loadPositionHistory(sessionId);
+  }
+  function posDeselectAll(sessionId) {
+    document.querySelectorAll('.pos-cb').forEach(cb => cb.checked = false);
+    posSelectedDrivers = [];
+    loadPositionHistory(sessionId);
+  }
+  function posToggleDriver(dn, sessionId) {
+    const cb = document.querySelector(`.pos-cb[value="${dn}"]`);
+    if (cb.checked) {
+      if (!posSelectedDrivers.includes(dn)) posSelectedDrivers.push(dn);
+    } else {
+      posSelectedDrivers = posSelectedDrivers.filter(d => d !== dn);
+    }
+    // Re-render chart without reloading everything
+    loadPositionHistory(sessionId);
   }
 
   async function compareDrivers(sessionId) {
@@ -2583,7 +2541,7 @@
           <tr>
             <td class="font-bold" style="color:${d.position <= 3 ? ['#ffd700','#c0c0c0','#cd7f32'][d.position-1] : 'var(--text-secondary)'}">${medal}</td>
             <td class="font-medium">${d.acronym}</td>
-            <td><span class="team-badge" style="background:${teamC};color:#fff">${d.team_name.replace(/ F1 Team$/, '').substring(0,14)}</span></td>
+            <td>${teamBadge(d.team_name, d.team_colour)}</td>
             <td class="text-right font-mono font-bold">${d.points}</td>
             <td style="width:150px">
               <div style="background:var(--bg-primary);border-radius:4px;height:8px;overflow:hidden">
@@ -2612,7 +2570,7 @@
         html += `
           <tr>
             <td class="font-bold" style="color:${c.position <= 3 ? ['#ffd700','#c0c0c0','#cd7f32'][c.position-1] : 'var(--text-secondary)'}">${c.position}</td>
-            <td class="font-medium">${c.team_name}</td>
+            <td>${teamBadge(c.team_name, '')}</td>
             <td class="text-right font-mono font-bold">${c.points}</td>
             <td style="width:150px">
               <div style="background:var(--bg-primary);border-radius:4px;height:8px;overflow:hidden">
