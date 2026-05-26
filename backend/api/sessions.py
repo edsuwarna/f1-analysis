@@ -11,6 +11,8 @@ from backend.models.models import (
     Session, SessionDriver, Lap, Stint, PitStop, Weather, Telemetry
 )
 from backend.api.teams import HEADSHOT_2026
+from backend.core.limiter import limiter
+from fastapi import Request
 
 router = APIRouter()
 
@@ -710,8 +712,10 @@ async def get_track_map(
 
 
 @router.get("/sessions/{session_id}/export/csv")
+@limiter.limit("10/minute")
 async def export_session_csv(
     session_id: int,
+    request: Request,
     data_type: str = Query("laps", description="Data type: laps, telemetry, stints, pit-stops, weather"),
     db: AsyncSession = Depends(get_db),
 ):

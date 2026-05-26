@@ -4,11 +4,15 @@ Main application entry point.
 """
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from backend.core.database import init_db
+from backend.core.limiter import limiter
 from backend.api import meetings, sessions, analytics, teams
 
 
@@ -27,6 +31,10 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # CORS — allow frontend domains (CF Pages, local dev)
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
