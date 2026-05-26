@@ -345,6 +345,11 @@
   }
 
   // ── Navigation ──
+  function setNavActive(id) {
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    const nav = document.getElementById(id);
+    if (nav) nav.classList.add('active');
+  }
   document.querySelectorAll('.nav-link').forEach(el => {
     el.addEventListener('click', function() {
       document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
@@ -592,6 +597,7 @@
   async function loadRaces() {
     currentView = 'races';
     clearState();
+    setNavActive('nav-races');
     const el = document.getElementById('content');
     el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading...</div>';
     try {
@@ -2764,6 +2770,7 @@
   function showAbout() {
     currentView = 'about';
     saveState('about');
+    setNavActive('nav-about');
     document.getElementById('content').innerHTML = `
       <div class="card p-6 md:p-8 max-w-3xl mx-auto">
         <h2 class="text-xl font-bold mb-2 text-center">🏎️ F1 Analysis 2026</h2>
@@ -2855,6 +2862,7 @@
   function showGuide() {
     currentView = 'guide';
     saveState('guide');
+    setNavActive('nav-guide');
     document.getElementById('content').innerHTML = `
       <div class="card p-6 max-w-3xl mx-auto">
         <h2 class="text-xl font-bold mb-5">📖 How to Read the Analysis</h2>
@@ -2938,6 +2946,7 @@
   async function loadChampionship() {
     currentView = 'standings';
     saveState('standings');
+    setNavActive('nav-standings');
     const el = document.getElementById('content');
     el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading championship standings...</div>';
     try {
@@ -3118,9 +3127,6 @@
   } else if (savedView === 'guide') {
     showGuide();
   } else if (savedView === 'standings') {
-    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-    const nav = document.getElementById('nav-standings');
-    if (nav) nav.classList.add('active');
     loadChampionship();
   } else if (savedView === 'sessions' && savedState) {
     try {
