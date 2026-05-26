@@ -3409,16 +3409,16 @@
         html += '<div class="grid grid-cols-2 gap-4 mb-4">';
         html += '<div class="text-center p-3 rounded" style="background:' + tc + '18;border:1px solid ' + tc + '44">';
         html += '<div class="text-lg font-bold" style="color:' + tc + '">' + d1 + '</div></div>';
-        html += '<div class="text-center p-3 rounded" style="background:var(--bg-primary);border:1px solid var(--border-color)">';
-        html += '<div class="text-lg font-bold" style="color:var(--text-secondary)">' + d2 + '</div></div></div>';
+        html += '<div class="text-center p-3 rounded" style="background:' + tc + '18;border:1px solid ' + tc + '44">';
+        html += '<div class="text-lg font-bold" style="color:' + tc + '">' + d2 + '</div></div></div>';
 
         html += '<div class="mb-3"><div class="flex items-center justify-between text-xs mb-1" style="color:var(--text-muted)"><span>\u23f1\ufe0f Qualifying</span><span>' + qTotal + ' rounds</span></div>';
         html += '<div class="flex items-center gap-1" style="height:26px">';
         html += '<div class="text-xs font-bold text-right pr-2" style="color:' + tc + ';min-width:28px">' + qWins1 + '</div>';
         html += '<div class="flex-1" style="height:20px;background:var(--bg-primary);border-radius:5px;overflow:hidden">';
         html += '<div style="width:' + Math.round(qWins1/qTotal*100) + '%;height:100%;background:linear-gradient(90deg,' + tc + ',' + tc + 'bb);border-radius:5px;float:left"></div>';
-        html += '<div style="width:' + Math.round(qWins2/qTotal*100) + '%;height:100%;background:linear-gradient(90deg,#666,#999);border-radius:5px;float:right"></div></div>';
-        html += '<div class="text-xs font-bold text-left pl-2" style="color:#999;min-width:28px">' + qWins2 + '</div></div>';
+        html += '<div style="width:' + Math.round(qWins2/qTotal*100) + '%;height:100%;background:linear-gradient(90deg,' + tc + '88,' + tc + '44);border-radius:5px;float:right"></div></div>';
+        html += '<div class="text-xs font-bold text-left pl-2" style="color:' + tc + ';min-width:28px">' + qWins2 + '</div></div>';
         html += '<div class="flex justify-between text-xs mt-0.5" style="color:var(--text-muted)"><span>' + Math.round(qWins1/qTotal*100) + '%</span><span>' + Math.round(qWins2/qTotal*100) + '%</span></div></div>';
 
         html += '<div><div class="flex items-center justify-between text-xs mb-1" style="color:var(--text-muted)"><span>\ud83c\udfc1 Race Pace</span><span>' + rTotal + ' rounds</span></div>';
@@ -3426,8 +3426,8 @@
         html += '<div class="text-xs font-bold text-right pr-2" style="color:' + tc + ';min-width:28px">' + rWins1 + '</div>';
         html += '<div class="flex-1" style="height:20px;background:var(--bg-primary);border-radius:5px;overflow:hidden">';
         html += '<div style="width:' + Math.round(rWins1/rTotal*100) + '%;height:100%;background:linear-gradient(90deg,' + tc + ',' + tc + 'bb);border-radius:5px;float:left"></div>';
-        html += '<div style="width:' + Math.round(rWins2/rTotal*100) + '%;height:100%;background:linear-gradient(90deg,#666,#999);border-radius:5px;float:right"></div></div>';
-        html += '<div class="text-xs font-bold text-left pl-2" style="color:#999;min-width:28px">' + rWins2 + '</div></div>';
+        html += '<div style="width:' + Math.round(rWins2/rTotal*100) + '%;height:100%;background:linear-gradient(90deg,' + tc + '88,' + tc + '44);border-radius:5px;float:right"></div></div>';
+        html += '<div class="text-xs font-bold text-left pl-2" style="color:' + tc + ';min-width:28px">' + rWins2 + '</div></div>';
         html += '<div class="flex justify-between text-xs mt-0.5" style="color:var(--text-muted)"><span>' + Math.round(rWins1/rTotal*100) + '%</span><span>' + Math.round(rWins2/rTotal*100) + '%</span></div></div></div>';
       }
       el.innerHTML = html;
