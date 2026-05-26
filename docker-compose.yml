@@ -45,6 +45,7 @@ services:
     container_name: f1-ingestion
     volumes:
       - ./backend:/app/backend
+      - ./migrations:/app/migrations
       - f1_cache:/app/cache
     environment:
       DATABASE_URL: postgresql+psycopg2://f1_user:f1_pass_secret@postgres:5432/f1_analysis
