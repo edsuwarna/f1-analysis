@@ -706,3 +706,54 @@ async def get_track_map(
         "max_lap": max_lap,
         "total_laps": len(sorted_laps),
     }
+
+
+@router.get("/sessions/{session_id}/export/csv")
+async def export_session_csv(
+    session_id: int,
+    data_type: str = Query("laps", description="Data type: laps, telemetry, stints, pit-stops, weather"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export session data as CSV."""
+    from io import StringIO
+    import csv
+
+    table_map = {
+        "laps": ("laps", Lap),
+        "telemetry": ("telemetry", Telemetry),
+        "stints": ("stints", Stint),
+        "pit-stops": ("pit_stops", PitStop),
+        "weather": ("weather", Weather),
+    }
+
+    if data_type not in table_map:
+        raise HTTPException(status_code=400, detail=f"Invalid data_type. Choose: {', '.join(table_map.keys())}")
+
+    table_name, model_class = table_map[data_type]
+    result = await db.execute(
+        select(model_class).where(model_class.session_id == session_id)  # type: ignore
+    )
+    rows = result.scalars().all()
+
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"No {data_type} data for this session")
+
+    # Get column names (exclude SQLAlchemy internal '_sa_instance_state')
+    if hasattr(rows[0], "__table__"):
+        columns = [c.name for c in rows[0].__table__.columns if c.name != "id"]
+    else:
+        columns = list(vars(rows[0]).keys())
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(columns)
+    for row in rows:
+        writer.writerow([getattr(row, col, "") for col in columns])
+
+    from fastapi.responses import PlainTextResponse
+    csv_content = output.getvalue()
+    return PlainTextResponse(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=session_{session_id}_{data_type}.csv"},
+    )
