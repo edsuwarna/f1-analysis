@@ -2671,23 +2671,67 @@
       }
       html += `</tbody></table></div></div>`;
 
-      // Race results per round
+      // Race results per round — collapsible cards, Race + Sprint separated
       html += `
-        <div class="card p-5">
+        <div class="card p-5 mb-6">
           <h3 class="font-semibold text-sm mb-4">📋 Race Results</h3>
-          <div class="space-y-4">
+          <div class="space-y-3">
       `;
       for (const race of races) {
+        // Separate Race and Sprint results
+        const raceResults = race.results.filter(r => r.session_name === 'Race' || r.session_name === undefined).filter(r => r.points > 0);
+        const sprintResults = race.results.filter(r => r.session_name === 'Sprint');
+        const hasSprint = sprintResults.length > 0;
+        const sprintKeys = sprintResults.reduce((acc, r) => { acc[r.driver_number] = r; return acc; }, {});
+        const raceKeys = raceResults.reduce((acc, r) => { acc[r.driver_number] = r; return acc; }, {});
         html += `
-          <div class="card p-4">
-            <h4 class="text-sm font-semibold mb-2" style="color:var(--text-primary)">🏎️ ${race.race_name}</h4>
-            <div class="flex flex-wrap gap-1">
+          <div class="card" style="overflow:hidden">
+            <div class="collapse-header flex items-center justify-between p-4" onclick="toggleCollapse(this)">
+              <h4 class="text-sm font-semibold" style="color:var(--text-primary)">🏎️ ${race.race_name}${hasSprint ? ' <span style="color:var(--text-muted);font-weight:400;font-size:11px">· Sprint</span>' : ''}</h4>
+              <span class="collapse-icon">▼</span>
+            </div>
+            <div class="collapse-body closed">
+              <div style="padding:0 16px 16px">
         `;
-        for (const r of race.results.slice(0, 10)) {
-          const bg = r.team_colour ? teamColor(r.team_colour) : '#666';
-          html += `<span class="badge" style="background:${bg};color:#fff">P${r.position} ${r.acronym} (${r.points}pts)</span>`;
+        // Race results (top 10 scoring)
+        if (raceResults.length > 0) {
+          html += `<div class="text-xs font-semibold mb-2" style="color:var(--text-muted)">🏁 Race — Race</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 mb-3">`;
+          for (const r of raceResults) {
+            const bg = r.team_colour ? teamColor(r.team_colour) : '#666';
+            const pos = r.position;
+            const pts = r.points;
+            const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : `P${pos}`;
+            html += `<div class="flex items-center gap-1.5 text-xs" style="background:${bg}22;border:1px solid ${bg}44;border-radius:6px;padding:4px 8px">
+              <span class="font-bold" style="color:#fff;background:${bg};border-radius:4px;padding:0 5px;font-size:10px">${pts}</span>
+              <span style="font-weight:600">${r.acronym}</span>
+              <span style="color:var(--text-muted);margin-left:auto;font-size:10px">${medal}</span>
+            </div>`;
+          }
+          html += `</div>`;
         }
-        html += `</div></div>`;
+        // Sprint results (top 8 scoring) — only if sprint exists
+        if (hasSprint && sprintResults.length > 0) {
+          html += `<div class="text-xs font-semibold mb-2" style="color:var(--text-muted)">⚡ Sprint</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5">`;
+          for (const r of sprintResults) {
+            const bg = r.team_colour ? teamColor(r.team_colour) : '#666';
+            const pts = r.points;
+            const pos = r.position;
+            const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : `P${pos}`;
+            html += `<div class="flex items-center gap-1.5 text-xs" style="background:${bg}22;border:1px solid ${bg}44;border-radius:6px;padding:4px 8px">
+              <span class="font-bold" style="color:#fff;background:${bg};border-radius:4px;padding:0 5px;font-size:10px">${pts}</span>
+              <span style="font-weight:600">${r.acronym}</span>
+              <span style="color:var(--text-muted);margin-left:auto;font-size:10px">${medal}</span>
+            </div>`;
+          }
+          html += `</div>`;
+        }
+        html += `
+              </div>
+            </div>
+          </div>
+        `;
       }
       html += `</div></div>`;
 

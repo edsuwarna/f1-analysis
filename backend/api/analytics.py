@@ -196,6 +196,7 @@ async def championship_standings(
             "points": pts,
             "acronym": r.name_acronym or f"#{driver_num}",
             "team_colour": team_colour,
+            "session_name": session_name,
         })
 
     # Build race list
