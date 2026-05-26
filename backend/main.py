@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.core.database import init_db
-from backend.api import meetings, sessions, analytics
+from backend.api import meetings, sessions, analytics, teams
 
 
 @asynccontextmanager
@@ -42,6 +42,7 @@ app.add_middleware(
 app.include_router(meetings.router, prefix="/api", tags=["Meetings"])
 app.include_router(sessions.router, prefix="/api", tags=["Sessions"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(teams.router, prefix="/api/teams", tags=["Teams"])
 
 # Serve frontend static files
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")

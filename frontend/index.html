@@ -346,6 +346,7 @@
         <button onclick="loadChampionship()" class="nav-link" id="nav-standings" style="padding:6px 10px;font-size:12px">🏆 Standings</button>
         <button onclick="loadSeasonAnalysis()" class="nav-link" id="nav-season" style="padding:6px 10px;font-size:12px">📊 Season</button>
         <button onclick="loadTeamMateBattle()" class="nav-link" id="nav-teammate" style="padding:6px 10px;font-size:12px">🤜 Team Battle</button>
+        <button onclick="loadTeams()" class="nav-link" id="nav-teams" style="padding:6px 10px;font-size:12px">🏢 Teams</button>
         <button onclick="showGuide()" class="nav-link" id="nav-guide" style="padding:6px 10px;font-size:12px">📖 Guide</button>
         <button onclick="showAbout()" class="nav-link" id="nav-about" style="padding:6px 10px;font-size:12px">ℹ️ About</button>
         <button onclick="toggleTheme()" class="theme-btn" id="theme-btn" title="Toggle theme" style="padding:4px 8px;font-size:14px">🌙</button>
@@ -3436,6 +3437,112 @@
     }
   }
 
+  // ── Teams ──
+  async function loadTeams() {
+    currentView = 'teams';
+    saveState('teams');
+    setNavActive('nav-teams');
+    const el = document.getElementById('content');
+    el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">🏢 Loading teams...</div>';
+
+    try {
+      const [teamsData] = await Promise.all([
+        api('/teams?year=2026'),
+      ]);
+
+      let html = `
+        <div class="mb-6">
+          <h2 class="text-xl font-bold">🏢 2026 Teams &amp; Drivers</h2>
+          <p class="text-sm" style="color:var(--text-secondary)">${teamsData.total_teams} constructors · Team personnel &amp; stats</p>
+        </div>
+      `;
+
+      for (const team of teamsData.teams) {
+        const tc = team.team_colour || '#666';
+        const drivers = team.drivers || [];
+
+        // Info grid
+        let infoHtml = '';
+        const infoItems = [
+          { label: 'Team Principal', value: team.team_principal, icon: '👔' },
+          { label: 'Technical Director', value: team.technical_director, icon: '🧠' },
+          { label: 'Base', value: team.base, icon: '📍' },
+          { label: 'Power Unit', value: team.power_unit, icon: '⚡' },
+          { label: 'Chassis', value: team.chassis, icon: '🏎️' },
+          { label: 'Founded', value: team.founded, icon: '📅' },
+        ];
+
+        if (team.constructors_titles > 0) {
+          infoItems.push({ label: 'Constructors Titles', value: team.constructors_titles, icon: '🏆' });
+        }
+        if (team.drivers_titles > 0) {
+          infoItems.push({ label: 'Drivers Titles', value: team.drivers_titles, icon: '👑' });
+        }
+
+        infoHtml = infoItems.map(item => `
+          <div class="flex items-center gap-2 py-1.5">
+            <span style="font-size:14px;min-width:20px">${item.icon}</span>
+            <span class="text-xs" style="color:var(--text-secondary);min-width:100px">${item.label}</span>
+            <span class="text-xs font-medium" style="color:var(--text-primary)">${item.value}</span>
+          </div>
+        `).join('');
+
+        // Championship stats bar — used inline in template below
+        // Driver cards
+        let driverCards = drivers.map(d => `
+          <div class="flex items-center gap-3 p-2.5 rounded" style="background:var(--bg-primary);border:1px solid var(--border-color)">
+            <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:${d.team_colour || '#666'};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff">
+              ${d.headshot_url ? `<img src="${d.headshot_url}" alt="${d.acronym}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.parentElement.textContent='${d.acronym}'">` : d.acronym}
+            </div>
+            <div class="min-w-0">
+              <div class="text-sm font-semibold" style="color:var(--text-primary)">${d.full_name}</div>
+              <div class="text-xs" style="color:${d.team_colour || '#666'};font-weight:600">${d.acronym}</div>
+            </div>
+          </div>
+        `).join('');
+
+        html += `
+          <div class="card p-5 mb-4" style="border-left:4px solid ${tc}">
+            <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse(this)">
+              <div class="flex items-center gap-3">
+                <span style="display:inline-block;width:20px;height:20px;border-radius:50%;background:${tc};border:2px solid rgba(255,255,255,0.15)"></span>
+                <div>
+                  <h3 class="font-semibold text-base" style="color:${tc}">${team.full_name}</h3>
+                  <div class="flex items-center gap-3 text-xs" style="color:var(--text-muted)">
+                    ${team.constructor_position ? `<span>🏆 <strong style="color:var(--text-secondary)">#${team.constructor_position}</strong> · ${team.constructor_points} pts</span>` : ''}
+                    ${team.pit_stop_rank ? `<span>⛽ <strong style="color:var(--text-secondary)">#${team.pit_stop_rank}</strong> pit rank · ${team.pit_stop_avg}s avg</span>` : ''}
+                    <span>👥 <strong style="color:var(--text-secondary)">${drivers.length}</strong> drivers</span>
+                  </div>
+                </div>
+              </div>
+              <span class="collapse-icon">▼</span>
+            </div>
+            <div class="collapse-body closed" style="margin-top:14px">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <h4 class="text-xs font-semibold mb-2" style="color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">Team Info</h4>
+                  <div class="p-3 rounded" style="background:var(--bg-primary);border:1px solid var(--border-color)">
+                    ${infoHtml}
+                  </div>
+                </div>
+                <div>
+                  <h4 class="text-xs font-semibold mb-2" style="color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">Drivers</h4>
+                  <div class="grid grid-cols-1 gap-2">
+                    ${driverCards}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      el.innerHTML = html;
+    } catch (e) {
+      el.innerHTML = '<div class="text-center py-20" style="color:#dc2626">Error: ' + e.message + '</div>';
+    }
+  }
+
   // ── Guide (How to Read Each Section) ──
   function showGuide() {
     currentView = 'guide';
@@ -3572,6 +3679,14 @@
           <h4 class="font-semibold text-sm mb-1">🤜 Team Mate Battle (Season)</h4>
           <p class="text-xs mb-1" style="color:var(--text-secondary)">Cross-season teammate comparison. For each team, shows qualifying and race head-to-head tallies with dual progress bars. Drivers sorted by who appeared in more race weekends.</p>
           <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Which driver dominates within each team. Big mismatches = potential driver change incoming.</p>
+        </div>
+
+        <h3 class="font-semibold text-sm mb-3 mt-6" style="color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">🏢 Teams Tab</h3>
+
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">🏢 Teams &amp; Personnel</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Every constructor on the grid: team principal, technical director, base, power unit, chassis. Driver cards with headshots. Championship position, points, and pit stop ranking.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Team experience vs new entries. Power unit supplier relationships between teams.</p>
         </div>
       </div>
     `;
@@ -4245,18 +4360,20 @@
     loadSeasonAnalysis();
   } else if (savedView === 'teammate') {
     loadTeamMateBattle();
-  } else if (savedView === 'sessions' && savedState) {
-    try {
-      const s = JSON.parse(savedState);
-      if (s.meetingId && s.meetingName) {
-        loadSessions(s.meetingId, s.meetingName);
-      } else { loadRaces(); }
-    } catch(e) { loadRaces(); }
+  } else if (savedView === 'teams') {
+    loadTeams();
   } else if (savedView === 'session' && savedState) {
     try {
       const s = JSON.parse(savedState);
       if (s.meetingId && s.sessionId && s.sessionName && s.sessionType) {
         loadSession(s.sessionId, s.meetingId, s.meetingName, s.sessionName, s.sessionType);
+      } else { loadRaces(); }
+    } catch(e) { loadRaces(); }
+  } else if (savedView === 'sessions' && savedState) {
+    try {
+      const s = JSON.parse(savedState);
+      if (s.meetingId && s.meetingName) {
+        loadSessions(s.meetingId, s.meetingName);
       } else { loadRaces(); }
     } catch(e) { loadRaces(); }
   } else {
