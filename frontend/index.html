@@ -1531,10 +1531,39 @@
         </div>
       </div>`;
 
-    // ── Grouped Bar Chart (only if multiple segments) ──
-    if (drivers.length >= 2 && segments.length >= 2) {
+    // ── Driver Picker (Select All / Clear + checkboxes) ──
+    html += `
+      <div class="flex flex-wrap gap-3 items-center mb-3">
+        <button onclick="qevoSelectAll(${meetingId})" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">✅ Select All</button>
+        <button onclick="qevoDeselectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">⬜ Clear</button>
+        <span style="color:var(--text-secondary);font-size:11px">Drivers to show on chart:</span>
+      </div>
+      <div class="flex flex-wrap gap-2 mb-3" id="qevo-drivers">
+        ${drivers.map(d => `
+          <label class="flex items-center gap-1.5 text-xs cursor-pointer" style="color:var(--text-primary)">
+            <input type="checkbox" class="qevo-cb" value="${d.driver_number}" data-acronym="${d.acronym}" checked>
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${d.team_colour ? teamColor(d.team_colour) : '#888'}"></span>
+            ${d.acronym}
+          </label>
+        `).join('')}
+      </div>
+      <button onclick="qevoUpdateChart(${meetingId})" class="bg-f1-red text-white px-3 py-1.5 rounded text-xs font-medium hover:opacity-90 transition mb-4">📈 Update Chart</button>
+    `;
+
+    // Filter drivers by selected checkboxes for chart
+    const selectedDns = new Set(
+      [...document.querySelectorAll('.qevo-cb:checked')].map(cb => parseInt(cb.value))
+    );
+    const chartDrivers = drivers.filter(d => selectedDns.has(d.driver_number));
+
+    // ── Line Chart (shows progression direction) ──
+    if (chartDrivers.length >= 2 && segments.length >= 2) {
       html += `<div class="relative" style="height:400px;margin-bottom:16px">
         <canvas id="qevo-chart-canvas-${meetingId}"></canvas>
+      </div>`;
+    } else if (chartDrivers.length < 2) {
+      html += `<div class="text-xs mb-4" style="color:var(--text-muted)">
+        ℹ️ Select at least 2 drivers for the chart.
       </div>`;
     } else if (segments.length === 1) {
       html += `<div class="text-xs mb-4" style="color:var(--text-muted)">
@@ -1597,7 +1626,7 @@
     el.innerHTML = html;
 
     // ── Chart init (line chart — shows progression direction) ──
-    if (drivers.length >= 2 && segments.length >= 2) {
+    if (chartDrivers.length >= 2 && segments.length >= 2) {
       setTimeout(() => {
         try {
           const canvas = document.getElementById(`qevo-chart-canvas-${meetingId}`);
@@ -1607,8 +1636,6 @@
           const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
           const textColor = isLight ? '#64748b' : '#8b949e';
 
-          // Show top 12 drivers for readability
-          const chartDrivers = drivers.slice(0, 12);
           const DRV_COLORS = ['#e10600','#16a34a','#3b82f6','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#e11d48','#a855f7'];
 
           const datasets = [];
@@ -1649,7 +1676,7 @@
               plugins: {
                 title: {
                   display: true,
-                  text: 'Best Lap Progression — Top 12 (lines going ↓ = improvement)',
+                  text: 'Best Lap Progression — ' + chartDrivers.length + ' driver(s) (lines going ↓ = improvement)',
                   color: textColor,
                   font: { size: 11 },
                   padding: { bottom: 8 },
@@ -1692,6 +1719,20 @@
         }
       }, 50);
     }
+  }
+
+  // ── Qualifying Evolution helpers (driver picker) ──
+  function qevoSelectAll() {
+    document.querySelectorAll('.qevo-cb').forEach(cb => cb.checked = true);
+  }
+  function qevoDeselectAll() {
+    document.querySelectorAll('.qevo-cb').forEach(cb => cb.checked = false);
+  }
+  function qevoUpdateChart(meetingId) {
+    const data = qevoCache[`qevo_${meetingId}`];
+    if (!data) return;
+    if (qevoChartInstance) { qevoChartInstance.destroy(); qevoChartInstance = null; }
+    renderQualifyingData(data, meetingId);
   }
 
   // ── Lap Distribution ──
