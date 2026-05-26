@@ -214,6 +214,7 @@
       </div>
       <div class="flex gap-2 items-center">
         <button onclick="loadRaces()" class="nav-link active" id="nav-races">🏁 Races</button>
+        <button onclick="loadChampionship()" class="nav-link" id="nav-standings">🏆 Standings</button>
         <button onclick="showAbout()" class="nav-link" id="nav-about">ℹ️ About</button>
         <button onclick="toggleTheme()" class="theme-btn" id="theme-btn" title="Toggle theme">🌙</button>
       </div>
@@ -1919,7 +1920,7 @@
           <p><strong>Data Source:</strong> OpenF1 API + FastAPI Backend</p>
           <p><strong>Database:</strong> PostgreSQL 18</p>
           <p><strong>Season:</strong> 2026</p>
-          <p><strong>Features:</strong> Sector times · Qualifying Evolution · Position History · Tyre strategy timeline · Pit stop analysis · Weather impact · Driver comparison · Gap Timeline · Tyre degradation</p>
+          <p><strong>Features:</strong> Sector times · Championship Standings · Qualifying Evolution · Position History · Tyre strategy timeline · Pit stop analysis · Weather impact · Driver comparison · Gap Timeline · Tyre degradation</p>
           <p class="mt-4"><strong>GitHub:</strong> <a href="https://github.com/edsuwarna/f1-analysis" target="_blank" style="color:var(--text-primary);text-decoration:underline">github.com/edsuwarna/f1-analysis</a></p>
         </div>
         <div class="mt-6 text-xs" style="color:var(--text-muted)">
@@ -1927,6 +1928,120 @@
         </div>
       </div>
     `;
+  }
+
+  // ── Championship Standings ──
+  async function loadChampionship() {
+    currentView = 'standings';
+    const el = document.getElementById('content');
+    el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading championship standings...</div>';
+    try {
+      const data = await api('/analytics/championship?year=2026');
+      const drivers = data.driver_standings;
+      const constructors = data.constructor_standings;
+      const races = data.races;
+
+      if (!drivers || drivers.length === 0) {
+        el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">No championship data available yet</div>';
+        return;
+      }
+
+      let html = `
+        <div class="mb-6">
+          <h2 class="text-xl font-bold">🏆 2026 Championship Standings</h2>
+          <p class="text-sm" style="color:var(--text-secondary)">${data.races_completed} races completed</p>
+        </div>
+      `;
+
+      // Driver standings
+      const maxPts = drivers[0]?.points || 1;
+      html += `
+        <div class="card p-5 mb-6">
+          <h3 class="font-semibold text-sm mb-4">👨‍👩‍👧‍👦 Driver Standings</h3>
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pos</th><th>Driver</th><th>Team</th>
+                  <th class="text-right">Points</th><th>Progress</th>
+                </tr>
+              </thead>
+              <tbody>
+      `;
+
+      for (const d of drivers) {
+        const pct = (d.points / maxPts * 100).toFixed(0);
+        const teamC = d.team_colour ? teamColor(d.team_colour) : '#666';
+        const medal = d.position === 1 ? '🥇' : d.position === 2 ? '🥈' : d.position === 3 ? '🥉' : d.position;
+        html += `
+          <tr>
+            <td class="font-bold" style="color:${d.position <= 3 ? ['#ffd700','#c0c0c0','#cd7f32'][d.position-1] : 'var(--text-secondary)'}">${medal}</td>
+            <td class="font-medium">${d.acronym}</td>
+            <td><span class="team-badge" style="background:${teamC};color:#fff">${d.team_name.replace(/ F1 Team$/, '').substring(0,14)}</span></td>
+            <td class="text-right font-mono font-bold">${d.points}</td>
+            <td style="width:150px">
+              <div style="background:var(--bg-primary);border-radius:4px;height:8px;overflow:hidden">
+                <div style="width:${pct}%;height:100%;background:${teamC};border-radius:4px;transition:width 0.5s"></div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }
+      html += `</tbody></table></div></div>`;
+
+      // Constructor standings
+      const maxCPts = constructors[0]?.points || 1;
+      html += `
+        <div class="card p-5 mb-6">
+          <h3 class="font-semibold text-sm mb-4">🏭 Constructor Standings</h3>
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr><th>Pos</th><th>Team</th><th class="text-right">Points</th><th>Progress</th></tr>
+              </thead>
+              <tbody>
+      `;
+      for (const c of constructors) {
+        const pct = (c.points / maxCPts * 100).toFixed(0);
+        html += `
+          <tr>
+            <td class="font-bold" style="color:${c.position <= 3 ? ['#ffd700','#c0c0c0','#cd7f32'][c.position-1] : 'var(--text-secondary)'}">${c.position}</td>
+            <td class="font-medium">${c.team_name}</td>
+            <td class="text-right font-mono font-bold">${c.points}</td>
+            <td style="width:150px">
+              <div style="background:var(--bg-primary);border-radius:4px;height:8px;overflow:hidden">
+                <div style="width:${pct}%;height:100%;background:#e10600;border-radius:4px;transition:width 0.5s"></div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }
+      html += `</tbody></table></div></div>`;
+
+      // Race results per round
+      html += `
+        <div class="card p-5">
+          <h3 class="font-semibold text-sm mb-4">📋 Race Results</h3>
+          <div class="space-y-4">
+      `;
+      for (const race of races) {
+        html += `
+          <div class="card p-4">
+            <h4 class="text-sm font-semibold mb-2" style="color:var(--text-primary)">🏎️ ${race.race_name}</h4>
+            <div class="flex flex-wrap gap-1">
+        `;
+        for (const r of race.results.slice(0, 10)) {
+          const bg = r.team_colour ? teamColor(r.team_colour) : '#666';
+          html += `<span class="badge" style="background:${bg};color:#fff">P${r.position} ${r.acronym} (${r.points}pts)</span>`;
+        }
+        html += `</div></div>`;
+      }
+      html += `</div></div>`;
+
+      el.innerHTML = html;
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-20" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
   }
 
   // ── Init ──

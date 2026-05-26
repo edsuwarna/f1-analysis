@@ -343,7 +343,6 @@ def _store_laps(sasession, session_key: int, session_id: int):
             time.sleep(REQUEST_DELAY)
             pos_data = api_get("position", {"session_key": session_key})
             if pos_data:
-                # Group positions by driver, sorted by date
                 from collections import defaultdict
                 by_driver = defaultdict(list)
                 for p in pos_data:
@@ -353,42 +352,60 @@ def _store_laps(sasession, session_key: int, session_id: int):
                     if dn and pos and date:
                         by_driver[dn].append({"date": date, "position": pos})
 
-                # For each driver, align position with lap numbers
                 for dn, entries in by_driver.items():
                     entries.sort(key=lambda x: x["date"])
-                    # Get lap data for this driver to match dates to laps
                     driver_batch = [l for l in batch if l["dn"] == dn]
-                    # Simple approach: assign positions based on lap progression
-                    prev_lap_num = 0
                     pos_idx = 0
                     for lb in driver_batch:
                         lb_num = lb["ln"]
-                        # Position data is sampled ~4/sec; find closest position
-                        # We'll just assign the median position during this lap
                         if pos_idx < len(entries):
                             positions_map[(dn, lb_num)] = entries[pos_idx]["position"]
                             pos_idx = min(pos_idx + 1, len(entries) - 1)
         except Exception as e:
             log.warning(f"      ⚠️ Could not fetch position data: {e}")
 
+        # Build compound + tyre_age map from stint data
+        compound_map = {}  # (driver_number, lap_number) -> (compound, tyre_age)
+        try:
+            time.sleep(REQUEST_DELAY)
+            stint_data = api_get("stints", {"session_key": session_key})
+            if stint_data:
+                for st in stint_data:
+                    dn = st.get("driver_number")
+                    comp = st.get("compound")
+                    age_start = st.get("tyre_age_at_start", 0)
+                    lap_start = st.get("lap_start", 1)
+                    lap_end = st.get("lap_end", 0)
+                    if dn and comp and lap_start:
+                        for lap_num in range(lap_start, lap_end + 1):
+                            tyre_age = (age_start or 0) + (lap_num - lap_start)
+                            compound_map[(dn, lap_num)] = (comp, tyre_age)
+        except Exception as e:
+            log.warning(f"      ⚠️ Could not fetch stint data: {e}")
+
         # Insert in batches of 500
         BATCH_SIZE = 500
         for i in range(0, len(batch), BATCH_SIZE):
             sub_batch = batch[i:i + BATCH_SIZE]
-            # Augment with position data
+            # Augment with position + compound + tyre_age data
             enhanced_batch = []
             for lb in sub_batch:
                 dn = lb["dn"]
                 ln = lb["ln"]
                 lb["pos"] = positions_map.get((dn, ln))
+                cmpd_info = compound_map.get((dn, ln))
+                lb["compound"] = cmpd_info[0] if cmpd_info else None
+                lb["tyre_age"] = cmpd_info[1] if cmpd_info else None
                 enhanced_batch.append(lb)
             sasession.execute(text("""
                 INSERT INTO laps
                     (session_id, driver_number, lap_number,
                      duration_sector_1, duration_sector_2, duration_sector_3,
-                     lap_duration, speed_fl, speed_straight, position)
+                     lap_duration, speed_fl, speed_straight, position,
+                     compound, tyre_age)
                 VALUES
-                    (:sid, :dn, :ln, :s1, :s2, :s3, :lt, :i1s, :sts, :pos)
+                    (:sid, :dn, :ln, :s1, :s2, :s3, :lt, :i1s, :sts, :pos,
+                     :compound, :tyre_age)
                 ON CONFLICT DO NOTHING
             """), enhanced_batch)
 

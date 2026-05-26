@@ -104,6 +104,146 @@ async def driver_season_progress(
     ]
 
 
+@router.get("/championship")
+async def championship_standings(
+    year: int = Query(2025),
+    db: AsyncSession = Depends(get_db),
+):
+    """Driver & Constructor championship standings for a season.
+
+    Computes points for Race (25-18-15-12-10-8-6-4-2-1) and
+    Sprint (8-7-6-5-4-3-2-1) sessions based on final lap positions.
+    """
+    # Points tables
+    RACE_POINTS = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10,
+                   6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
+    SPRINT_POINTS = {1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1}
+
+    query = text("""
+        SELECT
+            m.id AS meeting_id,
+            m.name AS race_name,
+            m.date_start,
+            s.id AS session_id,
+            s.session_type,
+            s.session_name,
+            l.driver_number,
+            l.position,
+            sd.full_name,
+            sd.name_acronym,
+            sd.team_name,
+            sd.team_colour
+        FROM meetings m
+        JOIN sessions s ON s.meeting_id = m.id
+        JOIN laps l ON l.session_id = s.id
+        LEFT JOIN session_drivers sd
+            ON sd.session_id = s.id AND sd.driver_number = l.driver_number
+        WHERE m.year = :year
+          AND s.session_name IN ('Race', 'Sprint')
+          AND l.position IS NOT NULL AND l.position > 0
+          AND l.position <= 20
+          AND l.lap_number = (
+              SELECT MAX(l2.lap_number)
+              FROM laps l2
+              WHERE l2.session_id = l.session_id
+                AND l2.driver_number = l.driver_number
+          )
+        ORDER BY m.date_start, l.position
+    """)
+    result = await db.execute(query, {"year": year})
+    rows = result.fetchall()
+
+    if not rows:
+        return {"driver_standings": [], "constructor_standings": [], "races": []}
+
+    from collections import defaultdict
+    driver_points = defaultdict(int)
+    constructor_points = defaultdict(int)
+    driver_details = {}
+    race_list = []
+    race_results = defaultdict(list)
+
+    for r in rows:
+        pos = r.position
+        session_type = r.session_type
+        session_name = r.session_name
+        driver_num = r.driver_number
+        team = r.team_name or "Unknown"
+        team_colour = r.team_colour or ""
+
+        # Determine points
+        pts = 0
+        if session_name == "Sprint":
+            pts = SPRINT_POINTS.get(pos, 0)
+        elif session_type == "Race" or session_name == "Race":
+            pts = RACE_POINTS.get(pos, 0)
+
+        driver_points[driver_num] += pts
+        constructor_points[team] += pts
+
+        if driver_num not in driver_details:
+            driver_details[driver_num] = {
+                "full_name": r.full_name or f"Driver #{driver_num}",
+                "acronym": r.name_acronym or f"#{driver_num}",
+                "team_name": team,
+                "team_colour": team_colour,
+            }
+
+        race_results[(r.race_name, r.meeting_id)].append({
+            "driver_number": driver_num,
+            "position": pos,
+            "points": pts,
+            "acronym": r.name_acronym or f"#{driver_num}",
+            "team_colour": team_colour,
+        })
+
+    # Build race list
+    for (rname, mid), results in sorted(race_results.items()):
+        results.sort(key=lambda x: x["position"])
+        race_list.append({
+            "meeting_id": mid,
+            "race_name": rname,
+            "results": results,
+        })
+
+    # Driver standings
+    driver_standings = [
+        {
+            "position": i + 1,
+            "driver_number": dn,
+            "full_name": info["full_name"],
+            "acronym": info["acronym"],
+            "team_name": info["team_name"],
+            "team_colour": info["team_colour"],
+            "points": pts,
+        }
+        for i, (dn, pts) in enumerate(
+            sorted(driver_points.items(), key=lambda x: -x[1])
+        )
+        for info in [driver_details[dn]]
+    ]
+
+    # Constructor standings
+    constructor_standings = [
+        {
+            "position": i + 1,
+            "team_name": team,
+            "points": pts,
+        }
+        for i, (team, pts) in enumerate(
+            sorted(constructor_points.items(), key=lambda x: -x[1])
+        )
+    ]
+
+    return {
+        "year": year,
+        "races_completed": len(race_list),
+        "driver_standings": driver_standings,
+        "constructor_standings": constructor_standings,
+        "races": race_list,
+    }
+
+
 @router.get("/tyre-strategy")
 async def tyre_strategy_summary(
     meeting_id: int,

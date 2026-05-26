@@ -9,8 +9,13 @@
 
 - **Sector Time Analysis** — Who's fastest in each sector, every session
 - **Driver Comparison** — Head-to-head telemetry and lap time overlay
+- **Championship Standings** — Driver & Constructor points, per-race results
+- **Qualifying Evolution** — Lap progression with improvement deltas
+- **Position History** — Race position changes lap by lap
 - **Tyre Strategy** — Compound tracking, stint visualization, undercut analysis
 - **Pit Stop Data** — Pit duration, lane loss, position changes
+- **Gap Timeline** — Cumulative gaps to leader lap by lap
+- **Tyre Degradation** — Lap time vs tyre age correlation
 - **Weather Data** — Track/air temperature, humidity, rainfall correlation
 - **Full Session Reports** — Complete data for FP1-3, Qualifying, Race, Sprint
 
@@ -83,6 +88,7 @@ make reset-db       # Wipe and recreate database
 | `GET /api/sessions/{id}/weather` | Weather timeline |
 | `GET /api/analytics/sectors?year=2025` | Season sector trends |
 | `GET /api/analytics/driver-progress/{num}` | Driver season progress |
+| `GET /api/analytics/championship?year=2025` | Driver & Constructor standings |
 
 Full API docs at `http://localhost:8000/docs`
 
