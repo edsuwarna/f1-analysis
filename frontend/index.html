@@ -209,12 +209,92 @@
     .card { padding: 12px !important; }
     table { font-size: 11px; }
     th, td { padding: 6px 6px !important; }
-    .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+    .overflow-x-auto { -webkit-overflow-scrolling: touch; margin: 0 -4px; }
     h2 { font-size: 1.1rem !important; }
     h3 { font-size: 0.8rem !important; }
     .grid { gap: 0.5rem !important; }
-    select, input, button { font-size: 12px !important; }
+    select, input, button.bg-f1-red, .btn-action {
+      font-size: 12px !important;
+      min-height: 44px !important;
+      padding: 10px 14px !important;
+    }
+    .collapse-header { min-height: 44px; }
+    .theme-btn { min-height: 44px; min-width: 44px; }
+    /* Stats strip stack vertical on tiny screens */
+    .stats-strip { gap: 4px; }
+    .stats-strip > span { font-size: 10px; }
+    /* Section nav button inside cards */
+    .section-nav-btn { display: none !important; }
   }
+
+  /* ── Floating ToC Button ── */
+  .toc-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 999;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #e10600;
+    color: #fff;
+    border: none;
+    box-shadow: 0 4px 16px rgba(225,6,0,.4);
+    cursor: pointer;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .toc-btn:hover { transform: scale(1.1); box-shadow: 0 6px 24px rgba(225,6,0,.5); }
+  .toc-btn:active { transform: scale(.95); }
+
+  /* ── ToC Overlay ── */
+  .toc-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0,0,0,.65);
+    display: none;
+    backdrop-filter: blur(4px);
+  }
+  .toc-overlay.open { display: block; }
+  .toc-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 70vh;
+    z-index: 1001;
+    background: var(--bg-card);
+    border-radius: 16px 16px 0 0;
+    padding: 16px 20px 24px;
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform .3s ease;
+    border-top: 1px solid var(--border-color);
+  }
+  .toc-overlay.open .toc-panel { transform: translateY(0); }
+  .toc-panel h4 {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+  }
+  .toc-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-secondary);
+    transition: background .15s;
+  }
+  .toc-item:hover { background: var(--hover-bg); color: var(--text-primary); }
+  .toc-item:active { background: rgba(225,6,0,.1); color: #e10600; }
 </style>
 </head>
 <body>
@@ -293,6 +373,36 @@
       return `${m}:${sec.padStart(6, '0')}`;
     }
     return s.toFixed(3) + 's';
+  }
+
+  // ── Table of Contents ──
+  function toggleToc() {
+    const overlay = document.getElementById('toc-overlay');
+    const open = overlay.classList.toggle('open');
+    document.getElementById('toc-btn').textContent = open ? '✕' : '📋';
+
+    if (open) {
+      // Scan DOM for visible section cards
+      const cards = document.querySelectorAll('.card.p-5');
+      const list = document.getElementById('toc-list');
+      list.innerHTML = '';
+      cards.forEach(card => {
+        const header = card.querySelector('.collapse-header h3');
+        if (!header) return;
+        // Skip disabled/hidden sections
+        if (header.closest('.collapse-body') && header.closest('.collapse-body').classList.contains('closed')) return;
+        const text = header.textContent.replace(/[▼▲]\s*$/, '').trim();
+        if (!text || text.includes('Only available')) return;
+        const item = document.createElement('div');
+        item.className = 'toc-item';
+        item.textContent = text;
+        item.onclick = () => {
+          toggleToc();
+          card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+        list.appendChild(item);
+      });
+    }
   }
 
   function teamColor(colour) {
@@ -571,7 +681,7 @@
         </div>
 
         <!-- Session Stats Strip -->
-        <div class="flex flex-wrap gap-3 mb-5 text-xs" style="color:var(--text-secondary)">
+        <div class="flex flex-wrap gap-3 mb-5 text-xs stats-strip" style="color:var(--text-secondary)">
           <span>👨‍👩‍👧‍👦 <strong style="color:var(--text-primary)">${drivers.length}</strong> drivers</span>
           <span>🏁 <strong style="color:var(--text-primary)">${sessionType}</strong></span>
           ${sectors.length > 0 ? `<span>⏱️ <strong style="color:var(--text-primary)">${sectors[0].total_laps || '?'}</strong> laps (max)</span>` : ''}
@@ -2947,5 +3057,14 @@
     loadRaces();
   }
   </script>
+
+  <!-- Floating Table of Contents -->
+  <button class="toc-btn" id="toc-btn" onclick="toggleToc()" title="Jump to section">📋</button>
+  <div class="toc-overlay" id="toc-overlay" onclick="toggleToc()">
+    <div class="toc-panel" onclick="event.stopPropagation()">
+      <h4>📋 Jump to Section</h4>
+      <div id="toc-list"></div>
+    </div>
+  </div>
 </body>
 </html>
