@@ -97,9 +97,9 @@
   .light .text-red-400 { color: #dc2626 !important; }
 
   /* ── Sector Colors ── */
-  .sector-s1 { color: #ff6b6b; }
-  .sector-s2 { color: #0ea5e9; }
-  .sector-s3 { color: #a855f7; }
+  .sector-s1 { color: #e10600; }  /* F1 Red */
+  .sector-s2 { color: #00b4d8; }  /* Ocean Blue */
+  .sector-s3 { color: #f59e0b; }  /* Amber/Gold */
 
   /* ── Collapse Sections ── */
   .collapse-header { cursor: pointer; user-select: none; }
@@ -524,9 +524,9 @@
                 🟣 Tercepat · 🟢 Top 3 · 🟡 Di luar Top 3
               </span>
             </h3>
-            <span class="collapse-icon open">▼</span>
+            <span class="collapse-icon">▼</span>
           </div>
-          <div class="collapse-body">
+          <div class="collapse-body closed">
           <div class="overflow-x-auto">
             <table>
               <thead>
@@ -591,9 +591,9 @@
           <div class="card p-5 mb-6">
             <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
               <h3 class="font-semibold text-sm">🛞 Tyre Strategy Timeline</h3>
-              <span class="collapse-icon open">▼</span>
+              <span class="collapse-icon">▼</span>
             </div>
-            <div class="collapse-body">
+            <div class="collapse-body closed">
             ${renderTyreTimeline(stints, driverMap)}
             <div class="overflow-x-auto mt-4">
               <table>
@@ -634,9 +634,9 @@
           <div class="card p-5 mb-6">
             <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
               <h3 class="font-semibold text-sm">⛽ Pit Stop Analysis</h3>
-              <span class="collapse-icon open">▼</span>
+              <span class="collapse-icon">▼</span>
             </div>
-            <div class="collapse-body">
+            <div class="collapse-body closed">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
               <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
                 <div class="font-bold" style="color:var(--text-primary)">${pits.length}</div>
@@ -746,9 +746,9 @@
           <div class="card p-5 mb-6">
             <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
               <h3 class="font-semibold text-sm">🌤️ Weather Impact</h3>
-              <span class="collapse-icon open">▼</span>
+              <span class="collapse-icon">▼</span>
             </div>
-            <div class="collapse-body">
+            <div class="collapse-body closed">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
               <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
                 <div class="font-bold" style="color:var(--text-primary)">${Math.min(...airTemps).toFixed(1)}° - ${Math.max(...airTemps).toFixed(1)}°</div>
@@ -783,9 +783,9 @@
         <div class="card p-5">
           <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
             <h3 class="font-semibold text-sm">🤜🤛 Driver Comparison</h3>
-            <span class="collapse-icon open">▼</span>
+            <span class="collapse-icon">▼</span>
           </div>
-          <div class="collapse-body">
+          <div class="collapse-body closed">
           <div class="flex flex-wrap gap-3 items-center">
             <select id="comp-drv1">
               ${drivers.map(d => `<option value="${d.driver_number}">${d.full_name} (${d.name_acronym})</option>`).join('')}
@@ -1029,8 +1029,9 @@
         <div class="text-left text-sm" style="color:var(--text-secondary)">
           <p><strong>Data Source:</strong> OpenF1 API + FastAPI Backend</p>
           <p><strong>Database:</strong> PostgreSQL 18</p>
-          <p><strong>Season:</strong> 2026 (5 active races)</p>
-          <p><strong>Features:</strong> Sector times · Tyre strategy timeline · Driver comparison</p>
+          <p><strong>Season:</strong> 2026</p>
+          <p><strong>Features:</strong> Sector times · Tyre strategy timeline · Pit stop analysis · Weather impact · Driver comparison</p>
+          <p class="mt-4"><strong>GitHub:</strong> <a href="https://github.com/edsuwarna/f1-analysis" target="_blank" style="color:var(--text-primary);text-decoration:underline">github.com/edsuwarna/f1-analysis</a></p>
         </div>
         <div class="mt-6 text-xs" style="color:var(--text-muted)">
           F1 is a trademark of Formula One Licensing B.V. This is an unofficial project.
