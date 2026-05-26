@@ -507,7 +507,7 @@
         <div class="card p-5 mb-6">
           <h3 class="font-semibold text-sm mb-4">🏆 Best Sector Times
             <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">
-              🟣=Overall Best 🟢=Top 3 🟡=Others
+              🟣 Tercepat seluruh pembalap · 🟢 Top 3 · 🟡 Di luar Top 3
             </span>
           </h3>
           <div class="overflow-x-auto">
@@ -823,9 +823,9 @@
       // Legend
       html += `
         <div class="flex flex-wrap gap-x-4 gap-y-1 justify-center mb-4 text-xs" style="color:var(--text-secondary)">
-          <span>🟢 <strong style="color:#16a34a">Hijau</strong> = ${d1name} unggul</span>
-          <span>🟡 <strong style="color:#eab308">Kuning</strong> = ${d2name} unggul</span>
-          <span>Δ = ${d1name} - ${d2name}</span>
+          <span><strong style="color:#16a34a">🟢 Hijau</strong> = Pembalap ini lebih cepat di sektor itu</span>
+          <span><strong>Putih</strong> = Lebih lambat (kuning di F1, tp biar ga bingung putih aja)</span>
+          <span>Δ ${d1name} - ${d2name} 🟢 = ${d1name} unggul · 🔴 = ${d2name} unggul</span>
         </div>`;
       const avgA = timesA.filter(t => t).reduce((s, t) => s + t, 0) / timesA.filter(t => t).length || 0;
       const avgB = timesB.filter(t => t).reduce((s, t) => s + t, 0) / timesB.filter(t => t).length || 0;
@@ -887,12 +887,12 @@
             <td class="text-right font-mono">${formatTime(a.lap_duration)}</td>
             <td class="text-right font-mono font-bold" style="${color}">${delta !== null ? (delta > 0 ? '+' : '') + delta.toFixed(3) : '—'}</td>
             <td class="text-right font-mono">${formatTime(b.lap_duration)}</td>
-            <td class="text-right font-mono" style="${a.sector_1 && b.sector_1 ? (a.sector_1 < b.sector_1 ? 'color:#16a34a;font-weight:700' : 'color:#eab308;font-weight:600') : ''}">${formatTime(a.sector_1)}</td>
-            <td class="text-right font-mono" style="${a.sector_1 && b.sector_1 ? (a.sector_1 > b.sector_1 ? 'color:#16a34a;font-weight:700' : 'color:#eab308;font-weight:600') : ''}">${formatTime(b.sector_1)}</td>
-            <td class="text-right font-mono" style="${a.sector_2 && b.sector_2 ? (a.sector_2 < b.sector_2 ? 'color:#16a34a;font-weight:700' : 'color:#eab308;font-weight:600') : ''}">${formatTime(a.sector_2)}</td>
-            <td class="text-right font-mono" style="${a.sector_2 && b.sector_2 ? (a.sector_2 > b.sector_2 ? 'color:#16a34a;font-weight:700' : 'color:#eab308;font-weight:600') : ''}">${formatTime(b.sector_2)}</td>
-            <td class="text-right font-mono" style="${a.sector_3 && b.sector_3 ? (a.sector_3 < b.sector_3 ? 'color:#16a34a;font-weight:700' : 'color:#eab308;font-weight:600') : ''}">${formatTime(a.sector_3)}</td>
-            <td class="text-right font-mono" style="${a.sector_3 && b.sector_3 ? (a.sector_3 > b.sector_3 ? 'color:#16a34a;font-weight:700' : 'color:#eab308;font-weight:600') : ''}">${formatTime(b.sector_3)}</td>
+            <td class="text-right font-mono" style="${a.sector_1 && b.sector_1 && a.sector_1 < b.sector_1 ? 'color:#16a34a;font-weight:700' : ''}">${formatTime(a.sector_1)}</td>
+            <td class="text-right font-mono" style="${a.sector_1 && b.sector_1 && a.sector_1 > b.sector_1 ? 'color:#16a34a;font-weight:700' : ''}">${formatTime(b.sector_1)}</td>
+            <td class="text-right font-mono" style="${a.sector_2 && b.sector_2 && a.sector_2 < b.sector_2 ? 'color:#16a34a;font-weight:700' : ''}">${formatTime(a.sector_2)}</td>
+            <td class="text-right font-mono" style="${a.sector_2 && b.sector_2 && a.sector_2 > b.sector_2 ? 'color:#16a34a;font-weight:700' : ''}">${formatTime(b.sector_2)}</td>
+            <td class="text-right font-mono" style="${a.sector_3 && b.sector_3 && a.sector_3 < b.sector_3 ? 'color:#16a34a;font-weight:700' : ''}">${formatTime(a.sector_3)}</td>
+            <td class="text-right font-mono" style="${a.sector_3 && b.sector_3 && a.sector_3 > b.sector_3 ? 'color:#16a34a;font-weight:700' : ''}">${formatTime(b.sector_3)}</td>
           </tr>
         `;
       }
