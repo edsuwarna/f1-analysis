@@ -78,3 +78,29 @@ async def get_meeting_sessions(meeting_id: int, db: AsyncSession = Depends(get_d
         }
         for s in sessions
     ]
+
+
+@router.get("/meetings/{meeting_id}/circuit")
+async def get_meeting_circuit(meeting_id: int, db: AsyncSession = Depends(get_db)):
+    """Get detailed circuit info for a race weekend."""
+    result = await db.execute(select(Meeting).where(Meeting.id == meeting_id))
+    meeting = result.scalar_one_or_none()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    from backend.api.circuits import get_circuit_info
+    info = get_circuit_info(meeting.circuit_name or meeting.name or "")
+    
+    base = {
+        "meeting_id": meeting.id,
+        "meeting_name": meeting.name,
+        "circuit_name": info["name"] if info else (meeting.circuit_name or ""),
+        "location": meeting.location or "",
+        "country": meeting.country_name or "",
+        "country_code": meeting.country_code or "",
+    }
+
+    if info:
+        return {**base, **info}
+    return {**base, "description": "", "fun_fact": "", "image_url": "", "map_url": "",
+            "length_km": None, "turns": None, "lap_record": "", "opened": None}

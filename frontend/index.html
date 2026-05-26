@@ -738,6 +738,19 @@
           </div>
         </div>
 
+        <!-- Circuit Detail Section -->
+        <div class="card p-5 mb-6" id="circuit-section-${meetingId}">
+          <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+            <h3 class="font-semibold text-sm">🏁 Circuit Detail
+              <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Track info, specs &amp; fun facts</span>
+            </h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="collapse-body" id="circuit-body-${meetingId}">
+            <div class="text-center py-8" style="color:var(--text-muted)">Loading circuit info...</div>
+          </div>
+        </div>
+
         <!-- Analysis Sections (collapsible) -->
         <div class="card p-5 mb-6">
           <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
@@ -1235,6 +1248,7 @@
       `;
 
       el.innerHTML = html;
+      loadCircuitInfo(meetingId);
     } catch(e) {
       el.innerHTML = `<div class="text-center py-20" style="color:#dc2626">Error: ${e.message}</div>`;
     }
@@ -3061,6 +3075,12 @@
 
     el.innerHTML = html;
 
+    // Restore play button state if interval is still running
+    if (trackMapInterval) {
+      const btn = document.getElementById('trackmap-playbtn');
+      if (btn) btn.textContent = '⏸ Pause';
+    }
+
     // Draw circuit + dots on canvas
     const canvas = document.getElementById('trackmap-canvas');
     const ctx = canvas.getContext('2d');
@@ -3092,7 +3112,8 @@
         const pt = coords[Math.min(ptIndex, totalPoints - 1)];
         const dotX = normX(pt.x);
         const dotY = normY(pt.y);
-        const color = p.team_colour || '#888';
+        const rawColor = p.team_colour || '#888';
+        const color = rawColor.startsWith('#') ? rawColor : '#' + rawColor;
 
         // Draw dot
         ctx.beginPath();
@@ -3115,7 +3136,8 @@
     const legend = document.getElementById('trackmap-legend');
     if (legend) {
       legend.innerHTML = positions.map(p => {
-        const color = p.team_colour || '#888';
+        const rawColor = p.team_colour || '#888';
+        const color = rawColor.startsWith('#') ? rawColor : '#' + rawColor;
         return `<span class="flex items-center gap-1 text-xs" style="color:${textColor}"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color}"></span> P${p.position} ${p.acronym}</span>`;
       }).join('');
     }
@@ -3141,7 +3163,7 @@
       renderTrackMap();
     }
   }
-
+  // ── Track Map Play ──
   function trackMapPlay() {
     if (trackMapInterval) {
       clearInterval(trackMapInterval);
@@ -3159,6 +3181,71 @@
       renderTrackMap();
     }, 400);
     document.getElementById('trackmap-playbtn').textContent = '⏸ Pause';
+  }
+
+  // ── Circuit Detail ──
+  async function loadCircuitInfo(meetingId) {
+    const body = document.getElementById(`circuit-body-${meetingId}`);
+    if (!body) return;
+    try {
+      const data = await api(`/meetings/${meetingId}/circuit`);
+      if (!data || !data.circuit_name) {
+        body.innerHTML = '<div class="text-center py-4" style="color:var(--text-muted)">No circuit data available</div>';
+        return;
+      }
+
+      const isLight = document.documentElement.classList.contains('light');
+      const textColor = isLight ? '#1e293b' : '#e1e1e6';
+      const mutedColor = 'var(--text-muted)';
+
+      body.innerHTML = `
+        <div class="flex flex-col lg:flex-row gap-6">
+          <!-- Track image -->
+          <div class="flex-1">
+            <img src="${data.image_url || ''}" alt="${data.circuit_name}" style="width:100%;max-width:480px;border-radius:8px;border:1px solid var(--border-color)" onerror="this.style.display='none'">
+          </div>
+
+          <!-- Track details -->
+          <div class="flex-1">
+            <h4 class="font-semibold text-base mb-2">${data.circuit_name}</h4>
+            <p class="text-sm mb-3" style="color:${textColor};line-height:1.6">${data.description || ''}</p>
+
+            <!-- Specs grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
+              <div class="text-center p-3 rounded" style="background:var(--badge-soft);border:1px solid var(--border-color)">
+                <div class="text-lg font-bold">${data.length_km || '?'}</div>
+                <div class="text-xs" style="color:${mutedColor}">Length (km)</div>
+              </div>
+              <div class="text-center p-3 rounded" style="background:var(--badge-soft);border:1px solid var(--border-color)">
+                <div class="text-lg font-bold">${data.turns || '?'}</div>
+                <div class="text-xs" style="color:${mutedColor}">Turns</div>
+              </div>
+              <div class="text-center p-3 rounded" style="background:var(--badge-soft);border:1px solid var(--border-color)">
+                <div class="text-lg font-bold">${data.drs_zones || '?'}</div>
+                <div class="text-xs" style="color:${mutedColor}">DRS Zones</div>
+              </div>
+              <div class="text-center p-3 rounded" style="background:var(--badge-soft);border:1px solid var(--border-color)">
+                <div class="text-lg font-bold">${data.opened || '?'}</div>
+                <div class="text-xs" style="color:${mutedColor}">Opened</div>
+              </div>
+              <div class="text-center p-3 rounded col-span-2 sm:col-span-1" style="background:var(--badge-soft);border:1px solid var(--border-color)">
+                <div class="text-lg font-bold">${data.lap_record || '?'}</div>
+                <div class="text-xs" style="color:${mutedColor}">Lap Record ${data.lap_record_driver ? '(' + data.lap_record_driver + ')' : ''}</div>
+              </div>
+            </div>
+
+            <!-- Fun fact -->
+            ${data.fun_fact ? `
+            <div class="mt-4 p-3 rounded text-sm" style="background:rgba(225,6,0,.08);border:1px solid rgba(225,6,0,.2);color:${textColor}">
+              <span style="font-weight:600;color:#e10600">💡 Did You Know?</span><br>
+              ${data.fun_fact}
+            </div>` : ''}
+          </div>
+        </div>
+      `;
+    } catch(e) {
+      body.innerHTML = `<div class="text-center py-4" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
   }
 
   // ── Collapse Toggle ──

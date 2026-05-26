@@ -51,11 +51,21 @@ DATABASE_URL = os.getenv(
     "postgresql+psycopg2://f1_user:f1_pass_secret@postgres:5432/f1_analysis",
 )
 
+def get_engine():
+    return create_engine(DATABASE_URL)
+
+
 REQUEST_DELAY = 0.5  # seconds between API calls to avoid rate limiting
 
 
-def get_engine():
-    return create_engine(DATABASE_URL)
+def _normalize_hex(color: str) -> str:
+    """Ensure hex color has # prefix. Returns empty string if blank."""
+    if not color or not color.strip():
+        return ""
+    c = color.strip()
+    if not c.startswith("#"):
+        return f"#{c}"
+    return c
 
 
 def api_get(endpoint: str, params: dict | None = None) -> list | dict:
@@ -389,7 +399,7 @@ def _store_drivers(sasession, session_key: int, session_id: int):
                 "fn": d.get("full_name", ""),
                 "acro": d.get("name_acronym", ""),
                 "team": d.get("team_name", ""),
-                "tc": d.get("team_colour", ""),
+                "tc": _normalize_hex(d.get("team_colour", "")),
                 "hs": d.get("headshot_url", ""),
                 "cc": d.get("country_code", ""),
             })
