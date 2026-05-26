@@ -573,15 +573,21 @@
   }
 
   // ── Views ──
+  // Use sessionStorage so state persists on refresh (same tab)
+  // but resets when opening a new tab / closing the browser.
   function saveState(view, params) {
-    localStorage.setItem('f1-view', view);
-    if (params) localStorage.setItem('f1-state', JSON.stringify(params));
+    sessionStorage.setItem('f1-view', view);
+    if (params) sessionStorage.setItem('f1-state', JSON.stringify(params));
   }
 
   function clearState() {
-    localStorage.removeItem('f1-view');
-    localStorage.removeItem('f1-state');
+    sessionStorage.removeItem('f1-view');
+    sessionStorage.removeItem('f1-state');
   }
+
+  // Legacy migration: clear old localStorage items from previous version
+  localStorage.removeItem('f1-view');
+  localStorage.removeItem('f1-state');
 
   async function loadRaces() {
     currentView = 'races';
@@ -2832,6 +2838,7 @@
             <h3 class="font-semibold text-sm mb-1" style="color:var(--text-primary)">🔗 Links</h3>
             <p>📦 GitHub: <a href="https://github.com/edsuwarna/f1-analysis" target="_blank" style="color:var(--text-primary);text-decoration:underline">github.com/edsuwarna/f1-analysis</a></p>
             <p>📖 API Docs: <code>https://f1-analysis.edsuwarna.id/docs</code></p>
+            <p>📚 Full Docs: <a href="https://f1-analysis-docs.pages.dev" target="_blank" style="color:var(--text-primary);text-decoration:underline">f1-analysis-docs.pages.dev</a> — analysis guide &amp; tech reference</p>
             <p>🗓️ Data: 2026 FIA Formula 1 World Championship</p>
           </div>
         </div>
@@ -3100,10 +3107,32 @@
 
   // ── Init ──
   initTheme();
-  // Always start at races list on page load.
-  // Saved state (localStorage) is only used during navigation within the app.
-  clearState();
-  loadRaces();
+  // Use sessionStorage: stays on same page on refresh,
+  // resets to home when opening a new tab.
+  const savedView = sessionStorage.getItem('f1-view');
+  const savedState = sessionStorage.getItem('f1-state');
+  if (savedView === 'standings') {
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    const nav = document.getElementById('nav-standings');
+    if (nav) nav.classList.add('active');
+    loadChampionship();
+  } else if (savedView === 'sessions' && savedState) {
+    try {
+      const s = JSON.parse(savedState);
+      if (s.meetingId && s.meetingName) {
+        loadSessions(s.meetingId, s.meetingName);
+      } else { loadRaces(); }
+    } catch(e) { loadRaces(); }
+  } else if (savedView === 'session' && savedState) {
+    try {
+      const s = JSON.parse(savedState);
+      if (s.meetingId && s.sessionId && s.sessionName && s.sessionType) {
+        loadSession(s.sessionId, s.meetingId, s.meetingName, s.sessionName, s.sessionType);
+      } else { loadRaces(); }
+    } catch(e) { loadRaces(); }
+  } else {
+    loadRaces();
+  }
   </script>
 
   <!-- Floating Table of Contents -->
