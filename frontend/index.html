@@ -353,6 +353,61 @@
     if (tymeTipEl) tymeTipEl.style.display = 'none';
   }
 
+  // ── Weather Chart Helper ──
+  let weatherChartInstances = {};
+  function initWeatherChart(sessionId, weather) {
+    setTimeout(() => {
+      const canvas = document.getElementById(`weather-chart-${sessionId}`);
+      if (!canvas) return;
+
+      // Destroy previous chart for this session
+      if (weatherChartInstances[sessionId]) {
+        weatherChartInstances[sessionId].destroy();
+      }
+
+      // Sample weather data
+      const sampleStep = Math.max(1, Math.floor(weather.length / 40));
+      const labels = [];
+      const airSeries = [];
+      const trackSeries = [];
+      for (let i = 0; i < weather.length; i += sampleStep) {
+        const w = weather[i];
+        labels.push(Math.floor(i * 70 / weather.length) + 1);
+        airSeries.push(w.air_temp);
+        trackSeries.push(w.track_temp);
+      }
+
+      const ctx = canvas.getContext('2d');
+      const isLight = document.documentElement.classList.contains('light');
+      const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+      const textColor = isLight ? '#64748b' : '#8b949e';
+      weatherChartInstances[sessionId] = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Air Temp °C', data: airSeries,
+              borderColor: '#f59e0b', borderWidth: 2, pointRadius: 0, tension: 0.3, fill: false },
+            { label: 'Track Temp °C', data: trackSeries,
+              borderColor: '#dc2626', borderWidth: 2, pointRadius: 0, tension: 0.3, fill: false },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          animation: { duration: 400 },
+          plugins: {
+            legend: { position: 'top', labels: { color: textColor, font: { size: 10 } } }
+          },
+          scales: {
+            x: { title: { display: true, text: 'Approx. Lap', color: textColor, font: { size: 10 } },
+              grid: { color: gridColor }, ticks: { color: textColor, font: { size: 9 } } },
+            y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 9 } } }
+          }
+        }
+      });
+    }, 100);
+  }
+
   // ── Views ──
   async function loadRaces() {
     currentView = 'races';
@@ -430,11 +485,12 @@
     el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading session data...</div>';
 
     try {
-      const [sectors, drivers, stints, pits] = await Promise.all([
+      const [sectors, drivers, stints, pits, weather] = await Promise.all([
         api(`/sessions/${sessionId}/sectors`),
         api(`/sessions/${sessionId}/drivers`),
         api(`/sessions/${sessionId}/stints`),
         api(`/sessions/${sessionId}/pit-stops`),
+        api(`/sessions/${sessionId}/weather`),
       ]);
 
       // Build driver map
@@ -522,6 +578,159 @@
           `;
         }
         html += `</tbody></table></div></div>`;
+      }
+
+      // ── Pit Stop Analysis ──
+      if (pits.length > 0) {
+        const byDriver = {};
+        pits.forEach(p => {
+          if (!byDriver[p.driver_number]) byDriver[p.driver_number] = [];
+          byDriver[p.driver_number].push(p);
+        });
+
+        // Group stops by driver + find fastest
+        const allStops = [...pits].sort((a, b) => (a.pit_duration || 999) - (b.pit_duration || 999));
+        const fastest = allStops[0];
+        const slowest = allStops[allStops.length - 1];
+
+        html += `
+          <div class="card p-5 mb-6">
+            <h3 class="font-semibold text-sm mb-4">⛽ Pit Stop Analysis</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
+              <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
+                <div class="font-bold" style="color:var(--text-primary)">${pits.length}</div>
+                <div>Total Stops</div>
+              </div>
+              <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
+                <div class="font-bold" style="color:var(--text-primary)">${Object.keys(byDriver).length}</div>
+                <div>Drivers</div>
+              </div>
+              <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
+                <div class="font-bold" style="color:#16a34a">${(fastest.pit_duration || 0).toFixed(1)}s</div>
+                <div>Fastest Stop</div>
+                <div>#${fastest.driver_number} L${fastest.lap_number}</div>
+              </div>
+              <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
+                <div class="font-bold" style="color:#dc2626">${(slowest.pit_duration || 0).toFixed(1)}s</div>
+                <div>Slowest Stop</div>
+                <div>#${slowest.driver_number} L${slowest.lap_number}</div>
+              </div>
+            </div>
+
+            <!-- Pit Window Timeline -->
+            <div class="overflow-x-auto mb-3">
+              <div style="min-width:450px">
+                <div class="flex text-xs mb-1" style="color:var(--text-muted)">
+                  <div style="width:44px"></div>
+                  <div class="flex-1 flex">`;
+
+        // Lap markers
+        const pitMaxLap = Math.max(...pits.map(p => p.lap_number));
+        const pitStep = pitMaxLap > 60 ? 10 : 5;
+        for (let i = 1; i <= pitMaxLap; i += pitStep) {
+          html += `<span style="width:${(pitStep/pitMaxLap)*100}%;text-align:center">L${i}</span>`;
+        }
+        html += `</div></div>`;
+
+        // Driver rows sorted by first pit lap
+        const sortedPits = Object.entries(byDriver).sort((a, b) =>
+          Math.min(...a[1].map(x => x.lap_number)) - Math.min(...b[1].map(x => x.lap_number))
+        );
+        for (const [dn, stops] of sortedPits) {
+          const drv = driverMap[parseInt(dn)];
+          const label = drv ? drv.name_acronym : dn;
+          const colour = drv ? teamColor(drv.team_colour) : '#666';
+          html += `<div class="flex items-center" style="height:20px;margin-bottom:2px">
+            <div style="width:44px;font-size:10px;font-weight:700;text-align:right;padding-right:6px;color:${colour};flex-shrink:0">${label}</div>
+            <div class="flex-1 relative" style="height:16px;background:var(--bg-primary);border-radius:3px">`;
+          for (const s of stops) {
+            const pct = ((s.lap_number - 1) / Math.max(pitMaxLap - 1, 1)) * 100;
+            const duration = s.pit_duration || 25;
+            const isFast = duration <= 22;
+            html += `<div style="position:absolute;left:${pct}%;top:1px;width:12px;height:12px;border-radius:50%;background:${isFast ? '#16a34a' : '#e10600'};cursor:pointer;border:1px solid var(--bg-primary)"
+              onmouseenter="showTymeTip(event,'#${dn} L${s.lap_number} · ${duration.toFixed(1)}s${isFast ? ' ⚡' : ''}')" onmouseleave="hideTymeTip()"></div>`;
+          }
+          html += `</div></div>`;
+        }
+        html += `</div></div>`;
+
+        // Pit stops table
+        html += `
+            <div class="overflow-x-auto">
+              <table>
+                <thead><tr><th>Driver</th><th>Team</th><th class="text-right">Stops</th><th class="text-right">Avg Stop</th><th class="text-right">Fastest</th><th class="text-right">Laps</th></tr></thead>
+                <tbody>
+        `;
+        const sortedByStops = Object.entries(byDriver).sort((a, b) => b[1].length - a[1].length);
+        for (const [dn, stops] of sortedByStops) {
+          const drv = driverMap[parseInt(dn)];
+          const avgStop = stops.reduce((s, p) => s + (p.pit_duration || 0), 0) / stops.length;
+          const fastestStop = Math.min(...stops.map(p => p.pit_duration || 999));
+          const laps = stops.map(p => p.lap_number).sort((a,b) => a-b).join(', ');
+          html += `
+            <tr>
+              <td class="font-medium">${drv ? drv.name_acronym : dn}</td>
+              <td><span class="team-dot" style="background:${teamColor(drv?.team_colour)}"></span>${drv?.team_name || '—'}</td>
+              <td class="text-right">${stops.length}</td>
+              <td class="text-right font-mono">${avgStop.toFixed(1)}s</td>
+              <td class="text-right font-mono" style="color:#16a34a">${fastestStop.toFixed(1)}s</td>
+              <td class="text-right" style="color:var(--text-secondary);font-size:11px">${laps}</td>
+            </tr>
+          `;
+        }
+        html += `</tbody></table></div></div>`;
+      }
+
+      // ── Weather Timeline ──
+      if (weather.length > 0) {
+        const airTemps = weather.filter(w => w.air_temp != null).map(w => w.air_temp);
+        const trackTemps = weather.filter(w => w.track_temp != null).map(w => w.track_temp);
+        const avgAir = (airTemps.reduce((s, t) => s + t, 0) / airTemps.length).toFixed(1);
+        const avgTrack = (trackTemps.reduce((s, t) => s + t, 0) / trackTemps.length).toFixed(1);
+
+        // Sample weather at regular intervals for chart (max ~50 points)
+        const sampleStep = Math.max(1, Math.floor(weather.length / 40));
+        const weatherLabels = [];
+        const airSeries = [];
+        const trackSeries = [];
+        for (let i = 0; i < weather.length; i += sampleStep) {
+          const w = weather[i];
+          const lap = Math.floor(i * 70 / weather.length) + 1; // approximate lap number
+          weatherLabels.push(lap);
+          airSeries.push(w.air_temp);
+          trackSeries.push(w.track_temp);
+        }
+
+        html += `
+          <div class="card p-5 mb-6">
+            <h3 class="font-semibold text-sm mb-4">🌤️ Weather Impact</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
+              <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
+                <div class="font-bold" style="color:var(--text-primary)">${Math.min(...airTemps).toFixed(1)}° - ${Math.max(...airTemps).toFixed(1)}°</div>
+                <div>🌡️ Air Temp</div>
+              </div>
+              <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
+                <div class="font-bold" style="color:var(--text-primary)">${Math.min(...trackTemps).toFixed(1)}° - ${Math.max(...trackTemps).toFixed(1)}°</div>
+                <div>🛞 Track Temp</div>
+              </div>
+              <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
+                <div class="font-bold" style="color:var(--text-primary)">${avgAir}° / ${avgTrack}°</div>
+                <div>Average Air/Track</div>
+              </div>
+              <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
+                <div class="font-bold" style="color:var(--text-primary)">${weather[0].humidity || '?'}%</div>
+                <div>💧 Humidity</div>
+              </div>
+            </div>
+
+            <div class="relative" style="height:200px">
+              <canvas id="weather-chart-${sessionId}"></canvas>
+            </div>
+          </div>
+        `;
+
+        // Init weather chart after DOM render
+        initWeatherChart(sessionId, weather);
       }
 
       // Compare button
