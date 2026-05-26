@@ -91,7 +91,7 @@ def fetch_and_store_meeting(engine, year: int, gp_name: str):
     # Get all meetings for the year
     meetings = api_get("meetings", {"year": year})
     if not meetings:
-        log.error("❌ No meetings found for year {year}")
+        log.error(f"❌ No meetings found for year {year}")
         return False
 
     # Find matching meeting
@@ -309,6 +309,7 @@ def _store_drivers(sasession, session_key: int, session_id: int):
             })
         log.info(f"      👨‍👩‍👧‍👦 Stored {len(drivers)} drivers")
     except Exception as e:
+        sasession.rollback()
         log.warning(f"      ⚠️ Driver error: {e}")
 
 
@@ -352,6 +353,7 @@ def _store_laps(sasession, session_key: int, session_id: int):
 
         log.info(f"      📊 Stored {len(batch)} laps")
     except Exception as e:
+        sasession.rollback()
         log.warning(f"      ⚠️ Laps store error: {e}")
 
 
@@ -369,7 +371,7 @@ def _store_stints(sasession, session_key: int, session_id: int):
                 "sid": session_id,
                 "dn": stint.get("driver_number"),
                 "sn": stint.get("stint_number"),
-                "comp": stint.get("compound", ""),
+                "comp": stint.get("compound") or "",
                 "age": stint.get("tyre_age_at_start", 0),
                 "ls": stint.get("lap_start"),
                 "le": stint.get("lap_end"),
@@ -387,6 +389,7 @@ def _store_stints(sasession, session_key: int, session_id: int):
             """), batch)
             log.info(f"      🛞 Stored {len(batch)} stints")
     except Exception as e:
+        sasession.rollback()
         log.warning(f"      ⚠️ Stints error: {e}")
 
 
@@ -419,6 +422,7 @@ def _store_pit_stops(sasession, session_key: int, session_id: int):
             """), batch)
             log.info(f"      ⛽ Stored {len(batch)} pit stops")
     except Exception as e:
+        sasession.rollback()
         log.warning(f"      ⚠️ Pit stops error: {e}")
 
 
@@ -462,6 +466,7 @@ def _store_weather(sasession, session_key: int, session_id: int):
                 """), sub)
             log.info(f"      🌤️ Stored {len(batch)} weather records")
     except Exception as e:
+        sasession.rollback()
         log.warning(f"      ⚠️ Weather error: {e}")
 
 
