@@ -870,12 +870,12 @@
             <td class="text-right font-mono">${formatTime(a.lap_duration)}</td>
             <td class="text-right font-mono font-bold" style="${color}">${delta !== null ? (delta > 0 ? '+' : '') + delta.toFixed(3) : '—'}</td>
             <td class="text-right font-mono">${formatTime(b.lap_duration)}</td>
-            <td class="text-right font-mono">${formatTime(a.sector_1)}</td>
-            <td class="text-right font-mono">${formatTime(b.sector_1)}</td>
-            <td class="text-right font-mono">${formatTime(a.sector_2)}</td>
-            <td class="text-right font-mono">${formatTime(b.sector_2)}</td>
-            <td class="text-right font-mono">${formatTime(a.sector_3)}</td>
-            <td class="text-right font-mono">${formatTime(b.sector_3)}</td>
+            <td class="text-right font-mono" style="${a.sector_1 && b.sector_1 ? (a.sector_1 < b.sector_1 ? 'color:#16a34a;font-weight:700' : 'color:var(--text-muted)') : ''}">${formatTime(a.sector_1)}</td>
+            <td class="text-right font-mono" style="${a.sector_1 && b.sector_1 ? (a.sector_1 > b.sector_1 ? 'color:#16a34a;font-weight:700' : 'color:var(--text-muted)') : ''}">${formatTime(b.sector_1)}</td>
+            <td class="text-right font-mono" style="${a.sector_2 && b.sector_2 ? (a.sector_2 < b.sector_2 ? 'color:#16a34a;font-weight:700' : 'color:var(--text-muted)') : ''}">${formatTime(a.sector_2)}</td>
+            <td class="text-right font-mono" style="${a.sector_2 && b.sector_2 ? (a.sector_2 > b.sector_2 ? 'color:#16a34a;font-weight:700' : 'color:var(--text-muted)') : ''}">${formatTime(b.sector_2)}</td>
+            <td class="text-right font-mono" style="${a.sector_3 && b.sector_3 ? (a.sector_3 < b.sector_3 ? 'color:#16a34a;font-weight:700' : 'color:var(--text-muted)') : ''}">${formatTime(a.sector_3)}</td>
+            <td class="text-right font-mono" style="${a.sector_3 && b.sector_3 ? (a.sector_3 > b.sector_3 ? 'color:#16a34a;font-weight:700' : 'color:var(--text-muted)') : ''}">${formatTime(b.sector_3)}</td>
           </tr>
         `;
       }
