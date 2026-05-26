@@ -619,24 +619,24 @@
       }
       html += `</tbody></table></div></div></div>`;
 
-      // ── Qualifying Evolution ──
-      html += `
+    // ── Qualifying Evolution (Q1→Q3, only for Qualifying sessions) ──
+      html += `${(sessionType === 'Qualifying') ? `
       <div class="card p-5 mb-6">
         <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
           <h3 class="font-semibold text-sm">⏱️ Qualifying Evolution
-            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Lap progression with deltas</span>
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Q1→Q2→Q3 best lap progression</span>
           </h3>
           <span class="collapse-icon">▼</span>
         </div>
         <div class="collapse-body closed">
           <div id="qevo-chart-area">
             <div class="text-center py-8" style="color:var(--text-muted)">
-              <button onclick="loadQualifyingEvolution(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">⏱️ Load Qualifying Evolution</button>
-              <div class="mt-2 text-xs">Shows each driver's lap progression — 🟢 improvement, 🔴 slower, 🟣 personal best</div>
+              <button onclick="loadQualifyingEvolution(${meetingId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">⏱️ Load Qualifying Evolution</button>
+              <div class="mt-2 text-xs">Shows best lap per driver across Q1→Q2→Q3 — green = improvement, red = slower</div>
             </div>
           </div>
         </div>
-      </div>`;
+      </div>` : ''}`;
 
       // ── Lap Distribution ──
       html += `
@@ -1394,162 +1394,152 @@
     }
   }
 
-  // ── Qualifying Evolution ──
-  async function loadQualifyingEvolution(sessionId) {
+  // ── Qualifying Evolution (Q1→Q2→Q3) ──
+  async function loadQualifyingEvolution(meetingId) {
     const el = document.getElementById('qevo-chart-area');
     el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading qualifying data...</div>';
 
     if (qevoChartInstance) { qevoChartInstance.destroy(); qevoChartInstance = null; }
 
     try {
-      const data = await api(`/sessions/${sessionId}/qualifying-evolution`);
-      const evolution = data.evolution;
-      const bestTimes = data.best_lap_times;
+      const data = await api(`/analytics/qualifying-summary?meeting_id=${meetingId}`);
+      const drivers = data.drivers;
+      const sessions = data.sessions;
 
-      if (!evolution || evolution.length === 0) {
+      if (!drivers || drivers.length === 0) {
         el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No qualifying data available</div>';
         return;
       }
 
+      const sessionKeys = sessions.map(s => s.session_name);
       let html = '';
 
-      // Per-driver lap progression
-      html += `<div class="text-xs mb-3" style="color:var(--text-muted)">
-        <span class="font-bold" style="color:#16a34a">🟢 Improvement</span> ·
-        <span class="font-bold" style="color:#dc2626">🔴 Slower</span> ·
-        <span class="font-bold" style="color:#a855f7">🟣 Personal Best</span>
-      </div>`;
+      // ── Stat cards ──
+      const fastest = drivers[0];
+      const mostImproved = [...drivers]
+        .filter(d => d.total_improvement !== null && d.total_improvement < 0)
+        .sort((a, b) => a.total_improvement - b.total_improvement)[0];
+      const driverCount = drivers.length;
+      const q3Count = drivers.filter(d => d.best_laps['Qualifying 3']).length;
 
-      // Chart: lap time evolution per driver (scatter/line)
-      const maxRuns = Math.max(...evolution.map(e => e.total_runs));
-      if (bestTimes.length >= 3) {
-        html += `<div class="relative" style="height:350px;margin-bottom:16px">
-          <canvas id="qevo-chart-canvas-${sessionId}"></canvas>
+      html += `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div class="card p-3 text-center">
+            <div class="text-xs" style="color:var(--text-muted)">⏱️ Pole</div>
+            <div class="font-bold text-sm" style="color:${teamColor(fastest.team_colour)}">${fastest.acronym}</div>
+            <div class="text-xs font-mono" style="color:var(--text-secondary)">${fastest.best_laps[sessionKeys[sessionKeys.length-1]]?.toFixed(3)}s</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="text-xs" style="color:var(--text-muted)">📈 Most Improved</div>
+            <div class="font-bold text-sm" style="color:${mostImproved ? teamColor(mostImproved.team_colour) : '#888'}">${mostImproved ? mostImproved.acronym : '—'}</div>
+            <div class="text-xs font-mono" style="color:#16a34a">${mostImproved ? mostImproved.total_improvement.toFixed(3) + 's' : '—'}</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="text-xs" style="color:var(--text-muted)">🏎️ Drivers</div>
+            <div class="font-bold text-lg">${driverCount}</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="text-xs" style="color:var(--text-muted)">🏁 Q3 Participants</div>
+            <div class="font-bold text-lg" style="color:#f59e0b">${q3Count}</div>
+          </div>
+        </div>`;
+
+      // ── Grouped Bar Chart ──
+      if (drivers.length >= 2 && sessionKeys.length >= 2) {
+        html += `<div class="relative" style="height:400px;margin-bottom:16px">
+          <canvas id="qevo-chart-canvas-${meetingId}"></canvas>
         </div>`;
       }
 
-      // Best lap ranking
+      // ── Progression Table ──
       html += `
-        <div class="overflow-x-auto mb-4">
+        <div class="overflow-x-auto">
           <table>
             <thead>
               <tr>
-                <th>Pos</th><th>Driver</th><th>Team</th>
-                <th class="text-right">Best Lap</th><th class="text-right">Runs</th>
-                <th class="text-right">Improvement</th>
+                <th>Pos</th><th>Driver</th><th>Team</th>`;
+      for (const sk of sessionKeys) {
+        html += `<th class="text-right font-mono">${sk}</th>`;
+      }
+      html += `<th class="text-right">Q3→Q1 Δ</th>
+                <th class="text-right">Sessions</th>
               </tr>
             </thead>
             <tbody>
       `;
 
-      const referenceBest = bestTimes[0]?.best_lap_time;
-      for (let i = 0; i < bestTimes.length; i++) {
-        const d = bestTimes[i];
-        const gap = d.best_lap_time && referenceBest ? (d.best_lap_time - referenceBest) : 0;
-        html += `
-          <tr>
-            <td style="color:var(--text-secondary)">${i + 1}</td>
-            <td class="font-medium">${d.acronym}</td>
-            <td>${d.team_name ? teamBadge(d.team_name, d.team_colour) : '—'}</td>
-            <td class="text-right font-mono font-bold">${formatTime(d.best_lap_time)}</td>
-            <td class="text-right" style="color:var(--text-secondary)">${evolution.find(e => e.driver_number === d.driver_number)?.total_runs || '—'}</td>
-            <td class="text-right font-mono" style="${gap > 0 ? 'color:#f59e0b' : 'color:#16a34a;font-weight:700'}">${gap > 0 ? '+' + gap.toFixed(3) + 's' : '—'}</td>
-          </tr>
-        `;
-      }
-      html += `</tbody></table></div>`;
-
-      // Table: per-driver lap progression with deltas
-      html += `<div class="overflow-x-auto" style="max-height:600px;overflow-y:auto">
-        <table>
-          <thead>
-            <tr>
-              <th>Driver</th>
-              ${Array.from({length: maxRuns}, (_, i) =>
-                `<th class="text-right">Run ${i + 1}</th>`
-              ).join('')}
-              <th class="text-right">Best</th>
-            </tr>
-          </thead>
-          <tbody>
-      `;
-
-      for (const e of evolution) {
-        const teamC = teamColor(e.team_colour);
-
+      for (let i = 0; i < drivers.length; i++) {
+        const d = drivers[i];
+        const teamC = d.team_colour ? teamColor(d.team_colour) : '#666';
         html += `<tr>
-          <td class="font-medium" style="color:${teamC}">${e.acronym}</td>`;
+          <td style="color:var(--text-secondary)">${i + 1}</td>
+          <td class="font-medium" style="color:${teamC}">${d.acronym}</td>
+          <td>${teamBadge(d.team_name, d.team_colour)}</td>`;
 
-        // Pad runs to maxRuns with empty cells
-        for (let r = 0; r < maxRuns; r++) {
-          const run = e.runs[r] || null;
-          if (!run) {
-            html += `<td class="text-right" style="color:var(--text-muted)">—</td>`;
-            continue;
-          }
-          const lapTime = run.lap_duration;
-          const delta = run.delta;
-          const isPB = run.is_personal_best;
-          let cellStyle = '';
-          if (isPB) cellStyle = 'color:#a855f7;font-weight:700';
-          else if (delta !== null && delta < 0) cellStyle = 'color:#16a34a;font-weight:600';
-          else if (delta !== null && delta > 0) cellStyle = 'color:#dc2626';
-          html += `<td class="text-right font-mono" style="${cellStyle}">
-            ${formatTime(lapTime)}
-            ${delta !== null ? `<span style="font-size:9px;${delta < 0 ? 'color:#16a34a' : 'color:#dc2626'}">${delta < 0 ? '' : '+'}${delta.toFixed(3)}</span>` : ''}
-          </td>`;
+        for (const sk of sessionKeys) {
+          const lap = d.best_laps[sk];
+          const isBest = i === 0 && lap !== undefined;
+          html += `<td class="text-right font-mono" style="${isBest ? 'font-weight:700' : ''}">${lap ? lap.toFixed(3) + 's' : '<span style="color:var(--text-muted)">—</span>'}</td>`;
         }
 
-        html += `<td class="text-right font-mono font-bold" style="color:#a855f7">${formatTime(e.best_lap_time)}</td>`;
+        // Delta column
+        if (d.total_improvement !== null) {
+          const isImprovement = d.total_improvement < 0;
+          html += `<td class="text-right font-mono" style="${isImprovement ? 'color:#16a34a;font-weight:600' : d.total_improvement > 0 ? 'color:#dc2626' : 'color:var(--text-secondary)'}">${isImprovement ? '' : '+'}${d.total_improvement.toFixed(3)}s</td>`;
+        } else {
+          html += `<td class="text-right" style="color:var(--text-muted)">—</td>`;
+        }
+
+        html += `<td class="text-right" style="color:var(--text-secondary)">${d.sessions_participated}/${sessionKeys.length}</td>`;
         html += `</tr>`;
       }
 
       html += `</tbody></table></div>`;
 
+      // ── Legend ──
+      html += `<div class="text-xs mt-3" style="color:var(--text-muted)">
+        <span style="color:#16a34a">🟢 Improvement</span> ·
+        <span style="color:#dc2626">🔴 Slower</span> ·
+        <span>— Eliminated (no further session)</span>
+      </div>`;
+
       el.innerHTML = html;
 
-      // Chart init
-      if (bestTimes.length >= 3) {
+      // ── Chart init ──
+      if (drivers.length >= 2 && sessionKeys.length >= 2) {
         setTimeout(() => {
-          const canvas = document.getElementById(`qevo-chart-canvas-${sessionId}`);
+          const canvas = document.getElementById(`qevo-chart-canvas-${meetingId}`);
           if (!canvas) return;
           const ctx = canvas.getContext('2d');
           const isLight = document.documentElement.classList.contains('light');
           const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
           const textColor = isLight ? '#64748b' : '#8b949e';
 
+          // Show top 15 drivers max for chart readability
+          const chartDrivers = drivers.slice(0, 15);
+          const DRV_COLORS = ['#e10600','#16a34a','#3b82f6','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#e11d48','#a855f7','#22c55e','#f43f5e','#0ea5e9'];
+
           const datasets = [];
-          const maxRunsChart = Math.max(...evolution.map(e => e.total_runs));
-          const labels = Array.from({length: maxRunsChart}, (_, i) => `Run ${i + 1}`);
-
-          // Top 10 drivers only for chart readability
-          const topDrivers = evolution.slice(0, 10);
-          const DRV_COLORS = ['#e10600','#16a34a','#3b82f6','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16'];
-
-          topDrivers.forEach((e, idx) => {
-            const color = e.team_colour ? teamColor(e.team_colour) : DRV_COLORS[idx];
-            const data = [];
-            for (let r = 0; r < maxRunsChart; r++) {
-              const run = e.runs[r];
-              data.push(run?.lap_duration || null);
-            }
+          chartDrivers.forEach((d, idx) => {
+            const color = d.team_colour ? teamColor(d.team_colour) : DRV_COLORS[idx % DRV_COLORS.length];
+            const data = sessionKeys.map(sk => d.best_laps[sk] || null);
             datasets.push({
-              label: e.acronym,
+              label: d.acronym,
               data: data,
-              borderColor: color,
               backgroundColor: color,
-              borderWidth: 2,
-              pointRadius: 4,
-              pointHoverRadius: 6,
-              tension: 0.15,
-              spanGaps: false,
-              fill: false,
+              borderColor: color,
+              borderWidth: 1,
+              borderRadius: 3,
+              barPercentage: 0.85,
             });
           });
 
           qevoChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: { labels, datasets },
+            type: 'bar',
+            data: {
+              labels: sessionKeys,
+              datasets: datasets,
+            },
             options: {
               responsive: true,
               maintainAspectRatio: false,
@@ -1564,7 +1554,7 @@
                   callbacks: {
                     title: (items) => items[0].label,
                     label: (ctx) => {
-                      if (ctx.parsed.y === null) return null;
+                      if (ctx.parsed.y === null) return `${ctx.dataset.label}: —`;
                       return `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(3)}s`;
                     },
                   },
@@ -1572,12 +1562,12 @@
               },
               scales: {
                 x: {
-                  title: { display: true, text: 'Run', color: textColor, font: { size: 11 } },
+                  title: { display: true, text: 'Session', color: textColor, font: { size: 11 } },
                   grid: { color: gridColor },
                   ticks: { color: textColor, font: { size: 10 } },
                 },
                 y: {
-                  title: { display: true, text: 'Lap Time (s)', color: textColor, font: { size: 11 } },
+                  title: { display: true, text: 'Best Lap (s)', color: textColor, font: { size: 11 } },
                   grid: { color: gridColor },
                   ticks: { color: textColor, font: { size: 10 } },
                   reverse: true,

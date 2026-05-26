@@ -507,3 +507,141 @@ async def tyre_strategy_summary(
         for dn, stints in strategies.items()
         for rows in [strategies[dn]]
     ]
+
+
+@router.get("/qualifying-summary")
+async def qualifying_summary(
+    meeting_id: int = Query(..., description="Meeting ID"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Qualifying summary across all 3 sessions (Q1→Q2→Q3).
+
+    For each driver, returns best lap time per qualifying session,
+    plus improvement deltas. Shows progression across qualifying stages.
+    """
+    # Get all qualifying sessions for this meeting, sorted chronologically
+    sess_result = await db.execute(
+        select(Session)
+        .where(
+            Session.meeting_id == meeting_id,
+            Session.session_type == "Qualifying",
+        )
+        .order_by(Session.date_start)
+    )
+    sessions = sess_result.scalars().all()
+
+    if not sessions:
+        return {"meeting_id": meeting_id, "sessions": [], "drivers": []}
+
+    session_list = [
+        {"session_id": s.id, "session_name": s.session_name}
+        for s in sessions
+    ]
+
+    # Fetch lap data for ALL qualifying sessions at once
+    session_ids = [s.id for s in sessions]
+    lap_result = await db.execute(
+        select(Lap).where(
+            Lap.session_id.in_(session_ids),
+            Lap.lap_duration.isnot(None),
+            Lap.lap_duration > 0,
+        )
+    )
+    all_laps = lap_result.scalars().all()
+
+    # Fetch driver info from the first qualifying session
+    drv_result = await db.execute(
+        select(SessionDriver).where(SessionDriver.session_id == session_ids[0])
+    )
+    driver_info_map = {}
+    for d in drv_result.scalars().all():
+        driver_info_map[d.driver_number] = {
+            "acronym": d.name_acronym,
+            "full_name": d.full_name,
+            "team_name": d.team_name,
+            "team_colour": d.team_colour,
+        }
+
+    # Session name lookup
+    session_name_map = {s.id: s.session_name for s in sessions}
+
+    # Group by driver_number, then within that by session_name
+    from collections import defaultdict
+
+    driver_session_laps = defaultdict(lambda: defaultdict(list))
+    for l in all_laps:
+        sn = session_name_map.get(l.session_id, "Unknown")
+        driver_session_laps[l.driver_number][sn].append(l.lap_duration)
+
+    drivers_data = []
+    all_drivers_best = []
+
+    for dn, session_laps_map in driver_session_laps.items():
+        info = driver_info_map.get(dn, {})
+        best_laps = {}
+        total_improvement = None
+        has_q1 = False
+        has_q3 = False
+
+        prev_best = None
+
+        # Get best lap per session (sorted by session order)
+        for s in sessions:
+            sn = s.session_name
+            laps_in_session = session_laps_map.get(sn, [])
+            if laps_in_session:
+                best = min(laps_in_session)
+                best_laps[sn] = round(best, 3)
+                if sn == "Qualifying 1":
+                    has_q1 = True
+                if sn == "Qualifying 3":
+                    has_q3 = True
+                if prev_best is not None:
+                    pass  # improvement computed below across all sessions
+                prev_best = best
+
+        # Total improvement from first to last session
+        session_names_ordered = [s.session_name for s in sessions if s.session_name in best_laps]
+        if len(session_names_ordered) >= 2:
+            first_best = best_laps.get(session_names_ordered[0])
+            last_best = best_laps.get(session_names_ordered[-1])
+            if first_best and last_best:
+                total_improvement = round(last_best - first_best, 3)
+
+        # Count sessions participated
+        sessions_participated = len(best_laps)
+
+        drivers_data.append({
+            "driver_number": dn,
+            "acronym": info.get("acronym", f"#{dn}"),
+            "full_name": info.get("full_name", "Unknown"),
+            "team_name": info.get("team_name", "Unknown"),
+            "team_colour": info.get("team_colour", ""),
+            "best_laps": best_laps,
+            "sessions_participated": sessions_participated,
+            "total_improvement": total_improvement,
+        })
+
+        # For overall ranking
+        if best_laps and session_names_ordered:
+            final_best = best_laps.get(session_names_ordered[-1])
+            if final_best:
+                all_drivers_best.append({
+                    "driver_number": dn,
+                    "acronym": info.get("acronym", f"#{dn}"),
+                    "full_name": info.get("full_name", "Unknown"),
+                    "team_name": info.get("team_name", "Unknown"),
+                    "team_colour": info.get("team_colour", ""),
+                    "best_lap": final_best,
+                })
+
+    # Sort drivers by their final best lap
+    all_drivers_best.sort(key=lambda x: x["best_lap"])
+    driver_order = {d["driver_number"]: i for i, d in enumerate(all_drivers_best)}
+    drivers_data.sort(key=lambda d: driver_order.get(d["driver_number"], 999))
+
+    return {
+        "meeting_id": meeting_id,
+        "sessions": session_list,
+        "drivers": drivers_data,
+    }
