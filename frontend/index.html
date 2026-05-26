@@ -463,8 +463,19 @@
   }
 
   // ── Views ──
+  function saveState(view, params) {
+    localStorage.setItem('f1-view', view);
+    if (params) localStorage.setItem('f1-state', JSON.stringify(params));
+  }
+
+  function clearState() {
+    localStorage.removeItem('f1-view');
+    localStorage.removeItem('f1-state');
+  }
+
   async function loadRaces() {
     currentView = 'races';
+    clearState();
     const el = document.getElementById('content');
     el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading...</div>';
     try {
@@ -502,6 +513,7 @@
   }
 
   async function loadSessions(meetingId, meetingName) {
+    saveState('sessions', { meetingId, meetingName });
     const el = document.getElementById('content');
     el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading sessions...</div>';
     try {
@@ -535,6 +547,7 @@
   }
 
   async function loadSession(sessionId, meetingId, meetingName, sessionName, sessionType) {
+    saveState('session', { sessionId, meetingId, meetingName, sessionName, sessionType });
     const el = document.getElementById('content');
     el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading session data...</div>';
 
@@ -1541,7 +1554,7 @@
 
     el.innerHTML = html;
 
-    // ── Chart init ──
+    // ── Chart init (line chart — shows progression direction) ──
     if (drivers.length >= 2 && segments.length >= 2) {
       setTimeout(() => {
         try {
@@ -1552,26 +1565,36 @@
           const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
           const textColor = isLight ? '#64748b' : '#8b949e';
 
-          const chartDrivers = drivers.slice(0, 15);
-          const DRV_COLORS = ['#e10600','#16a34a','#3b82f6','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#e11d48','#a855f7','#22c55e','#f43f5e','#0ea5e9'];
+          // Show top 12 drivers for readability
+          const chartDrivers = drivers.slice(0, 12);
+          const DRV_COLORS = ['#e10600','#16a34a','#3b82f6','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#e11d48','#a855f7'];
 
           const datasets = [];
           chartDrivers.forEach((d, idx) => {
             const color = d.team_colour ? teamColor(d.team_colour) : DRV_COLORS[idx % DRV_COLORS.length];
-            const data = segments.map(seg => (d.best_laps && d.best_laps[seg]) || null);
+            const data = segments.map(seg => {
+              const lap = d.best_laps && d.best_laps[seg];
+              return lap != null ? +lap.toFixed(3) : null;
+            });
             datasets.push({
               label: d.acronym,
               data: data,
-              backgroundColor: color,
               borderColor: color,
-              borderWidth: 1,
-              borderRadius: 3,
-              barPercentage: 0.85,
+              backgroundColor: color,
+              borderWidth: idx < 5 ? 2.5 : 1.5,
+              pointRadius: idx < 5 ? 5 : 3,
+              pointHoverRadius: 7,
+              pointBackgroundColor: color,
+              pointBorderColor: isLight ? '#fff' : '#111',
+              pointBorderWidth: 1.5,
+              tension: 0.1,
+              spanGaps: false,
+              fill: false,
             });
           });
 
           qevoChartInstance = new Chart(ctx, {
-            type: 'bar',
+            type: 'line',
             data: {
               labels: segments,
               datasets: datasets,
@@ -1580,11 +1603,18 @@
               responsive: true,
               maintainAspectRatio: false,
               animation: { duration: 300 },
-              interaction: { mode: 'index', intersect: false },
+              interaction: { mode: 'nearest', intersect: false },
               plugins: {
+                title: {
+                  display: true,
+                  text: 'Best Lap Progression — Top 12 (lines going ↓ = improvement)',
+                  color: textColor,
+                  font: { size: 11 },
+                  padding: { bottom: 8 },
+                },
                 legend: {
                   position: 'top',
-                  labels: { color: textColor, font: { size: 9 }, boxWidth: 12, padding: 6, usePointStyle: true },
+                  labels: { color: textColor, font: { size: 9 }, boxWidth: 14, padding: 6, usePointStyle: true, pointStyle: 'circle' },
                 },
                 tooltip: {
                   callbacks: {
@@ -1598,14 +1628,18 @@
               },
               scales: {
                 x: {
-                  title: { display: true, text: 'Session', color: textColor, font: { size: 11 } },
+                  title: { display: true, text: 'Qualifying Segment', color: textColor, font: { size: 11 } },
                   grid: { color: gridColor },
-                  ticks: { color: textColor, font: { size: 10 } },
+                  ticks: { color: textColor, font: { size: 10, weight: 'bold' } },
                 },
                 y: {
                   title: { display: true, text: 'Best Lap (s)', color: textColor, font: { size: 11 } },
                   grid: { color: gridColor },
-                  ticks: { color: textColor, font: { size: 10 } },
+                  ticks: {
+                    color: textColor,
+                    font: { size: 10 },
+                    callback: (val) => val.toFixed(3),
+                  },
                   reverse: true,
                 },
               },
@@ -2794,11 +2828,26 @@
   // ── Init ──
   initTheme();
   const savedView = localStorage.getItem('f1-view');
+  const savedState = localStorage.getItem('f1-state');
   if (savedView === 'standings') {
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     const nav = document.getElementById('nav-standings');
     if (nav) nav.classList.add('active');
     loadChampionship();
+  } else if (savedView === 'sessions' && savedState) {
+    try {
+      const s = JSON.parse(savedState);
+      if (s.meetingId && s.meetingName) {
+        loadSessions(s.meetingId, s.meetingName);
+      } else { loadRaces(); }
+    } catch(e) { loadRaces(); }
+  } else if (savedView === 'session' && savedState) {
+    try {
+      const s = JSON.parse(savedState);
+      if (s.meetingId && s.sessionId && s.sessionName && s.sessionType) {
+        loadSession(s.sessionId, s.meetingId, s.meetingName, s.sessionName, s.sessionType);
+      } else { loadRaces(); }
+    } catch(e) { loadRaces(); }
   } else {
     loadRaces();
   }
