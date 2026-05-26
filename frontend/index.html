@@ -804,6 +804,12 @@
       </div>`;
 
       // Stats summary
+      // Delta legend
+      html += `
+        <div class="flex gap-4 justify-center mb-4 text-xs" style="color:var(--text-secondary)">
+          <span>🟢 <strong style="color:#16a34a">Hijau</strong> = ${d1name} lebih cepat (Δ negatif)</span>
+          <span>🔴 <strong style="color:#dc2626">Merah</strong> = ${d2name} lebih cepat (Δ positif)</span>
+        </div>`;
       const avgA = timesA.filter(t => t).reduce((s, t) => s + t, 0) / timesA.filter(t => t).length || 0;
       const avgB = timesB.filter(t => t).reduce((s, t) => s + t, 0) / timesB.filter(t => t).length || 0;
       const bestA = Math.min(...timesA.filter(t => t));
