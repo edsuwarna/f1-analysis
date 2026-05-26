@@ -31,6 +31,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://f1_user:f1_pass_secret@postgres:5432/f1_analysis
       CACHE_DIR: /app/cache
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
     depends_on:
       postgres:
         condition: service_healthy

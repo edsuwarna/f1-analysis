@@ -50,6 +50,8 @@
   </div>
 
   <script>
+  // Default: relative path (local dev via FastAPI)
+  // CF Pages: sed -i \"s|const API = ''|const API = 'https://f1-api.edsuwarna.id'|g\" frontend/index.html
   const API = '';
   let meetings = [];
   let currentView = 'races';

@@ -19,6 +19,8 @@ async def lifespan(app: FastAPI):
     yield
 
 
+import os
+
 app = FastAPI(
     title="F1 Analysis API",
     description="Formula 1 telemetry, lap timing, and performance analysis API",
@@ -26,9 +28,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# CORS — allow frontend domains (CF Pages, local dev)
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tighten in production
+    allow_origins=[o.strip() for o in CORS_ORIGINS.split(",")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,7 +44,6 @@ app.include_router(sessions.router, prefix="/api", tags=["Sessions"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 
 # Serve frontend static files
-import os
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
 if os.path.exists(frontend_path):
     app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
