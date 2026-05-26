@@ -1395,127 +1395,156 @@
   }
 
   // ── Qualifying Evolution (Q1→Q2→Q3) ──
+  const qevoCache = {};
+
   async function loadQualifyingEvolution(meetingId) {
     const el = document.getElementById('qevo-chart-area');
-    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading qualifying data...</div>';
+    if (!el) return;
+
+    // Check cache
+    const cacheKey = `qevo_${meetingId}`;
+    if (qevoCache[cacheKey]) {
+      renderQualifyingData(qevoCache[cacheKey], meetingId);
+      return;
+    }
+
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">⏳ Loading qualifying data...</div>';
 
     if (qevoChartInstance) { qevoChartInstance.destroy(); qevoChartInstance = null; }
 
     try {
       const data = await api(`/analytics/qualifying-summary?meeting_id=${meetingId}`);
-      const drivers = data.drivers;
-      const segments = data.segments || ['Q1', 'Q2', 'Q3'];
-      const sessionInfo = data.session;
-
-      if (!drivers || drivers.length === 0) {
+      if (!data || !data.drivers || !Array.isArray(data.drivers)) {
         el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No qualifying data available</div>';
         return;
       }
+      qevoCache[cacheKey] = data;
+      renderQualifyingData(data, meetingId);
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error loading data: ${e.message}</div>`;
+    }
+  }
 
-      let html = '';
+  function renderQualifyingData(data, meetingId) {
+    const el = document.getElementById('qevo-chart-area');
+    if (!el) return;
 
-      // ── Stat cards ──
-      const fastest = drivers[0];
-      const lastSeg = segments[segments.length - 1];
-      const mostImproved = [...drivers]
-        .filter(d => d.total_improvement !== null && d.total_improvement < 0)
-        .sort((a, b) => a.total_improvement - b.total_improvement)[0];
-      const driverCount = drivers.length;
+    const drivers = data.drivers || [];
+    const segments = Array.isArray(data.segments) && data.segments.length > 0
+      ? data.segments
+      : ['Q1', 'Q2', 'Q3'];
+    const sessionInfo = data.session;
 
-      html += `
-        <div class="text-xs mb-3" style="color:var(--text-muted)">
-          <strong>${sessionInfo ? sessionInfo.session_name + ' — ' : ''}</strong>
-          Segments detected: ${segments.join(' → ')}
+    if (drivers.length === 0) {
+      el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No qualifying data available</div>';
+      return;
+    }
+
+    let html = '';
+
+    // ── Stat cards ──
+    const fastest = drivers[0];
+    const lastSeg = segments[segments.length - 1];
+    const mostImproved = [...drivers]
+      .filter(d => d.total_improvement !== null && d.total_improvement < 0)
+      .sort((a, b) => a.total_improvement - b.total_improvement)[0];
+    const driverCount = drivers.length;
+
+    html += `
+      <div class="text-xs mb-3" style="color:var(--text-muted)">
+        <strong>${sessionInfo && sessionInfo.session_name ? sessionInfo.session_name + ' — ' : ''}</strong>
+        ${segments.length > 1 ? 'Segments: ' + segments.join(' → ') : 'Single session'}
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div class="card p-3 text-center">
+          <div class="text-xs" style="color:var(--text-muted)">⏱️ Pole</div>
+          <div class="font-bold text-sm" style="color:${fastest && fastest.team_colour ? teamColor(fastest.team_colour) : '#888'}">${fastest ? fastest.acronym : '—'}</div>
+          <div class="text-xs font-mono" style="color:var(--text-secondary)">${fastest && fastest.best_laps && fastest.best_laps[lastSeg] ? fastest.best_laps[lastSeg].toFixed(3) + 's' : '—'}</div>
         </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <div class="card p-3 text-center">
-            <div class="text-xs" style="color:var(--text-muted)">⏱️ Pole</div>
-            <div class="font-bold text-sm" style="color:${teamColor(fastest.team_colour)}">${fastest.acronym}</div>
-            <div class="text-xs font-mono" style="color:var(--text-secondary)">${fastest.best_laps[lastSeg]?.toFixed(3)}s</div>
-          </div>
-          <div class="card p-3 text-center">
-            <div class="text-xs" style="color:var(--text-muted)">📈 Most Improved</div>
-            <div class="font-bold text-sm" style="color:${mostImproved ? teamColor(mostImproved.team_colour) : '#888'}">${mostImproved ? mostImproved.acronym : '—'}</div>
-            <div class="text-xs font-mono" style="color:#16a34a">${mostImproved ? mostImproved.total_improvement.toFixed(3) + 's' : '—'}</div>
-          </div>
-          <div class="card p-3 text-center">
-            <div class="text-xs" style="color:var(--text-muted)">🏎️ Drivers</div>
-            <div class="font-bold text-lg">${driverCount}</div>
-          </div>
-          <div class="card p-3 text-center">
-            <div class="text-xs" style="color:var(--text-muted)">🏁 Q3</div>
-            <div class="font-bold text-lg" style="color:#f59e0b">${data.q3_drivers || '—'}</div>
-          </div>
-        </div>`;
-
-      // ── Grouped Bar Chart (only if multiple segments) ──
-      if (drivers.length >= 2 && segments.length >= 2) {
-        html += `<div class="relative" style="height:400px;margin-bottom:16px">
-          <canvas id="qevo-chart-canvas-${meetingId}"></canvas>
-        </div>`;
-      } else if (segments.length === 1) {
-        html += `<div class="text-xs mb-4" style="color:var(--text-muted)">
-          ℹ️ Only 1 qualifying session found in the data — showing best lap ranking table below.
-        </div>`;
-      }
-
-      // ── Progression Table ──
-      html += `
-        <div class="overflow-x-auto">
-          <table>
-            <thead>
-              <tr>
-                <th>Pos</th><th>Driver</th><th>Team</th>`;
-      for (const seg of segments) {
-        html += `<th class="text-right font-mono">${seg}</th>`;
-      }
-      html += `<th class="text-right">Last→First Δ</th>
-                <th class="text-right">Segments</th>
-              </tr>
-            </thead>
-            <tbody>
-      `;
-
-      for (let i = 0; i < drivers.length; i++) {
-        const d = drivers[i];
-        const teamC = d.team_colour ? teamColor(d.team_colour) : '#666';
-        html += `<tr>
-          <td style="color:var(--text-secondary)">${i + 1}</td>
-          <td class="font-medium" style="color:${teamC}">${d.acronym}</td>
-          <td>${teamBadge(d.team_name, d.team_colour)}</td>`;
-
-        for (const seg of segments) {
-          const lap = d.best_laps[seg];
-          const isPole = i === 0 && seg === lastSeg && lap !== undefined;
-          html += `<td class="text-right font-mono" style="${isPole ? 'font-weight:700' : ''}">${lap ? lap.toFixed(3) + 's' : '<span style="color:var(--text-muted)">—</span>'}</td>`;
-        }
-
-        // Delta column
-        if (d.total_improvement !== null) {
-          const isImprovement = d.total_improvement < 0;
-          html += `<td class="text-right font-mono" style="${isImprovement ? 'color:#16a34a;font-weight:600' : d.total_improvement > 0 ? 'color:#dc2626' : 'color:var(--text-secondary)'}">${isImprovement ? '' : '+'}${d.total_improvement.toFixed(3)}s</td>`;
-        } else {
-          html += `<td class="text-right" style="color:var(--text-muted)">—</td>`;
-        }
-
-        html += `<td class="text-right" style="color:var(--text-secondary)">${d.segments_completed}/${segments.length}</td>`;
-        html += `</tr>`;
-      }
-
-      html += `</tbody></table></div>`;
-
-      // ── Legend ──
-      html += `<div class="text-xs mt-3" style="color:var(--text-muted)">
-        <span style="color:#16a34a">🟢 Improvement</span> ·
-        <span style="color:#dc2626">🔴 Slower</span> ·
-        <span>— Eliminated (no further session)</span>
+        <div class="card p-3 text-center">
+          <div class="text-xs" style="color:var(--text-muted)">📈 Most Improved</div>
+          <div class="font-bold text-sm" style="color:${mostImproved && mostImproved.team_colour ? teamColor(mostImproved.team_colour) : '#888'}">${mostImproved ? mostImproved.acronym : '—'}</div>
+          <div class="text-xs font-mono" style="color:#16a34a">${mostImproved && mostImproved.total_improvement !== null ? mostImproved.total_improvement.toFixed(3) + 's' : '—'}</div>
+        </div>
+        <div class="card p-3 text-center">
+          <div class="text-xs" style="color:var(--text-muted)">🏎️ Drivers</div>
+          <div class="font-bold text-lg">${driverCount}</div>
+        </div>
+        <div class="card p-3 text-center">
+          <div class="text-xs" style="color:var(--text-muted)">🏁 Q3</div>
+          <div class="font-bold text-lg" style="color:#f59e0b">${data.q3_drivers != null ? data.q3_drivers : '—'}</div>
+        </div>
       </div>`;
 
-      el.innerHTML = html;
+    // ── Grouped Bar Chart (only if multiple segments) ──
+    if (drivers.length >= 2 && segments.length >= 2) {
+      html += `<div class="relative" style="height:400px;margin-bottom:16px">
+        <canvas id="qevo-chart-canvas-${meetingId}"></canvas>
+      </div>`;
+    } else if (segments.length === 1) {
+      html += `<div class="text-xs mb-4" style="color:var(--text-muted)">
+        ℹ️ Only 1 qualifying session found — showing best lap ranking.
+      </div>`;
+    }
 
-      // ── Chart init ──
-      if (drivers.length >= 2 && segments.length >= 2) {
-        setTimeout(() => {
+    // ── Progression Table ──
+    html += `
+      <div class="overflow-x-auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Pos</th><th>Driver</th><th>Team</th>`;
+    for (const seg of segments) {
+      html += `<th class="text-right font-mono">${seg}</th>`;
+    }
+    html += `<th class="text-right">Last→First Δ</th>
+              <th class="text-right">Segments</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    for (let i = 0; i < drivers.length; i++) {
+      const d = drivers[i];
+      const teamC = d.team_colour ? teamColor(d.team_colour) : '#666';
+      html += `<tr>
+        <td style="color:var(--text-secondary)">${i + 1}</td>
+        <td class="font-medium" style="color:${teamC}">${d.acronym}</td>
+        <td>${teamBadge(d.team_name, d.team_colour)}</td>`;
+
+      for (const seg of segments) {
+        const lap = d.best_laps ? d.best_laps[seg] : undefined;
+        const isPole = i === 0 && seg === lastSeg && lap !== undefined;
+        html += `<td class="text-right font-mono" style="${isPole ? 'font-weight:700' : ''}">${lap != null ? lap.toFixed(3) + 's' : '<span style="color:var(--text-muted)">—</span>'}</td>`;
+      }
+
+      // Delta column
+      if (d.total_improvement !== null && d.total_improvement !== undefined) {
+        const isImprovement = d.total_improvement < 0;
+        html += `<td class="text-right font-mono" style="${isImprovement ? 'color:#16a34a;font-weight:600' : d.total_improvement > 0 ? 'color:#dc2626' : 'color:var(--text-secondary)'}">${isImprovement ? '' : '+'}${d.total_improvement.toFixed(3)}s</td>`;
+      } else {
+        html += `<td class="text-right" style="color:var(--text-muted)">—</td>`;
+      }
+
+      html += `<td class="text-right" style="color:var(--text-secondary)">${d.segments_completed != null ? d.segments_completed + '/' + segments.length : '—'}</td>`;
+      html += `</tr>`;
+    }
+
+    html += `</tbody></table></div>`;
+
+    // ── Legend ──
+    html += `<div class="text-xs mt-3" style="color:var(--text-muted)">
+      <span style="color:#16a34a">🟢 Improvement</span> ·
+      <span style="color:#dc2626">🔴 Slower</span> ·
+      <span>— Eliminated (no further session)</span>
+    </div>`;
+
+    el.innerHTML = html;
+
+    // ── Chart init ──
+    if (drivers.length >= 2 && segments.length >= 2) {
+      setTimeout(() => {
+        try {
           const canvas = document.getElementById(`qevo-chart-canvas-${meetingId}`);
           if (!canvas) return;
           const ctx = canvas.getContext('2d');
@@ -1523,14 +1552,13 @@
           const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
           const textColor = isLight ? '#64748b' : '#8b949e';
 
-          // Show top 15 drivers max for chart readability
           const chartDrivers = drivers.slice(0, 15);
           const DRV_COLORS = ['#e10600','#16a34a','#3b82f6','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#e11d48','#a855f7','#22c55e','#f43f5e','#0ea5e9'];
 
           const datasets = [];
           chartDrivers.forEach((d, idx) => {
             const color = d.team_colour ? teamColor(d.team_colour) : DRV_COLORS[idx % DRV_COLORS.length];
-            const data = segments.map(seg => d.best_laps[seg] || null);
+            const data = segments.map(seg => (d.best_laps && d.best_laps[seg]) || null);
             datasets.push({
               label: d.acronym,
               data: data,
@@ -1583,10 +1611,10 @@
               },
             },
           });
-        }, 50);
-      }
-    } catch(e) {
-      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
+        } catch(e) {
+          console.warn('Qualifying chart error:', e);
+        }
+      }, 50);
     }
   }
 
