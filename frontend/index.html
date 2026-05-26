@@ -1617,6 +1617,11 @@
       return;
     }
 
+    // Preserve checkbox state from previous render
+    const prevChecked = new Set(
+      [...document.querySelectorAll('.qevo-cb:checked')].map(cb => parseInt(cb.value))
+    );
+
     let html = '';
 
     // ── Stat cards ──
@@ -1663,7 +1668,7 @@
       <div class="flex flex-wrap gap-2 mb-3" id="qevo-drivers">
         ${drivers.map(d => `
           <label class="flex items-center gap-1.5 text-xs cursor-pointer" style="color:var(--text-primary)">
-            <input type="checkbox" class="qevo-cb" value="${d.driver_number}" data-acronym="${d.acronym}" checked>
+            <input type="checkbox" class="qevo-cb" value="${d.driver_number}" data-acronym="${d.acronym}" ${prevChecked.has(d.driver_number) ? 'checked' : ''}>
             <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${d.team_colour ? teamColor(d.team_colour) : '#888'}"></span>
             ${d.acronym}
           </label>
@@ -1673,10 +1678,7 @@
     `;
 
     // Filter drivers by selected checkboxes for chart
-    const selectedDns = new Set(
-      [...document.querySelectorAll('.qevo-cb:checked')].map(cb => parseInt(cb.value))
-    );
-    const chartDrivers = drivers.filter(d => selectedDns.has(d.driver_number));
+    const chartDrivers = drivers.filter(d => prevChecked.has(d.driver_number));
 
     // ── Line Chart (shows progression direction) ──
     if (chartDrivers.length >= 2 && segments.length >= 2) {
