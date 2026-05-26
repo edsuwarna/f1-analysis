@@ -825,6 +825,39 @@
           <div id="comp-result" class="mt-4"></div>
         </div></div>
 
+      <!-- Gap Timeline -->
+      <div class="card p-5 mt-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm">📊 Gap Timeline</h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body closed">
+          <div class="flex flex-wrap gap-3 items-center mb-3">
+            <button onclick="gapSelectAll(${sessionId})" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">✅ Select All</button>
+            <button onclick="gapDeselectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">⬜ Clear</button>
+            <span style="color:var(--text-secondary);font-size:11px">Pick drivers to show:</span>
+          </div>
+          <div class="flex flex-wrap gap-2 mb-3" id="gap-drivers">
+            ${drivers.map(d => `
+              <label class="flex items-center gap-1.5 text-xs cursor-pointer" style="color:var(--text-primary)">
+                <input type="checkbox" class="gap-cb" value="${d.driver_number}" data-acronym="${d.name_acronym}" checked>
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${teamColor(d.team_colour)}"></span>
+                ${d.name_acronym}
+              </label>
+            `).join('')}
+          </div>
+          <div class="flex items-center gap-3 mb-3">
+            <select id="gap-ref" class="text-xs">
+              <option value="">🚩 Leader (auto)</option>
+              ${drivers.map(d => `<option value="${d.driver_number}">📌 ${d.name_acronym} (${d.full_name})</option>`).join('')}
+            </select>
+            <button onclick="loadGaps(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">📈 Plot Gaps</button>
+          </div>
+          <div class="text-xs mb-3" style="color:var(--text-muted)">Cumulative gap to leader per lap — garis di 0 = leader. Pilih driver buat dibandingin.</div>
+          <div id="gap-chart-area"></div>
+        </div>
+      </div>
+
       <!-- Tyre Degradation -->
       <div class="card p-5 mt-6">
         <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
@@ -855,6 +888,7 @@
   }
 
   let degChartInstance = null;
+  let gapChartInstance = null;
 
   // ── Tyre Degradation ──
   async function loadDegradation(sessionId) {
@@ -988,6 +1022,233 @@
   }
 
   let lapChartInstance = null;
+
+  // ── Gap Timeline ──
+  function gapSelectAll(sessionId) {
+    document.querySelectorAll('.gap-cb').forEach(cb => cb.checked = true);
+  }
+  function gapDeselectAll() {
+    document.querySelectorAll('.gap-cb').forEach(cb => cb.checked = false);
+  }
+
+  async function loadGaps(sessionId) {
+    const el = document.getElementById('gap-chart-area');
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading gap data...</div>';
+
+    const refEl = document.getElementById('gap-ref');
+    const refValue = refEl.value;
+    const refParam = refValue ? `?reference=${refValue}` : '';
+
+    if (gapChartInstance) { gapChartInstance.destroy(); gapChartInstance = null; }
+
+    try {
+      const data = await api(`/sessions/${sessionId}/gaps${refParam}`);
+      const timeline = data.timeline;
+      const leader = data.leader;
+      const maxLap = data.max_lap || 0;
+
+      if (!timeline || timeline.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No gap data available — try a Race session</div>';
+        return;
+      }
+
+      // Which drivers are selected?
+      const selected = [];
+      document.querySelectorAll('.gap-cb:checked').forEach(cb => {
+        selected.push(parseInt(cb.value));
+      });
+
+      // Get unique drivers in data
+      const allDrivers = [...new Set(timeline.map(t => t.driver_number))];
+      const showDrivers = selected.length > 0
+        ? allDrivers.filter(dn => selected.includes(dn))
+        : allDrivers;
+
+      // Build per-driver series: { driver_number, acronym, color, team_name, laps: [{lap, gap}] }
+      const seriesMap = {};
+      for (const entry of timeline) {
+        if (!showDrivers.includes(entry.driver_number)) continue;
+        if (!seriesMap[entry.driver_number]) {
+          seriesMap[entry.driver_number] = {
+            acronym: entry.acronym,
+            team_name: entry.team_name,
+            team_colour: entry.team_colour,
+            points: [],
+          };
+        }
+        seriesMap[entry.driver_number].points.push({
+          lap: entry.lap,
+          gap: entry.gap_to_leader,
+        });
+      }
+
+      // Colors for top 20 drivers
+      const DRIVER_COLORS = [
+        '#e10600', '#16a34a', '#3b82f6', '#f59e0b', '#8b5cf6',
+        '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16',
+        '#dc2626', '#6366f1', '#d946ef', '#22c55e', '#eab308',
+        '#64748b', '#0ea5e9', '#a855f7', '#10b981', '#9ca3af',
+      ];
+
+      const labels = [];
+      for (let i = 1; i <= maxLap; i++) labels.push(i);
+
+      let colorIdx = 0;
+      const datasets = [];
+      const driverEntries = Object.entries(seriesMap).sort((a, b) => {
+        // Sort by last gap (final position)
+        const aLast = a[1].points[a[1].points.length - 1]?.gap || 0;
+        const bLast = b[1].points[b[1].points.length - 1]?.gap || 0;
+        return aLast - bLast;
+      });
+
+      for (const [dn, series] of driverEntries) {
+        const color = series.team_colour
+          ? `#${series.team_colour.replace('#', '')}`
+          : DRIVER_COLORS[colorIdx % DRIVER_COLORS.length];
+        colorIdx++;
+
+        const data = [];
+        const ptsByLap = {};
+        for (const p of series.points) {
+          ptsByLap[p.lap] = p.gap;
+        }
+        for (let i = 1; i <= maxLap; i++) {
+          data.push(i in ptsByLap ? ptsByLap[i] : null);
+        }
+
+        datasets.push({
+          label: series.acronym || `#${dn}`,
+          data: data,
+          borderColor: color,
+          backgroundColor: color,
+          borderWidth: 1.5,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.1,
+          spanGaps: false,
+          fill: false,
+        });
+      }
+
+      // Stats summary
+      const finalGaps = driverEntries.map(([dn, s]) => {
+        const lastPt = s.points[s.points.length - 1];
+        return { dn, acronym: s.acronym, gap: lastPt?.gap || 0 };
+      });
+      const leaderAcronym = leader?.acronym || '—';
+      const refLabel = refValue ? `(ref: #${refValue})` : '(auto leader)';
+
+      el.innerHTML = `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">🏁 ${leaderAcronym}</div>
+            <div>Race Leader ${refLabel}</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">${maxLap}</div>
+            <div>Total Laps</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">${driverEntries.length}</div>
+            <div>Drivers Shown</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">${finalGaps.length > 1 ? (finalGaps[finalGaps.length-1].gap - finalGaps[1].gap).toFixed(1) + 's' : '—'}</div>
+            <div>P1 → Last Gap</div>
+          </div>
+        </div>
+        <div class="relative" style="height:350px">
+          <canvas id="gap-chart-canvas"></canvas>
+        </div>
+        <div class="overflow-x-auto mt-4">
+          <table>
+            <thead>
+              <tr><th>Pos</th><th>Driver</th><th>Team</th><th class="text-right">Final Gap</th><th class="text-right">Max Gap</th><th class="text-right">Avg Gap/Lap</th></tr>
+            </thead>
+            <tbody>
+              ${driverEntries.map(([dn, s], i) => {
+                const gaps = s.points.map(p => p.gap);
+                const finalGap = gaps[gaps.length - 1] || 0;
+                const maxGap = Math.max(...gaps);
+                const avgGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+                const isLeader = finalGap === 0;
+                return `
+                  <tr>
+                    <td style="color:var(--text-secondary)">${i + 1}</td>
+                    <td class="font-medium">${s.acronym || `#${dn}`}</td>
+                    <td>${s.team_name ? `<span class="team-badge" style="background:#${s.team_colour?.replace('#', '') || '666'};color:#fff">${s.team_name.replace(/ F1 Team$/, '').replace(/ Team$/, '').substring(0, 12)}</span>` : '—'}</td>
+                    <td class="text-right font-mono ${isLeader ? 'font-bold' : ''}" style="${isLeader ? 'color:#16a34a' : ''}">${isLeader ? '0.000s (P1)' : '+' + finalGap.toFixed(3) + 's'}</td>
+                    <td class="text-right font-mono" style="color:var(--text-secondary)">${maxGap > 0 ? '+' + maxGap.toFixed(1) + 's' : '—'}</td>
+                    <td class="text-right font-mono" style="color:var(--text-secondary)">${avgGap > 0 ? '+' + avgGap.toFixed(2) + 's' : '0.00s'}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      // Render chart after DOM
+      setTimeout(() => {
+        const canvas = document.getElementById('gap-chart-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const isLight = document.documentElement.classList.contains('light');
+        const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+        const textColor = isLight ? '#64748b' : '#8b949e';
+
+        gapChartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: datasets,
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 400 },
+            interaction: {
+              mode: 'index',
+              intersect: false,
+            },
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: { color: textColor, font: { size: 10 }, boxWidth: 14, padding: 8 },
+              },
+              tooltip: {
+                callbacks: {
+                  title: (items) => `Lap ${items[0].label}`,
+                  label: (ctx) => {
+                    const val = ctx.parsed.y;
+                    if (val === null) return null;
+                    return `${ctx.dataset.label}: ${val > 0 ? '+' : ''}${val.toFixed(3)}s`;
+                  },
+                },
+              },
+            },
+            scales: {
+              x: {
+                title: { display: true, text: 'Lap', color: textColor, font: { size: 11 } },
+                grid: { color: gridColor },
+                ticks: { color: textColor, font: { size: 10 } },
+                min: 1,
+              },
+              y: {
+                title: { display: true, text: 'Gap to Leader (s)', color: textColor, font: { size: 11 } },
+                grid: { color: gridColor },
+                ticks: { color: textColor, font: { size: 10 } },
+                beginAtZero: true,
+              },
+            },
+          },
+        });
+      }, 50);
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
+  }
 
   async function compareDrivers(sessionId) {
     const d1el = document.getElementById('comp-drv1');
@@ -1211,7 +1472,7 @@
           <p><strong>Data Source:</strong> OpenF1 API + FastAPI Backend</p>
           <p><strong>Database:</strong> PostgreSQL 18</p>
           <p><strong>Season:</strong> 2026</p>
-          <p><strong>Features:</strong> Sector times · Tyre strategy timeline · Pit stop analysis · Weather impact · Driver comparison</p>
+          <p><strong>Features:</strong> Sector times · Tyre strategy timeline · Pit stop analysis · Weather impact · Driver comparison · Gap Timeline · Tyre degradation</p>
           <p class="mt-4"><strong>GitHub:</strong> <a href="https://github.com/edsuwarna/f1-analysis" target="_blank" style="color:var(--text-primary);text-decoration:underline">github.com/edsuwarna/f1-analysis</a></p>
         </div>
         <div class="mt-6 text-xs" style="color:var(--text-muted)">

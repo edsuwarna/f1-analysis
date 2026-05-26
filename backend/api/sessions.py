@@ -245,6 +245,134 @@ async def get_session_weather(session_id: int, db: AsyncSession = Depends(get_db
     ]
 
 
+@router.get("/sessions/{session_id}/gaps")
+async def get_session_gaps(
+    session_id: int,
+    reference: int | None = Query(None, description="Reference driver number (default: leader per lap)"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Gap timeline — cumulative gap of each driver to leader (or reference driver) lap by lap.
+
+    Returns a timeline array where each entry has the gap to leader (or ref driver)
+    for every driver at every lap. Only valid Race sessions have meaningful positions.
+    """
+    # Get all laps with valid lap_durations, ordered by driver + lap
+    result = await db.execute(
+        select(Lap)
+        .where(
+            Lap.session_id == session_id,
+            Lap.lap_duration.isnot(None),
+            Lap.lap_duration > 0,
+        )
+        .order_by(Lap.driver_number, Lap.lap_number)
+    )
+    laps = result.scalars().all()
+
+    if not laps:
+        return {"leader": None, "reference": reference, "timeline": []}
+
+    # Group by driver, compute cumulative time per lap
+    from collections import defaultdict
+    driver_laps = defaultdict(list)
+    driver_info = {}
+
+    for l in laps:
+        driver_laps[l.driver_number].append(l)
+        if l.driver_number not in driver_info:
+            driver_info[l.driver_number] = {
+                "full_name": "",  # filled below from session_drivers
+                "name_acronym": f"#{l.driver_number}",
+                "team_name": "",
+                "team_colour": "",
+            }
+
+    # Fetch driver info
+    drv_result = await db.execute(
+        select(SessionDriver).where(SessionDriver.session_id == session_id)
+    )
+    for d in drv_result.scalars().all():
+        if d.driver_number in driver_info:
+            driver_info[d.driver_number] = {
+                "full_name": d.full_name,
+                "name_acronym": d.name_acronym,
+                "team_name": d.team_name,
+                "team_colour": d.team_colour,
+            }
+
+    # Get all unique lap numbers across all drivers
+    all_lap_nums = sorted(set(l.lap_number for l in laps))
+    if not all_lap_nums:
+        return {"leader": None, "reference": reference, "timeline": []}
+
+    # Build cumulative time per driver per lap
+    # cum_times[driver_number][lap_number] = cumulative_time
+    cum_times = {}
+    for dn, dlaps in driver_laps.items():
+        ct = 0.0
+        cum_times[dn] = {}
+        for l in dlaps:
+            ct += l.lap_duration
+            cum_times[dn][l.lap_number] = ct
+
+    # Determine reference driver: if not specified, use the driver leading at the final lap
+    leader_dn = None
+    if reference is not None and reference in cum_times:
+        leader_dn = reference
+    else:
+        # Leader = driver with smallest cumulative time at the last common lap
+        last_lap = all_lap_nums[-1]
+        min_ct = float('inf')
+        for dn, ct_map in cum_times.items():
+            if last_lap in ct_map and ct_map[last_lap] < min_ct:
+                min_ct = ct_map[last_lap]
+                leader_dn = dn
+
+    # Build timeline: flat array sorted by lap, then position
+    timeline = []
+    for lap_num in all_lap_nums:
+        # Get leader's cumulative time at this lap
+        leader_ct = None
+        if leader_dn and lap_num in cum_times.get(leader_dn, {}):
+            leader_ct = cum_times[leader_dn][lap_num]
+
+        # Collect all drivers present at this lap, compute gap
+        lap_entries = []
+        for dn, ct_map in cum_times.items():
+            if lap_num not in ct_map:
+                continue
+            ct = ct_map[lap_num]
+            gap = (ct - leader_ct) if (leader_ct is not None) else 0.0
+            info = driver_info.get(dn, {})
+            lap_entries.append({
+                "lap": lap_num,
+                "driver_number": dn,
+                "acronym": info.get("name_acronym", f"#{dn}"),
+                "full_name": info.get("full_name", ""),
+                "team_name": info.get("team_name", ""),
+                "team_colour": info.get("team_colour", ""),
+                "cumulative_time": round(ct, 3),
+                "gap_to_leader": round(gap, 3),
+            })
+
+        # Sort by gap (so leader first)
+        lap_entries.sort(key=lambda x: x["gap_to_leader"])
+        timeline.extend(lap_entries)
+
+    leader_info = driver_info.get(leader_dn) if leader_dn else None
+    return {
+        "leader": {
+            "driver_number": leader_dn,
+            "acronym": leader_info["name_acronym"] if leader_info else None,
+            "full_name": leader_info["full_name"] if leader_info else None,
+            "team_name": leader_info["team_name"] if leader_info else None,
+            "team_colour": leader_info["team_colour"] if leader_info else None,
+        } if leader_info else None,
+        "reference": reference,
+        "max_lap": all_lap_nums[-1],
+        "timeline": timeline,
+    }
+
+
 @router.get("/sessions/{session_id}/compare/{driver_a}/{driver_b}")
 async def compare_drivers(
     session_id: int,
