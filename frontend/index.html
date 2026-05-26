@@ -570,18 +570,31 @@
           <h2 class="text-xl font-bold mt-2">${meetingName} — ${sessionName}</h2>
         </div>
 
-        <!-- Sector Times -->
+        <!-- Session Stats Strip -->
+        <div class="flex flex-wrap gap-3 mb-5 text-xs" style="color:var(--text-secondary)">
+          <span>👨‍👩‍👧‍👦 <strong style="color:var(--text-primary)">${drivers.length}</strong> drivers</span>
+          <span>🏁 <strong style="color:var(--text-primary)">${sessionType}</strong></span>
+          ${sectors.length > 0 ? `<span>⏱️ <strong style="color:var(--text-primary)">${sectors[0].total_laps || '?'}</strong> laps (max)</span>` : ''}
+          ${pits.length > 0 ? `<span>⛽ <strong style="color:var(--text-primary)">${pits.length}</strong> pit stops</span>` : ''}
+          ${stints.length > 0 ? `<span>🛞 <strong style="color:var(--text-primary)">${[...new Set(stints.map(s => s.compound))].filter(Boolean).length}</strong> compounds</span>` : ''}
+          ${weather.length > 0 && weather[0].track_temp ? `<span>🌡️ <strong style="color:var(--text-primary)">${weather[0].track_temp}°C</strong> track</span>` : ''}
+        </div>
+
+        <!-- Sector Times (auto-loaded) -->
         <div class="card p-5 mb-6">
           <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
             <h3 class="font-semibold text-sm">🏆 Best Sector Times
-              <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">
-                🟣 Fastest · 🟢 Top 3 · 🟡 Outside Top 3
-              </span>
+              <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Best sector 1/2/3 &amp; lap times per driver</span>
             </h3>
             <span class="collapse-icon">▼</span>
           </div>
-          <div class="collapse-body closed">
-          <div class="overflow-x-auto">
+          <div class="collapse-body">
+            <div class="text-xs mb-3" style="color:var(--text-muted)">
+              <span style="color:#a855f7">🟣 Fastest overall</span> ·
+              <span style="color:#16a34a">🟢 Top 3</span> ·
+              <span style="color:#eab308">🟡 Outside Top 3</span>
+            </div>
+            <div class="overflow-x-auto">
             <table>
               <thead>
                 <tr>
@@ -887,7 +900,9 @@
         html += `
           <div class="card p-5 mb-6">
             <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
-              <h3 class="font-semibold text-sm">🌤️ Weather Impact</h3>
+              <h3 class="font-semibold text-sm">🌤️ Weather Impact
+                <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Track &amp; air conditions during session</span>
+              </h3>
               <span class="collapse-icon">▼</span>
             </div>
             <div class="collapse-body closed">
@@ -924,7 +939,9 @@
       html += `
         <div class="card p-5">
           <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
-            <h3 class="font-semibold text-sm">🤜🤛 Driver Comparison</h3>
+            <h3 class="font-semibold text-sm">🤜🤛 Driver Comparison
+              <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Compare two drivers head-to-head</span>
+            </h3>
             <span class="collapse-icon">▼</span>
           </div>
           <div class="collapse-body closed">
