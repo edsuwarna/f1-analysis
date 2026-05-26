@@ -715,7 +715,9 @@
         html += `
           <div class="card p-5 mb-6">
             <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
-              <h3 class="font-semibold text-sm">🛞 Tyre Strategy Timeline</h3>
+              <h3 class="font-semibold text-sm">🛞 Tyre Strategy Timeline
+                <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Compound usage &amp; stint length per driver</span>
+              </h3>
               <span class="collapse-icon">▼</span>
             </div>
             <div class="collapse-body closed">
@@ -758,7 +760,9 @@
         html += `
           <div class="card p-5 mb-6">
             <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
-              <h3 class="font-semibold text-sm">⛽ Pit Stop Analysis</h3>
+              <h3 class="font-semibold text-sm">⛽ Pit Stop Analysis
+                <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Stop times, compound changes &amp; crew performance</span>
+              </h3>
               <span class="collapse-icon">▼</span>
             </div>
             <div class="collapse-body closed">
@@ -927,7 +931,9 @@
       <!-- Gap Timeline -->
       <div class="card p-5 mt-6">
         <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
-          <h3 class="font-semibold text-sm">📊 Gap Timeline</h3>
+          <h3 class="font-semibold text-sm">📊 Gap Timeline
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Cumulative gap to leader per lap</span>
+          </h3>
           <span class="collapse-icon">▼</span>
         </div>
         <div class="collapse-body closed">
@@ -979,7 +985,9 @@
       <!-- Tyre Degradation -->
       <div class="card p-5 mt-6">
         <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
-          <h3 class="font-semibold text-sm">🛞 Tyre Degradation</h3>
+          <h3 class="font-semibold text-sm">🛞 Tyre Degradation
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Lap time vs tyre age — compare two drivers</span>
+          </h3>
           <span class="collapse-icon">▼</span>
         </div>
         <div class="collapse-body closed">
@@ -1048,8 +1056,17 @@
       };
       const compoundLabels = { 'SOFT': 'Soft', 'MEDIUM': 'Medium', 'HARD': 'Hard', 'INTERMEDIATE': 'Intermediate', 'WET': 'Wet' };
 
+      // Darken a hex color for Driver 2 differentiation
+      function darkenColor(hex, amount = 40) {
+        const c = hex.replace('#', '');
+        const r = Math.max(0, parseInt(c.substring(0,2), 16) - amount);
+        const g = Math.max(0, parseInt(c.substring(2,4), 16) - amount);
+        const b = Math.max(0, parseInt(c.substring(4,6), 16) - amount);
+        return `rgb(${r},${g},${b})`;
+      }
+
       const datasets = [];
-      // Driver 1
+      // Driver 1 — solid lines, full color
       for (const compound of [...new Set(f1.map(l => l.compound))]) {
         const pts = f1.filter(l => l.compound === compound);
         datasets.push({
@@ -1062,16 +1079,17 @@
           tension: 0.3,
         });
       }
-      // Driver 2
+      // Driver 2 — dashed lines, darkened colors for contrast
       for (const compound of [...new Set(f2.map(l => l.compound))]) {
         const pts = f2.filter(l => l.compound === compound);
         datasets.push({
           label: `${d2name} ${compoundLabels[compound] || compound}`,
           data: pts.map(l => ({ x: l.tyre_age, y: l.lap_duration })),
-          borderColor: compoundColors[compound] || '#666',
-          borderDash: [5, 5],
+          borderColor: darkenColor(compoundColors[compound] || '#666', 50),
+          backgroundColor: darkenColor(compoundColors[compound] || '#666', 50),
+          borderDash: [6, 4],
           borderWidth: 2,
-          pointRadius: 3,
+          pointRadius: 4,
           pointStyle: 'rectRot',
           tension: 0.3,
         });
@@ -1080,15 +1098,18 @@
       // Avg lap times
       const avg1 = (f1.reduce((s, l) => s + l.lap_duration, 0) / f1.length).toFixed(3);
       const avg2 = (f2.reduce((s, l) => s + l.lap_duration, 0) / f2.length).toFixed(3);
+      // Get driver team colors
+      const drv1Meta = f1.length > 0 ? (f1[0].team_colour ? `#${f1[0].team_colour.replace('#', '')}` : '#e10600') : '#e10600';
+      const drv2Meta = f2.length > 0 ? (f2[0].team_colour ? `#${f2[0].team_colour.replace('#', '')}` : '#16a34a') : '#16a34a';
 
       el.innerHTML = `
         <div class="grid grid-cols-2 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
           <div class="card p-3 text-center">
-            <div class="font-bold" style="color:#e10600">${d1name}</div>
+            <div class="font-bold" style="color:${drv1Meta}">${d1name}</div>
             <div>Avg: ${avg1}s · Laps: ${f1.length}</div>
           </div>
           <div class="card p-3 text-center">
-            <div class="font-bold" style="color:#16a34a">${d2name}</div>
+            <div class="font-bold" style="color:${drv2Meta}">${d2name}</div>
             <div>Avg: ${avg2}s · Laps: ${f2.length}</div>
           </div>
         </div>
@@ -2586,6 +2607,7 @@
   // ── Championship Standings ──
   async function loadChampionship() {
     currentView = 'standings';
+    localStorage.setItem('f1-view', 'standings');
     const el = document.getElementById('content');
     el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading championship standings...</div>';
     try {
@@ -2678,9 +2700,9 @@
           <div class="space-y-3">
       `;
       for (const race of races) {
-        // Separate Race and Sprint results
-        const raceResults = race.results.filter(r => r.session_name === 'Race' || r.session_name === undefined).filter(r => r.points > 0);
-        const sprintResults = race.results.filter(r => r.session_name === 'Sprint');
+        // Separate Race and Sprint results (ALL drivers, sorted by position)
+        const raceResults = race.results.filter(r => r.session_name === 'Race' || r.session_name === undefined).sort((a, b) => a.position - b.position);
+        const sprintResults = race.results.filter(r => r.session_name === 'Sprint').sort((a, b) => a.position - b.position);
         const hasSprint = sprintResults.length > 0;
         const sprintKeys = sprintResults.reduce((acc, r) => { acc[r.driver_number] = r; return acc; }, {});
         const raceKeys = raceResults.reduce((acc, r) => { acc[r.driver_number] = r; return acc; }, {});
@@ -2693,24 +2715,25 @@
             <div class="collapse-body closed">
               <div style="padding:0 16px 16px">
         `;
-        // Race results (top 10 scoring)
+        // Race results — ALL drivers in position order
         if (raceResults.length > 0) {
-          html += `<div class="text-xs font-semibold mb-2" style="color:var(--text-muted)">🏁 Race — Race</div>
+          html += `<div class="text-xs font-semibold mb-2" style="color:var(--text-muted)">🏁 Race</div>
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 mb-3">`;
           for (const r of raceResults) {
             const bg = r.team_colour ? teamColor(r.team_colour) : '#666';
             const pos = r.position;
             const pts = r.points;
             const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : `P${pos}`;
+            const ptsBadge = pts > 0 ? `<span class="font-bold" style="color:#fff;background:${bg};border-radius:4px;padding:0 5px;font-size:10px">${pts}</span>` : '';
             html += `<div class="flex items-center gap-1.5 text-xs" style="background:${bg}22;border:1px solid ${bg}44;border-radius:6px;padding:4px 8px">
-              <span class="font-bold" style="color:#fff;background:${bg};border-radius:4px;padding:0 5px;font-size:10px">${pts}</span>
+              <span style="font-weight:700;font-size:11px">${medal}</span>
               <span style="font-weight:600">${r.acronym}</span>
-              <span style="color:var(--text-muted);margin-left:auto;font-size:10px">${medal}</span>
+              <span style="margin-left:auto">${ptsBadge}</span>
             </div>`;
           }
           html += `</div>`;
         }
-        // Sprint results (top 8 scoring) — only if sprint exists
+        // Sprint results — ALL drivers in position order
         if (hasSprint && sprintResults.length > 0) {
           html += `<div class="text-xs font-semibold mb-2" style="color:var(--text-muted)">⚡ Sprint</div>
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5">`;
@@ -2719,10 +2742,11 @@
             const pts = r.points;
             const pos = r.position;
             const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : `P${pos}`;
+            const ptsBadge = pts > 0 ? `<span class="font-bold" style="color:#fff;background:${bg};border-radius:4px;padding:0 5px;font-size:10px">${pts}</span>` : '';
             html += `<div class="flex items-center gap-1.5 text-xs" style="background:${bg}22;border:1px solid ${bg}44;border-radius:6px;padding:4px 8px">
-              <span class="font-bold" style="color:#fff;background:${bg};border-radius:4px;padding:0 5px;font-size:10px">${pts}</span>
+              <span style="font-weight:700;font-size:11px">${medal}</span>
               <span style="font-weight:600">${r.acronym}</span>
-              <span style="color:var(--text-muted);margin-left:auto;font-size:10px">${medal}</span>
+              <span style="margin-left:auto">${ptsBadge}</span>
             </div>`;
           }
           html += `</div>`;
@@ -2743,7 +2767,15 @@
 
   // ── Init ──
   initTheme();
-  loadRaces();
+  const savedView = localStorage.getItem('f1-view');
+  if (savedView === 'standings') {
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    const nav = document.getElementById('nav-standings');
+    if (nav) nav.classList.add('active');
+    loadChampionship();
+  } else {
+    loadRaces();
+  }
   </script>
 </body>
 </html>
