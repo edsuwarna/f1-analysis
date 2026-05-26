@@ -90,6 +90,7 @@ make reset-db       # Wipe and recreate database
 | `GET /api/analytics/driver-progress/{num}` | Driver season progress |
 | `GET /api/analytics/championship?year=2025` | Driver & Constructor standings |
 | `GET /api/analytics/lap-distribution?session_id=N` | Per-driver lap stats (avg, median, stddev) |
+| `GET /api/analytics/sessions/{id}/pit-strategy` | Pit stop impact analysis (undercut deltas) |
 
 Full API docs at `http://localhost:8000/docs`
 

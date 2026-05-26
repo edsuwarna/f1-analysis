@@ -670,6 +670,25 @@
         </div>
       </div>`}
 
+      <!-- Pit Strategy (Race/Sprint only) -->
+      ${(sessionType === 'Race' || sessionName === 'Sprint' || sessionName === 'Race') ? `
+      <div class="card p-5 mb-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm">⛽ Pit Strategy Battle
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Undercut analysis & pit stop impact</span>
+          </h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body closed">
+          <div id="pitstrategy-chart-area">
+            <div class="text-center py-8" style="color:var(--text-muted)">
+              <button onclick="loadPitStrategy(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">⛽ Load Pit Strategy</button>
+              <div class="mt-2 text-xs">Analyses pit stop timing impact, undercut deltas, and stint-by-stint performance.</div>
+            </div>
+          </div>
+        </div>
+      </div>` : ''}
+
       // ── Tyre Strategy Timeline ──
       if (stints.length > 0) {
         // Build stint-by-driver for the table (keeping the detail)
@@ -978,6 +997,7 @@
   let qevoChartInstance = null;
   let lapdistChartInstance = null;
   let overtakeChartInstance = null;
+  let pitStrategyChartInstance = null;
 
   // ── Tyre Degradation ──
   async function loadDegradation(sessionId) {
@@ -1677,6 +1697,190 @@
     }
   }
 
+  // ── Pit Strategy ──
+  async function loadPitStrategy(sessionId) {
+    const el = document.getElementById('pitstrategy-chart-area');
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading pit strategy data...</div>';
+
+    if (pitStrategyChartInstance) { pitStrategyChartInstance.destroy(); pitStrategyChartInstance = null; }
+
+    try {
+      const data = await api(`/analytics/sessions/${sessionId}/pit-strategy`);
+      const drivers = data.drivers;
+
+      if (!drivers || drivers.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No pit strategy data available</div>';
+        return;
+      }
+
+      // Find fastest pit stop + slowest
+      let fastestPit = 999, slowestPit = 0;
+      let fastestD = '', slowestD = '', fastestL = 0, slowestL = 0;
+      for (const d of drivers) {
+        for (const p of d.pit_analysis) {
+          if (p.pit_duration && p.pit_duration < fastestPit) {
+            fastestPit = p.pit_duration;
+            fastestD = d.acronym;
+            fastestL = p.lap_number;
+          }
+          if (p.pit_duration && p.pit_duration > slowestPit && p.pit_duration < 200) {
+            slowestPit = p.pit_duration;
+            slowestD = d.acronym;
+            slowestL = p.lap_number;
+          }
+        }
+      }
+
+      // Stats
+      let html = `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">${data.total_stops}</div>
+            <div>Total Pit Stops</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">${drivers.length}</div>
+            <div>Drivers with Stops</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:#16a34a">${fastestPit.toFixed(1)}s</div>
+            <div>Fastest Stop (${fastestD} L${fastestL})</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:#dc2626">${slowestPit.toFixed(1)}s</div>
+            <div>Slowest Stop (${slowestD} L${slowestL})</div>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto mb-4" style="max-height:500px;overflow-y:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Driver</th><th>Lap</th>
+                <th class="text-right">Pit Time</th>
+                <th class="text-right">In-Lap</th>
+                <th class="text-right">Out-Lap</th>
+                <th class="text-right">Avg Before</th>
+                <th class="text-right">Avg After</th>
+                <th class="text-right">Δ (After-Before)</th>
+                <th class="text-right">Pit Loss</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      // Sort drivers: those with best avg improvement first
+      const allStops = [];
+      for (const d of drivers) {
+        for (const p of d.pit_analysis) {
+          const delta = (p.avg_after && p.avg_before) ? (p.avg_after - p.avg_before) : null;
+          allStops.push({ ...p, acronym: d.acronym, team_colour: d.team_colour, delta });
+        }
+      }
+      allStops.sort((a, b) => (b.pit_duration || 99) - (a.pit_duration || 99));
+
+      for (const stop of allStops) {
+        const color = stop.team_colour ? teamColor(stop.team_colour) : '#666';
+        const isFast = stop.pit_duration && stop.pit_duration < 23;
+        const isSlow = stop.pit_duration && stop.pit_duration > 30;
+        const delta = stop.delta;
+        const deltaColor = delta !== null ? (delta < -0.5 ? '#16a34a' : delta > 0.5 ? '#dc2626' : 'var(--text-secondary)') : '';
+        const deltaIcon = delta !== null ? (delta < -0.5 ? ' 🟢' : delta > 0.5 ? ' 🔴' : '') : '';
+        html += `
+          <tr>
+            <td class="font-medium" style="color:${color}">${stop.acronym}</td>
+            <td style="color:var(--text-secondary)">L${stop.lap_number}</td>
+            <td class="text-right font-mono ${isFast ? 'font-bold' : ''}" style="${isFast ? 'color:#16a34a' : isSlow ? 'color:#dc2626' : ''}">${stop.pit_duration ? stop.pit_duration.toFixed(1) + 's' : '—'}</td>
+            <td class="text-right font-mono" style="color:var(--text-secondary)">${stop.in_lap_time ? stop.in_lap_time.toFixed(3) + 's' : '—'}</td>
+            <td class="text-right font-mono" style="color:var(--text-secondary)">${stop.out_lap_time ? stop.out_lap_time.toFixed(3) + 's' : '—'}</td>
+            <td class="text-right font-mono" style="color:var(--text-secondary)">${stop.avg_before ? stop.avg_before.toFixed(3) + 's' : '—'}</td>
+            <td class="text-right font-mono" style="color:var(--text-secondary)">${stop.avg_after ? stop.avg_after.toFixed(3) + 's' : '—'}</td>
+            <td class="text-right font-mono" style="color:${deltaColor};font-weight:${delta !== null && Math.abs(delta) > 0.5 ? '700' : '400'}">${delta !== null ? (delta > 0 ? '+' : '') + delta.toFixed(3) + 's' + deltaIcon : '—'}</td>
+            <td class="text-right font-mono" style="color:${stop.pit_duration && stop.pit_duration > 25 ? '#dc2626' : '#16a34a'}">${stop.pit_duration ? stop.pit_duration.toFixed(1) + 's' : '—'}</td>
+          </tr>
+        `;
+      }
+      html += `</tbody></table></div>`;
+
+      // Pit stop timing chart
+      html += `
+        <div class="text-xs mb-3" style="color:var(--text-muted)">
+          <strong>Pit Stop Duration Distribution</strong> — each dot = one stop. Green = fast (&lt;23s), Red = slow (&gt;30s).
+        </div>
+        <div class="relative" style="height:250px;margin-bottom:16px">
+          <canvas id="pitstrategy-chart-canvas-${sessionId}"></canvas>
+        </div>
+      `;
+
+      el.innerHTML = html;
+
+      // Render chart
+      setTimeout(() => {
+        const canvas = document.getElementById(`pitstrategy-chart-canvas-${sessionId}`);
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const isLight = document.documentElement.classList.contains('light');
+        const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+        const textColor = isLight ? '#64748b' : '#8b949e';
+
+        // Group by lap number for bar chart
+        const stopsByLap = {};
+        for (const stop of allStops) {
+          const ln = stop.lap_number;
+          if (!stopsByLap[ln]) stopsByLap[ln] = [];
+          stopsByLap[ln].push(stop);
+        }
+
+        const labels = Object.keys(stopsByLap).map(Number).sort((a, b) => a - b);
+        const fastCounts = [];
+        const midCounts = [];
+        const slowCounts = [];
+
+        for (const ln of labels) {
+          const stops = stopsByLap[ln];
+          fastCounts.push(stops.filter(s => s.pit_duration < 23).length);
+          midCounts.push(stops.filter(s => s.pit_duration >= 23 && s.pit_duration <= 30).length);
+          slowCounts.push(stops.filter(s => s.pit_duration > 30 && s.pit_duration < 200).length);
+        }
+
+        pitStrategyChartInstance = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              { label: 'Fast (<23s)', data: fastCounts, backgroundColor: 'rgba(22,163,74,0.7)', borderColor: '#16a34a', borderWidth: 1, borderRadius: 2 },
+              { label: 'Normal (23-30s)', data: midCounts, backgroundColor: 'rgba(245,158,11,0.7)', borderColor: '#f59e0b', borderWidth: 1, borderRadius: 2 },
+              { label: 'Slow (>30s)', data: slowCounts, backgroundColor: 'rgba(220,38,38,0.7)', borderColor: '#dc2626', borderWidth: 1, borderRadius: 2 },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 300 },
+            plugins: {
+              legend: { position: 'top', labels: { color: textColor, font: { size: 9 }, boxWidth: 12, padding: 6 } },
+              tooltip: {
+                callbacks: {
+                  title: (items) => `Lap ${items[0].label}`,
+                  label: (ctx) => {
+                    const val = ctx.parsed.y;
+                    return `${ctx.dataset.label}: ${val} stop${val !== 1 ? 's' : ''}`;
+                  },
+                },
+              },
+            },
+            scales: {
+              x: { title: { display: true, text: 'Lap', color: textColor, font: { size: 11 } }, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 9 } } },
+              y: { title: { display: true, text: 'Number of Stops', color: textColor, font: { size: 11 } }, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 9 }, stepSize: 1 }, beginAtZero: true },
+            },
+          },
+        });
+      }, 100);
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
+  }
+
   // ── Overtake Analysis ──
   async function loadOvertakeAnalysis(sessionId) {
     const el = document.getElementById('overtake-chart-area');
@@ -2322,7 +2526,7 @@
           <p><strong>Data Source:</strong> OpenF1 API + FastAPI Backend</p>
           <p><strong>Database:</strong> PostgreSQL 18</p>
           <p><strong>Season:</strong> 2026</p>
-          <p><strong>Features:</strong> Sector times · Lap Distribution · Championship Standings · Qualifying Evolution · Position History · Tyre strategy · Pit stops · Weather · Driver comparison · Gap Timeline · Tyre degradation · Overtake Analysis</p>
+          <p><strong>Features:</strong> Sector times · Lap Distribution · Championship Standings · Qualifying Evolution · Position History · Tyre strategy · Pit stops · Weather · Driver comparison · Gap Timeline · Tyre degradation · Overtake Analysis · Pit Strategy</p>
           <p class="mt-4"><strong>GitHub:</strong> <a href="https://github.com/edsuwarna/f1-analysis" target="_blank" style="color:var(--text-primary);text-decoration:underline">github.com/edsuwarna/f1-analysis</a></p>
         </div>
         <div class="mt-6 text-xs" style="color:var(--text-muted)">

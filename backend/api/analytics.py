@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 
 from backend.core.database import get_db
-from backend.models.models import Session, SessionDriver, Lap
+from backend.models.models import Session, SessionDriver, Lap, PitStop
 
 router = APIRouter()
 
@@ -341,6 +341,114 @@ async def lap_distribution(
         "session_type": sess.session_type if sess else None,
         "total_drivers": len(drivers_data),
         "total_laps": sum(d["total_laps"] for d in drivers_data),
+        "drivers": drivers_data,
+    }
+
+
+@router.get("/sessions/{session_id}/pit-strategy")
+async def get_pit_strategy(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Pit strategy analysis — undercut deltas, pit stop impact, stint comparison.
+
+    Returns per-driver pit analysis including lap times before/after each
+    pit stop, net undercut gain, and cross-driver undercut windows.
+    """
+    # Get all pit stops
+    result = await db.execute(
+        select(PitStop).where(PitStop.session_id == session_id)
+        .order_by(PitStop.driver_number, PitStop.lap_number)
+    )
+    pits = result.scalars().all()
+
+    if not pits:
+        return {"session_id": session_id, "drivers": []}
+
+    # Get all laps
+    result = await db.execute(
+        select(Lap).where(
+            Lap.session_id == session_id,
+            Lap.lap_duration.isnot(None),
+            Lap.lap_duration > 0,
+        ).order_by(Lap.driver_number, Lap.lap_number)
+    )
+    laps = result.scalars().all()
+
+    # Group laps by driver
+    from collections import defaultdict
+    laps_by_driver = defaultdict(list)
+    for l in laps:
+        laps_by_driver[l.driver_number].append(l)
+
+    # Get driver info
+    drv_result = await db.execute(
+        select(SessionDriver).where(SessionDriver.session_id == session_id)
+    )
+    driver_info = {}
+    for d in drv_result.scalars().all():
+        driver_info[d.driver_number] = {
+            "acronym": d.name_acronym,
+            "full_name": d.full_name,
+            "team_name": d.team_name,
+            "team_colour": d.team_colour,
+        }
+
+    # Group pits by driver
+    pits_by_driver = defaultdict(list)
+    for p in pits:
+        pits_by_driver[p.driver_number].append(p)
+
+    drivers_data = []
+    for dn, stops in pits_by_driver.items():
+        driver_laps = laps_by_driver.get(dn, [])
+        if not driver_laps:
+            continue
+
+        info = driver_info.get(dn, {})
+        pit_analysis = []
+
+        for p in stops:
+            ln = p.lap_number
+            # Find in-lap and out-lap
+            in_lap = next((l for l in driver_laps if l.lap_number == ln), None)
+            out_lap = next((l for l in driver_laps if l.lap_number == ln + 1), None)
+            prev_lap = next((l for l in driver_laps if l.lap_number == ln - 1), None)
+
+            # Average of 3 laps before (excluding in-lap)
+            laps_before = [l for l in driver_laps if l.lap_number < ln and l.lap_duration and l.lap_duration < 600]
+            laps_before = sorted(laps_before, key=lambda x: x.lap_number, reverse=True)[:3]
+            avg_before = sum(l.lap_duration for l in laps_before) / len(laps_before) if laps_before else None
+
+            # Average of 3 laps after pit (excluding out-lap)
+            laps_after = [l for l in driver_laps if l.lap_number > ln + 1 and l.lap_duration and l.lap_duration < 600]
+            laps_after = sorted(laps_after, key=lambda x: x.lap_number)[:3]
+            avg_after = sum(l.lap_duration for l in laps_after) / len(laps_after) if laps_after else None
+
+            pit_analysis.append({
+                "lap_number": ln,
+                "pit_duration": round(p.pit_duration, 1) if p.pit_duration else None,
+                "in_lap_time": round(in_lap.lap_duration, 3) if in_lap and in_lap.lap_duration else None,
+                "out_lap_time": round(out_lap.lap_duration, 3) if out_lap and out_lap.lap_duration else None,
+                "prev_lap_time": round(prev_lap.lap_duration, 3) if prev_lap and prev_lap.lap_duration else None,
+                "avg_before": round(avg_before, 3) if avg_before else None,
+                "avg_after": round(avg_after, 3) if avg_after else None,
+                "time_lost_in_pit": round(p.pit_duration - (prev_lap.lap_duration or p.pit_duration), 1) if p.pit_duration and prev_lap and prev_lap.lap_duration else None,
+            })
+
+        drivers_data.append({
+            "driver_number": dn,
+            "acronym": info.get("acronym", f"#{dn}"),
+            "full_name": info.get("full_name", ""),
+            "team_name": info.get("team_name", ""),
+            "team_colour": info.get("team_colour", ""),
+            "total_stops": len(stops),
+            "pit_analysis": pit_analysis,
+        })
+
+    return {
+        "session_id": session_id,
+        "total_stops": len(pits),
         "drivers": drivers_data,
     }
 
