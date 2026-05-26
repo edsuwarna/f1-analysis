@@ -66,6 +66,18 @@ async def get_session_laps(
     query = query.order_by(Lap.driver_number, Lap.lap_number)
     result = await db.execute(query)
     laps = result.scalars().all()
+
+    # Fetch driver info for team colours
+    drv_result = await db.execute(
+        select(SessionDriver).where(SessionDriver.session_id == session_id)
+    )
+    driver_color_map = {}
+    for d in drv_result.scalars().all():
+        driver_color_map[d.driver_number] = {
+            "team_colour": d.team_colour,
+            "acronym": d.name_acronym,
+        }
+
     return [
         {
             "driver_number": l.driver_number,
@@ -79,6 +91,8 @@ async def get_session_laps(
             "position": l.position,
             "is_personal_best": l.is_personal_best,
             "is_valid": l.is_valid,
+            "team_colour": driver_color_map.get(l.driver_number, {}).get("team_colour"),
+            "acronym": driver_color_map.get(l.driver_number, {}).get("acronym"),
         }
         for l in laps
     ]

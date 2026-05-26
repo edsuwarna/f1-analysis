@@ -1073,16 +1073,26 @@
 
       const datasets = [];
 
-      // Darken a driver color for Driver 2 (keeps distinct hue)
-      function driverColor(hex, darkenPct = 0) {
+      // Adjust driver color: positive = darken, negative = lighten (mix with white for contrast)
+      function driverColor(hex, adjust = 0) {
         const c = hex.replace('#', '');
-        const r = Math.max(0, Math.min(255, parseInt(c.substring(0,2), 16) * (1 - darkenPct)));
-        const g = Math.max(0, Math.min(255, parseInt(c.substring(2,4), 16) * (1 - darkenPct)));
-        const b = Math.max(0, Math.min(255, parseInt(c.substring(4,6), 16) * (1 - darkenPct)));
-        return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+        let r = parseInt(c.substring(0,2), 16);
+        let g = parseInt(c.substring(2,4), 16);
+        let b = parseInt(c.substring(4,6), 16);
+        if (adjust < 0) {
+          const pct = Math.min(1, -adjust);
+          r = Math.round(r + (255 - r) * pct);
+          g = Math.round(g + (255 - g) * pct);
+          b = Math.round(b + (255 - b) * pct);
+        } else {
+          r = Math.round(r * (1 - Math.min(1, adjust)));
+          g = Math.round(g * (1 - Math.min(1, adjust)));
+          b = Math.round(b * (1 - Math.min(1, adjust)));
+        }
+        return `rgb(${r},${g},${b})`;
       }
 
-      // Driver 1 — team color, solid circle points
+      // Driver 1 — team color, bold circle points
       for (const compound of [...new Set(f1.map(l => l.compound))]) {
         const pts = f1.filter(l => l.compound === compound);
         datasets.push({
@@ -1090,30 +1100,30 @@
           data: pts.map(l => ({ x: l.tyre_age, y: l.lap_duration })),
           borderColor: d1color,
           backgroundColor: d1color,
-          borderWidth: 2,
+          borderWidth: 2.5,
           borderDash: lineDashMap[compound] || [],
-          pointRadius: 4,
+          pointRadius: 5,
           pointStyle: 'circle',
           pointBorderColor: '#fff',
-          pointBorderWidth: 1,
+          pointBorderWidth: 2,
           tension: 0.3,
         });
       }
-      // Driver 2 — darker team color, square points
-      const d2colorDark = driverColor(d2color, 0.2);
+      // Driver 2 — lightened team color (mix with white), diamond points
+      const d2colorLight = driverColor(d2color, -0.35);
       for (const compound of [...new Set(f2.map(l => l.compound))]) {
         const pts = f2.filter(l => l.compound === compound);
         datasets.push({
           label: `${d2name} ${compoundLabels[compound] || compound}`,
           data: pts.map(l => ({ x: l.tyre_age, y: l.lap_duration })),
-          borderColor: d2colorDark,
-          backgroundColor: d2colorDark,
+          borderColor: d2colorLight,
+          backgroundColor: d2colorLight,
           borderWidth: 2,
           borderDash: lineDashMap[compound] || [],
-          pointRadius: 5,
-          pointStyle: 'rectRot',
+          pointRadius: 6,
+          pointStyle: 'triangle',
           pointBorderColor: '#fff',
-          pointBorderWidth: 1,
+          pointBorderWidth: 2,
           tension: 0.3,
         });
       }
@@ -1137,8 +1147,8 @@
           </div>
         </div>
         <div class="text-xs mb-2 flex flex-wrap gap-3 justify-center" style="color:var(--text-muted)">
-          <span>● <strong style="color:${drv1Meta}">${d1name}</strong> (circle · team color)</span>
-          <span>■ <strong style="color:${drv2Meta}">${d2name}</strong> (square · darker shade)</span>
+          <span>● <strong style="color:${drv1Meta}">${d1name}</strong> (circle · full team color)</span>
+          <span>▲ <strong style="color:${drv2Meta}">${d2name}</strong> (triangle · lightened 35%)</span>
           <span>— Solid = Soft · — — = Medium · · · = Hard</span>
         </div>
         <div class="relative" style="height:350px">
