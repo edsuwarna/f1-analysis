@@ -865,3 +865,423 @@ async def teammate_battle(
         "battles": battle,
         "total_teams": len(battle),
     }
+
+
+@router.get("/season-progression")
+async def season_progression(
+    year: int = Query(2026),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cumulative points per driver across race rounds — perfect for a line chart.
+
+    Returns rounds in chronological order with per-driver points and cumulative
+    totals. Separate Race and Sprint points. Top 15 drivers shown by default.
+    """
+    RACE_POINTS = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10,
+                   6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
+    SPRINT_POINTS = {1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1}
+
+    query = text("""
+        SELECT
+            m.id AS meeting_id,
+            m.name AS race_name,
+            m.date_start,
+            s.session_name,
+            l.driver_number,
+            l.position,
+            sd.full_name,
+            sd.name_acronym,
+            sd.team_name,
+            sd.team_colour
+        FROM meetings m
+        JOIN sessions s ON s.meeting_id = m.id
+        JOIN laps l ON l.session_id = s.id
+        LEFT JOIN session_drivers sd
+            ON sd.session_id = s.id AND sd.driver_number = l.driver_number
+        WHERE m.year = :year
+          AND s.session_name IN ('Race', 'Sprint')
+          AND l.position IS NOT NULL AND l.position > 0
+          AND l.position <= 20
+          AND l.lap_number = (
+              SELECT MAX(l2.lap_number)
+              FROM laps l2
+              WHERE l2.session_id = l.session_id
+                AND l2.driver_number = l.driver_number
+          )
+        ORDER BY m.date_start, l.position
+    """)
+    result = await db.execute(query, {"year": year})
+    rows = result.fetchall()
+
+    if not rows:
+        return {"year": year, "rounds": []}
+
+    from collections import defaultdict, OrderedDict
+
+    # Track all drivers and their points per race
+    all_drivers = {}  # driver_number -> {acronym, team_name, team_colour}
+    rounds_data = OrderedDict()  # (mid, rname) -> {date, race_name, meeting_id, drivers: {dn: {race_pts, sprint_pts}}}
+
+    for r in rows:
+        mid = r.meeting_id
+        rname = r.race_name
+        date = str(r.date_start) if r.date_start else ""
+        dn = r.driver_number
+        session_name = r.session_name
+        pos = r.position
+
+        if dn not in all_drivers:
+            all_drivers[dn] = {
+                "acronym": r.name_acronym or f"#{dn}",
+                "team_name": r.team_name or "Unknown",
+                "team_colour": r.team_colour or "",
+            }
+
+        key = (mid, rname)
+        if key not in rounds_data:
+            rounds_data[key] = {
+                "meeting_id": mid,
+                "race_name": rname,
+                "date": date,
+                "drivers": defaultdict(lambda: {"race_pts": 0, "sprint_pts": 0}),
+            }
+
+        pts = 0
+        if session_name == "Sprint":
+            pts = SPRINT_POINTS.get(pos, 0)
+            rounds_data[key]["drivers"][dn]["sprint_pts"] = pts
+        else:  # Race
+            pts = RACE_POINTS.get(pos, 0)
+            rounds_data[key]["drivers"][dn]["race_pts"] = pts
+
+    # Sort rounds chronologically
+    sorted_rounds = sorted(rounds_data.values(), key=lambda x: x["date"])
+
+    # Compute cumulative points per driver per round
+    cumulative = defaultdict(int)
+    rounds_output = []
+
+    for rnd_num, rd in enumerate(sorted_rounds, 1):
+        driver_list = []
+        for dn, info in all_drivers.items():
+            d = rd["drivers"].get(dn, {"race_pts": 0, "sprint_pts": 0})
+            total = d["race_pts"] + d["sprint_pts"]
+            cumulative[dn] += total
+            driver_list.append({
+                "driver_number": dn,
+                "acronym": info["acronym"],
+                "team_name": info["team_name"],
+                "team_colour": info["team_colour"],
+                "race_points": d["race_pts"],
+                "sprint_points": d["sprint_pts"],
+                "round_points": total,
+                "cumulative_points": cumulative[dn],
+            })
+
+        # Sort by cumulative points descending
+        driver_list.sort(key=lambda x: -x["cumulative_points"])
+
+        rounds_output.append({
+            "round": rnd_num,
+            "race_name": rd["race_name"],
+            "meeting_id": rd["meeting_id"],
+            "standings": driver_list,
+        })
+
+    # Also return driver info for consistent coloring
+    driver_info_list = [
+        {"driver_number": dn, "acronym": info["acronym"],
+         "team_name": info["team_name"], "team_colour": info["team_colour"],
+         "total_points": cumulative[dn]}
+        for dn, info in sorted(all_drivers.items(),
+                               key=lambda x: -cumulative[x[0]])
+    ]
+
+    return {
+        "year": year,
+        "rounds": rounds_output,
+        "drivers": driver_info_list,
+        "total_rounds": len(rounds_output),
+    }
+
+
+@router.get("/head-to-head")
+async def head_to_head(
+    year: int = Query(2026),
+    db: AsyncSession = Depends(get_db),
+):
+    """Driver vs driver head-to-head matrix across all race weekends.
+
+    For each pair of drivers, returns who beat who in qualifying and race
+    across all completed rounds. Ideal for a heatmap or comparison table.
+    """
+    # Get qualifying finishing positions and race finishing positions per driver per round
+    query = text("""
+        WITH driver_info AS (
+            SELECT DISTINCT ON (sd.driver_number)
+                sd.driver_number,
+                sd.name_acronym,
+                sd.team_name,
+                sd.team_colour
+            FROM session_drivers sd
+            JOIN sessions s ON s.id = sd.session_id
+            JOIN meetings m ON m.id = s.meeting_id
+            WHERE m.year = :year
+            ORDER BY sd.driver_number, s.date_start DESC
+        ),
+        round_order AS (
+            SELECT DISTINCT m.id AS meeting_id, m.name AS race_name, m.date_start
+            FROM meetings m
+            WHERE m.year = :year
+        ),
+        qual_positions AS (
+            SELECT
+                s.meeting_id,
+                l.driver_number,
+                l.position,
+                ROW_NUMBER() OVER (
+                    PARTITION BY s.meeting_id, s.session_name
+                    ORDER BY l.lap_duration NULLS LAST
+                ) AS qual_rank
+            FROM laps l
+            JOIN sessions s ON s.id = l.session_id
+            WHERE s.session_type = 'Qualifying'
+              AND l.lap_duration > 0 AND l.lap_duration < 600
+              AND s.meeting_id IN (SELECT id FROM meetings WHERE year = :year2)
+        ),
+        race_positions AS (
+            SELECT
+                s.meeting_id,
+                l.driver_number,
+                l.position
+            FROM laps l
+            JOIN sessions s ON s.id = l.session_id
+            WHERE s.session_name = 'Race'
+              AND l.position IS NOT NULL AND l.position > 0
+              AND l.lap_number = (
+                  SELECT MAX(l2.lap_number)
+                  FROM laps l2
+                  WHERE l2.session_id = l.session_id
+                    AND l2.driver_number = l.driver_number
+              )
+              AND s.meeting_id IN (SELECT id FROM meetings WHERE year = :year3)
+        )
+        SELECT
+            ro.meeting_id,
+            ro.race_name,
+            qp.driver_number AS qual_dn,
+            qp.qual_rank,
+            rp.driver_number AS race_dn,
+            rp.position AS race_position
+        FROM round_order ro
+        LEFT JOIN qual_positions qp ON qp.meeting_id = ro.meeting_id
+        LEFT JOIN race_positions rp ON rp.meeting_id = ro.meeting_id
+            AND rp.driver_number = qp.driver_number
+        ORDER BY ro.date_start, qp.qual_rank
+    """)
+    result = await db.execute(query, {"year": year, "year2": year, "year3": year})
+    rows = result.fetchall()
+
+    # Get all drivers
+    drv_result = await db.execute(
+        text("""
+            SELECT DISTINCT ON (driver_number)
+                driver_number, name_acronym, team_name, team_colour
+            FROM session_drivers sd
+            JOIN sessions s ON s.id = sd.session_id
+            JOIN meetings m ON m.id = s.meeting_id
+            WHERE m.year = :year
+            ORDER BY driver_number, s.date_start DESC
+        """), {"year": year}
+    )
+    all_drivers = drv_result.fetchall()
+    driver_map = {}
+    for d in all_drivers:
+        driver_map[d.driver_number] = {
+            "acronym": d.name_acronym or f"#{d.driver_number}",
+            "team_name": d.team_name or "Unknown",
+            "team_colour": d.team_colour or "",
+        }
+
+    from collections import defaultdict
+
+    # Group data by meeting, then by driver
+    meetings_data = defaultdict(lambda: defaultdict(dict))
+    meeting_names = {}
+    for r in rows:
+        if r.meeting_id not in meeting_names:
+            meeting_names[r.meeting_id] = r.race_name
+        if r.qual_dn:
+            meetings_data[r.meeting_id][r.qual_dn]["qual_rank"] = r.qual_rank
+        if r.race_dn:
+            meetings_data[r.meeting_id][r.race_dn]["race_pos"] = r.race_position
+
+    # For each pair of drivers, count who beat who
+    driver_nums = list(driver_map.keys())
+    qual_wins = defaultdict(lambda: defaultdict(int))
+    race_wins = defaultdict(lambda: defaultdict(int))
+    qual_totals = defaultdict(lambda: defaultdict(int))
+    race_totals = defaultdict(lambda: defaultdict(int))
+
+    for mid, drivers_data in meetings_data.items():
+        # Qualifying head-to-head
+        qual_drivers = [(dn, d["qual_rank"]) for dn, d in drivers_data.items()
+                       if d.get("qual_rank")]
+        for i in range(len(qual_drivers)):
+            for j in range(i + 1, len(qual_drivers)):
+                d1, r1 = qual_drivers[i]
+                d2, r2 = qual_drivers[j]
+                if r1 < r2:
+                    qual_wins[d1][d2] += 1
+                else:
+                    qual_wins[d2][d1] += 1
+                qual_totals[d1][d2] += 1
+                qual_totals[d2][d1] += 1
+
+        # Race head-to-head
+        race_drivers = [(dn, d["race_pos"]) for dn, d in drivers_data.items()
+                       if d.get("race_pos")]
+        for i in range(len(race_drivers)):
+            for j in range(i + 1, len(race_drivers)):
+                d1, p1 = race_drivers[i]
+                d2, p2 = race_drivers[j]
+                if p1 < p2:
+                    race_wins[d1][d2] += 1
+                else:
+                    race_wins[d2][d1] += 1
+                race_totals[d1][d2] += 1
+                race_totals[d2][d1] += 1
+
+    # Build driver list with standings
+    driver_list = []
+    for dn in driver_nums:
+        info = driver_map[dn]
+        driver_list.append({
+            "driver_number": dn,
+            "acronym": info["acronym"],
+            "team_name": info["team_name"],
+            "team_colour": info["team_colour"],
+            "qual_wins": dict(qual_wins.get(dn, {})),
+            "race_wins": dict(race_wins.get(dn, {})),
+            "qual_totals": dict(qual_totals.get(dn, {})),
+            "race_totals": dict(race_totals.get(dn, {})),
+        })
+
+    # Sort by acronym for consistent display
+    driver_list.sort(key=lambda x: x["acronym"])
+
+    return {
+        "year": year,
+        "drivers": driver_list,
+        "total_rounds": len(meetings_data),
+    }
+
+
+@router.get("/pit-stop-championship")
+async def pit_stop_championship(
+    year: int = Query(2026),
+    db: AsyncSession = Depends(get_db),
+):
+    """Team pit stop speed championship — aggregate across all Race sessions.
+
+    Ranks teams by average pit stop duration, with fastest/slowest stops,
+    consistency, and individual stop history.
+    """
+    query = text("""
+        SELECT
+            sd.team_name,
+            sd.team_colour,
+            p.driver_number,
+            p.lap_number,
+            p.pit_duration,
+            p.lane_duration,
+            p.stop_duration,
+            sd.name_acronym,
+            m.name AS race_name
+        FROM pit_stops p
+        JOIN sessions s ON s.id = p.session_id
+        JOIN meetings m ON m.id = s.meeting_id
+        JOIN session_drivers sd ON sd.session_id = s.id AND sd.driver_number = p.driver_number
+        WHERE m.year = :year
+          AND s.session_name = 'Race'
+          AND p.pit_duration IS NOT NULL AND p.pit_duration > 0
+        ORDER BY sd.team_name, m.date_start, p.lap_number
+    """)
+    result = await db.execute(query, {"year": year})
+    rows = result.fetchall()
+
+    if not rows:
+        return {"year": year, "teams": []}
+
+    from collections import defaultdict
+    import math
+
+    teams = defaultdict(lambda: {
+        "stops": [],
+        "total_stops": 0,
+        "durations": [],
+        "drivers": set(),
+    })
+
+    for r in rows:
+        team = r.team_name or "Unknown"
+        teams[team]["stops"].append({
+            "driver_number": r.driver_number,
+            "acronym": r.name_acronym or f"#{r.driver_number}",
+            "lap_number": r.lap_number,
+            "pit_duration": round(r.pit_duration, 1),
+            "lane_duration": round(r.lane_duration, 1) if r.lane_duration else None,
+            "stop_duration": round(r.stop_duration, 1) if r.stop_duration else None,
+            "race_name": r.race_name,
+        })
+        teams[team]["total_stops"] += 1
+        if r.pit_duration:
+            teams[team]["durations"].append(r.pit_duration)
+        teams[team]["drivers"].add(r.driver_number)
+        # Store colour from any entry
+        if r.team_colour:
+            teams[team]["colour"] = r.team_colour
+
+    teams_output = []
+    for team, data in teams.items():
+        durations = data["durations"]
+        if not durations:
+            continue
+        avg = sum(durations) / len(durations)
+        variance = sum((d - avg) ** 2 for d in durations) / len(durations)
+        std = math.sqrt(variance)
+
+        # Count stops per race
+        races_with_stops = len(set(s["race_name"] for s in data["stops"]))
+
+        teams_output.append({
+            "team_name": team,
+            "team_colour": data.get("colour", ""),
+            "drivers": len(data["drivers"]),
+            "total_stops": data["total_stops"],
+            "races_with_stops": races_with_stops,
+            "avg_pit_duration": round(avg, 2),
+            "fastest_stop": round(min(durations), 1),
+            "slowest_stop": round(max(durations), 1),
+            "std_dev": round(std, 2),
+            "consistency": round((1 - (std / avg)) * 100, 1) if avg > 0 else 0,
+        })
+
+    # Sort by avg pit duration ascending (fastest first)
+    teams_output.sort(key=lambda x: x["avg_pit_duration"])
+
+    # Best overall stop
+    all_stops = []
+    for team, data in teams.items():
+        for s in data["stops"]:
+            all_stops.append((s["pit_duration"], team, s))
+
+    all_stops.sort(key=lambda x: x[0])
+
+    return {
+        "year": year,
+        "teams": teams_output,
+        "total_teams": len(teams_output),
+        "total_stops": sum(t["total_stops"] for t in teams_output),
+        "overall_fastest_stop": all_stops[0] if all_stops else None,
+    }

@@ -344,6 +344,7 @@
       <div class="flex flex-wrap gap-1.5 items-center">
         <button onclick="loadRaces()" class="nav-link active" id="nav-races" style="padding:6px 10px;font-size:12px">🏁 Races</button>
         <button onclick="loadChampionship()" class="nav-link" id="nav-standings" style="padding:6px 10px;font-size:12px">🏆 Standings</button>
+        <button onclick="loadSeasonAnalysis()" class="nav-link" id="nav-season" style="padding:6px 10px;font-size:12px">📊 Season</button>
         <button onclick="loadTeamMateBattle()" class="nav-link" id="nav-teammate" style="padding:6px 10px;font-size:12px">🤜 Team Battle</button>
         <button onclick="showGuide()" class="nav-link" id="nav-guide" style="padding:6px 10px;font-size:12px">📖 Guide</button>
         <button onclick="showAbout()" class="nav-link" id="nav-about" style="padding:6px 10px;font-size:12px">ℹ️ About</button>
@@ -3678,6 +3679,347 @@
     }
   }
 
+
+  // ── Season Analysis ──
+  let seasonChartInstance = null;
+  let h2hChartInstance = null;
+
+  async function loadSeasonAnalysis() {
+    currentView = 'season';
+    saveState('season');
+    setNavActive('nav-season');
+    const el = document.getElementById('content');
+    el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading season analysis...</div>';
+
+    try {
+      const [progression, h2h, pitStop] = await Promise.all([
+        api('/analytics/season-progression?year=2026'),
+        api('/analytics/head-to-head?year=2026'),
+        api('/analytics/pit-stop-championship?year=2026'),
+      ]);
+
+      let html = `
+        <div class="mb-6">
+          <h2 class="text-xl font-bold">📊 2026 Season Analysis</h2>
+          <p class="text-sm" style="color:var(--text-secondary)">${progression.total_rounds} rounds completed</p>
+        </div>
+
+        <!-- Season Progression Chart -->
+        <div class="card p-5 mb-6">
+          <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+            <h3 class="font-semibold text-sm">📈 Points Progression
+              <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Cumulative points per driver across rounds</span>
+            </h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="collapse-body">
+            <div class="flex flex-wrap gap-2 mb-3" id="prog-drivers">
+              ${progression.drivers.slice(0, 15).map((d, i) => `
+                <label class="flex items-center gap-1.5 text-xs cursor-pointer" style="color:var(--text-primary)">
+                  <input type="checkbox" class="prog-cb" value="${d.driver_number}" data-acronym="${d.acronym}" ${i < 10 ? 'checked' : ''}>
+                  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${d.team_colour || '#666'}"></span>
+                  ${d.acronym}
+                </label>
+              `).join('')}
+            </div>
+            <div class="flex gap-2 mb-3">
+              <button onclick="plotSeasonProgression()" class="bg-f1-red text-white px-3 py-1.5 rounded text-xs font-medium hover:opacity-90 transition">📈 Plot</button>
+              <button onclick="progSelectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">✅ Select All</button>
+              <button onclick="progDeselectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">⬜ Clear</button>
+            </div>
+            <div class="relative" style="height:380px">
+              <canvas id="season-prog-chart"></canvas>
+            </div>
+            <div id="prog-chart-status" class="text-xs mt-2" style="color:var(--text-muted);text-align:center">Select drivers above and click Plot</div>
+          </div>
+        </div>
+
+        <!-- Head-to-Head -->
+        <div class="card p-5 mb-6">
+          <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+            <h3 class="font-semibold text-sm">🤜🤛 Driver Head-to-Head
+              <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Select two drivers to compare</span>
+            </h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="collapse-body closed">
+            <div class="flex flex-wrap gap-3 items-center mb-4">
+              <select id="h2h-drv1" class="text-xs">
+                ${h2h.drivers.map(d => `<option value="${d.driver_number}">${d.acronym} (${d.team_name})</option>`).join('')}
+              </select>
+              <span style="color:var(--text-secondary)">vs</span>
+              <select id="h2h-drv2" class="text-xs">
+                ${h2h.drivers.map(d => `<option value="${d.driver_number}">${d.acronym} (${d.team_name})</option>`).join('')}
+              </select>
+              <button onclick="compareH2H()" class="bg-f1-red text-white px-3 py-1.5 rounded text-xs font-medium hover:opacity-90 transition">Compare</button>
+            </div>
+            <div id="h2h-result" class="text-xs" style="color:var(--text-muted)">Select two drivers and click Compare.</div>
+          </div>
+        </div>
+
+        <!-- Pit Stop Championship -->
+        <div class="card p-5 mb-6">
+          <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+            <h3 class="font-semibold text-sm">⛽ Pit Stop Championship
+              <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Team rankings by pit stop speed</span>
+            </h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="collapse-body closed">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
+              <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
+                <div class="font-bold" style="color:var(--text-primary)">${pitStop.total_teams}</div>
+                <div>Teams</div>
+              </div>
+              <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
+                <div class="font-bold" style="color:var(--text-primary)">${pitStop.total_stops}</div>
+                <div>Total Pit Stops</div>
+              </div>
+              <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
+                <div class="font-bold" style="color:#16a34a">${pitStop.overall_fastest_stop ? pitStop.overall_fastest_stop[0].toFixed(1) + 's' : '—'}</div>
+                <div>Fastest Stop Overall</div>
+                <div>${pitStop.overall_fastest_stop ? pitStop.overall_fastest_stop[2].acronym + ' L' + pitStop.overall_fastest_stop[2].lap_number : ''}</div>
+              </div>
+              <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
+                <div class="font-bold" style="color:#f59e0b">${pitStop.teams[0] ? pitStop.teams[0].avg_pit_duration + 's' : '—'}</div>
+                <div>Fastest Avg (${pitStop.teams[0] ? pitStop.teams[0].team_name : ''})</div>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th><th>Team</th>
+                    <th class="text-right">Avg Stop</th>
+                    <th class="text-right">Fastest</th>
+                    <th class="text-right">Slowest</th>
+                    <th class="text-right">Stops</th>
+                    <th class="text-right">Drivers</th>
+                    <th class="text-right">🎯 Consistency</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${pitStop.teams.map((t, i) => {
+                    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+                    return `
+                    <tr>
+                      <td class="font-bold" style="font-size:14px">${medal}</td>
+                      <td class="font-medium">${t.team_name}</td>
+                      <td class="text-right font-mono font-bold">${t.avg_pit_duration}s</td>
+                      <td class="text-right font-mono" style="color:#16a34a">${t.fastest_stop}s</td>
+                      <td class="text-right font-mono" style="color:#dc2626">${t.slowest_stop}s</td>
+                      <td class="text-right" style="color:var(--text-secondary)">${t.total_stops}</td>
+                      <td class="text-right" style="color:var(--text-secondary)">${t.drivers}</td>
+                      <td class="text-right font-mono font-bold" style="color:${t.consistency > 88 ? '#16a34a' : t.consistency > 82 ? '#f59e0b' : '#dc2626'}">${t.consistency}%</td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+
+      el.innerHTML = html;
+    } catch(e) {
+      el.innerHTML = '<div class="text-center py-20" style="color:#dc2626">Error: ' + e.message + '</div>';
+    }
+  }
+
+  // ── Season Progression helpers ──
+  let progData = null;
+
+  function progSelectAll() {
+    document.querySelectorAll('.prog-cb').forEach(cb => cb.checked = true);
+  }
+  function progDeselectAll() {
+    document.querySelectorAll('.prog-cb').forEach(cb => cb.checked = false);
+  }
+
+  async function plotSeasonProgression() {
+    const el = document.getElementById('season-prog-chart');
+    if (!el) return;
+
+    if (seasonChartInstance) { seasonChartInstance.destroy(); seasonChartInstance = null; }
+
+    if (!progData) {
+      progData = await api('/analytics/season-progression?year=2026');
+    }
+
+    // Get selected drivers
+    const selected = [];
+    document.querySelectorAll('.prog-cb:checked').forEach(cb => {
+      selected.push(parseInt(cb.value));
+    });
+
+    if (selected.length === 0) {
+      document.getElementById('prog-chart-status').textContent = '⚠️ Select at least one driver';
+      return;
+    }
+
+    const rounds = progData.rounds;
+    const labels = rounds.map(r => 'R' + r.round);
+    const driverMap = {};
+    progData.drivers.forEach(d => { driverMap[d.driver_number] = d; });
+
+    const datasets = [];
+    const colors = ['#e10600','#1e63a8','#16a34a','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#dc2626','#84cc16','#14b8a6','#f97316','#6366f1','#d946ef','#0ea5e9','#22c55e','#eab308','#a855f7','#3b82f6','#ef4444','#10b981','#f59e0b','#6b7280'];
+
+    selected.forEach((dn, idx) => {
+      const info = driverMap[dn];
+      const color = info && info.team_colour ? info.team_colour : colors[idx % colors.length];
+      const data = rounds.map(r => {
+        const d = r.standings.find(s => s.driver_number === dn);
+        return d ? d.cumulative_points : null;
+      });
+      datasets.push({
+        label: info ? info.acronym : '#' + dn,
+        data: data,
+        borderColor: color,
+        backgroundColor: color + '22',
+        borderWidth: idx < 5 ? 3 : 1.5,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+        spanGaps: true,
+        tension: 0.2,
+        fill: idx < 3,
+      });
+    });
+
+    const ctx = el.getContext('2d');
+    const isLight = document.documentElement.classList.contains('light');
+    const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+    const textColor = isLight ? '#64748b' : '#8b949e';
+
+    seasonChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        interaction: { mode: 'nearest', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { color: textColor, font: { size: 10 }, boxWidth: 12, padding: 8 } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const d = ctx.parsed.y;
+                if (d === null) return ctx.dataset.label + ': DNP';
+                return ctx.dataset.label + ': ' + d + ' pts';
+              }
+            }
+          }
+        },
+        scales: {
+          x: { title: { display: true, text: 'Round', color: textColor, font: { size: 10 } },
+            grid: { color: gridColor }, ticks: { color: textColor, font: { size: 9 } } },
+          y: { title: { display: true, text: 'Cumulative Points', color: textColor, font: { size: 10 } },
+            grid: { color: gridColor }, ticks: { color: textColor, font: { size: 9 } }, beginAtZero: true }
+        }
+      }
+    });
+    document.getElementById('prog-chart-status').textContent = 'Showing ' + selected.length + ' drivers';
+  }
+
+  // ── Head-to-Head comparison ──
+  let h2hData = null;
+
+  async function compareH2H() {
+    const d1 = parseInt(document.getElementById('h2h-drv1').value);
+    const d2 = parseInt(document.getElementById('h2h-drv2').value);
+    if (d1 === d2) { return; }
+
+    if (!h2hData) {
+      h2hData = await api('/analytics/head-to-head?year=2026');
+    }
+
+    const driverMap = {};
+    h2hData.drivers.forEach(d => { driverMap[d.driver_number] = d; });
+
+    const drv1 = driverMap[d1];
+    const drv2 = driverMap[d2];
+
+    if (!drv1 || !drv2) {
+      document.getElementById('h2h-result').innerHTML = '<div style="color:var(--text-muted)">Driver data not found</div>';
+      return;
+    }
+
+    // Get head-to-head stats
+    const qualWins1 = drv1.qual_wins[d2] || 0;
+    const qualWins2 = drv2.qual_wins[d1] || 0;
+    const qualTotal = drv1.qual_totals[d2] || (qualWins1 + qualWins2) || 0;
+    const raceWins1 = drv1.race_wins[d2] || 0;
+    const raceWins2 = drv2.race_wins[d1] || 0;
+    const raceTotal = drv1.race_totals[d2] || (raceWins1 + raceWins2) || 0;
+
+    const c1 = drv1.team_colour || '#666';
+    const c2 = drv2.team_colour || '#666';
+
+    document.getElementById('h2h-result').innerHTML = `
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Qualifying -->
+        <div class="card p-4" style="background:var(--bg-primary)">
+          <h4 class="text-xs font-semibold mb-3" style="color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">⏱️ Qualifying</h4>
+          <div class="flex items-center justify-between mb-3">
+            <div class="text-center flex-1">
+              <div class="font-bold text-lg" style="color:${c1}">${drv1.acronym}</div>
+              <div class="text-3xl font-bold mt-1" style="color:${c1}">${qualWins1}</div>
+              <div class="text-xs" style="color:var(--text-muted)">wins</div>
+            </div>
+            <div class="text-center" style="color:var(--text-muted);font-size:11px">
+              <div>of</div>
+              <div class="text-xl font-bold mt-1" style="color:var(--text-primary)">${qualTotal}</div>
+              <div>rounds</div>
+            </div>
+            <div class="text-center flex-1">
+              <div class="font-bold text-lg" style="color:${c2}">${drv2.acronym}</div>
+              <div class="text-3xl font-bold mt-1" style="color:${c2}">${qualWins2}</div>
+              <div class="text-xs" style="color:var(--text-muted)">wins</div>
+            </div>
+          </div>
+          <div class="w-full" style="background:var(--bg-card);border-radius:4px;height:8px;overflow:hidden">
+            <div style="width:${qualTotal > 0 ? (qualWins1/qualTotal*100).toFixed(0) : 50}%;height:100%;background:${c1};border-radius:4px;float:left;transition:width 0.5s"></div>
+            <div style="width:${qualTotal > 0 ? (qualWins2/qualTotal*100).toFixed(0) : 50}%;height:100%;background:${c2};border-radius:4px;float:right;transition:width 0.5s"></div>
+          </div>
+          <div class="flex justify-between text-xs mt-1" style="color:var(--text-muted)">
+            <span>${qualTotal > 0 ? (qualWins1/qualTotal*100).toFixed(0) : 50}%</span>
+            <span>${qualTotal > 0 ? (qualWins2/qualTotal*100).toFixed(0) : 50}%</span>
+          </div>
+        </div>
+        <!-- Race -->
+        <div class="card p-4" style="background:var(--bg-primary)">
+          <h4 class="text-xs font-semibold mb-3" style="color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">🏁 Race</h4>
+          <div class="flex items-center justify-between mb-3">
+            <div class="text-center flex-1">
+              <div class="font-bold text-lg" style="color:${c1}">${drv1.acronym}</div>
+              <div class="text-3xl font-bold mt-1" style="color:${c1}">${raceWins1}</div>
+              <div class="text-xs" style="color:var(--text-muted)">wins</div>
+            </div>
+            <div class="text-center" style="color:var(--text-muted);font-size:11px">
+              <div>of</div>
+              <div class="text-xl font-bold mt-1" style="color:var(--text-primary)">${raceTotal}</div>
+              <div>rounds</div>
+            </div>
+            <div class="text-center flex-1">
+              <div class="font-bold text-lg" style="color:${c2}">${drv2.acronym}</div>
+              <div class="text-3xl font-bold mt-1" style="color:${c2}">${raceWins2}</div>
+              <div class="text-xs" style="color:var(--text-muted)">wins</div>
+            </div>
+          </div>
+          <div class="w-full" style="background:var(--bg-card);border-radius:4px;height:8px;overflow:hidden">
+            <div style="width:${raceTotal > 0 ? (raceWins1/raceTotal*100).toFixed(0) : 50}%;height:100%;background:${c1};border-radius:4px;float:left;transition:width 0.5s"></div>
+            <div style="width:${raceTotal > 0 ? (raceWins2/raceTotal*100).toFixed(0) : 50}%;height:100%;background:${c2};border-radius:4px;float:right;transition:width 0.5s"></div>
+          </div>
+          <div class="flex justify-between text-xs mt-1" style="color:var(--text-muted)">
+            <span>${raceTotal > 0 ? (raceWins1/raceTotal*100).toFixed(0) : 50}%</span>
+            <span>${raceTotal > 0 ? (raceWins2/raceTotal*100).toFixed(0) : 50}%</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   // ── Init ──
   initTheme();
   // Use sessionStorage: stays on same page on refresh,
@@ -3690,6 +4032,8 @@
     showGuide();
   } else if (savedView === 'standings') {
     loadChampionship();
+  } else if (savedView === 'season') {
+    loadSeasonAnalysis();
   } else if (savedView === 'teammate') {
     loadTeamMateBattle();
   } else if (savedView === 'sessions' && savedState) {
