@@ -370,8 +370,12 @@
   }
 
   async function compareDrivers(sessionId) {
-    const d1 = document.getElementById('comp-drv1').value;
-    const d2 = document.getElementById('comp-drv2').value;
+    const d1el = document.getElementById('comp-drv1');
+    const d2el = document.getElementById('comp-drv2');
+    const d1 = d1el.value;
+    const d2 = d2el.value;
+    const d1name = d1el.options[d1el.selectedIndex].text.match(/\((\w+)\)/)?.[1] || d1;
+    const d2name = d2el.options[d2el.selectedIndex].text.match(/\((\w+)\)/)?.[1] || d2;
     const el = document.getElementById('comp-result');
     el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Comparing...</div>';
 
@@ -387,15 +391,15 @@
             <thead>
               <tr>
                 <th>Lap</th>
-                <th class="text-right">Driver A</th>
+                <th class="text-right">${d1name}</th>
                 <th class="text-right">Δ</th>
-                <th class="text-right">Driver B</th>
-                <th class="text-right">S1 A</th>
-                <th class="text-right">S1 B</th>
-                <th class="text-right">S2 A</th>
-                <th class="text-right">S2 B</th>
-                <th class="text-right">S3 A</th>
-                <th class="text-right">S3 B</th>
+                <th class="text-right">${d2name}</th>
+                <th class="text-right">S1 ${d1name}</th>
+                <th class="text-right">S1 ${d2name}</th>
+                <th class="text-right">S2 ${d1name}</th>
+                <th class="text-right">S2 ${d2name}</th>
+                <th class="text-right">S3 ${d1name}</th>
+                <th class="text-right">S3 ${d2name}</th>
               </tr>
             </thead>
             <tbody>
