@@ -202,21 +202,35 @@
     display: none;
   }
   .light .tyme-tooltip { background: #334155; }
+
+  /* ── Mobile Responsive ── */
+  @media (max-width: 640px) {
+    .nav-link { padding: 5px 8px !important; font-size: 11px !important; }
+    .card { padding: 12px !important; }
+    table { font-size: 11px; }
+    th, td { padding: 6px 6px !important; }
+    .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+    h2 { font-size: 1.1rem !important; }
+    h3 { font-size: 0.8rem !important; }
+    .grid { gap: 0.5rem !important; }
+    select, input, button { font-size: 12px !important; }
+  }
 </style>
 </head>
 <body>
   <div class="max-w-6xl mx-auto px-4 py-6">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-8">
+    <div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-3">
       <div>
-        <h1 class="text-2xl font-bold"><span class="f1-red">F1</span> Analysis <span class="text-sm" style="color:var(--text-muted)">2026</span></h1>
-        <p class="text-sm mt-1" style="color:var(--text-secondary)">Telemetry, sector times &amp; race data</p>
+        <h1 class="text-xl md:text-2xl font-bold"><span class="f1-red">F1</span> Analysis <span class="text-sm" style="color:var(--text-muted)">2026</span></h1>
+        <p class="text-xs md:text-sm mt-1" style="color:var(--text-secondary)">Telemetry, sector times &amp; race data</p>
       </div>
-      <div class="flex gap-2 items-center">
-        <button onclick="loadRaces()" class="nav-link active" id="nav-races">🏁 Races</button>
-        <button onclick="loadChampionship()" class="nav-link" id="nav-standings">🏆 Standings</button>
-        <button onclick="showAbout()" class="nav-link" id="nav-about">ℹ️ About</button>
-        <button onclick="toggleTheme()" class="theme-btn" id="theme-btn" title="Toggle theme">🌙</button>
+      <div class="flex flex-wrap gap-1.5 items-center">
+        <button onclick="loadRaces()" class="nav-link active" id="nav-races" style="padding:6px 10px;font-size:12px">🏁 Races</button>
+        <button onclick="loadChampionship()" class="nav-link" id="nav-standings" style="padding:6px 10px;font-size:12px">🏆 Standings</button>
+        <button onclick="showGuide()" class="nav-link" id="nav-guide" style="padding:6px 10px;font-size:12px">📖 Guide</button>
+        <button onclick="showAbout()" class="nav-link" id="nav-about" style="padding:6px 10px;font-size:12px">ℹ️ About</button>
+        <button onclick="toggleTheme()" class="theme-btn" id="theme-btn" title="Toggle theme" style="padding:4px 8px;font-size:14px">🌙</button>
       </div>
     </div>
 
@@ -656,7 +670,7 @@
           <div id="pos-chart-area">
             <div class="text-center py-8" style="color:var(--text-muted)">
               <button onclick="loadPositionHistory(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">📊 Load Position Chart</button>
-              <div class="mt-2 text-xs">Shows how positions changed lap by lap — P1 at top. Click legend to toggle drivers.</div>
+              <div class="mt-2 text-xs">Shows how positions changed lap by lap — P1 at top. Use checkboxes + Plot to focus on specific drivers.</div>
             </div>
           </div>
         </div>
@@ -2104,7 +2118,7 @@
   }
 
   // ── Position History ──
-  let posSelectedDrivers = [];
+  let posChartData = null; // { lapPositions, driverMap, allDrivers, maxLap, allLaps, timeline }
 
   async function loadPositionHistory(sessionId) {
     const el = document.getElementById('pos-chart-area');
@@ -2139,14 +2153,14 @@
       const allDrivers = Object.keys(driverMap).map(Number);
       const allLaps = Object.keys(lapPositions).map(Number).sort((a, b) => a - b);
 
-      // Initialize selection: all checked
-      if (posSelectedDrivers.length === 0) posSelectedDrivers = [...allDrivers];
+      // Store data globally for chart re-render
+      posChartData = { lapPositions, driverMap, allDrivers, maxLap, allLaps, timeline };
 
-      // Driver picker + chart container
+      // Driver picker + chart canvas rendered once
       let html = `
         <div class="flex flex-wrap gap-3 items-center mb-3">
-          <button onclick="posSelectAll(${sessionId})" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">✅ Select All</button>
-          <button onclick="posDeselectAll(${sessionId})" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">⬜ Clear</button>
+          <button onclick="posSelectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">✅ Select All</button>
+          <button onclick="posDeselectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">⬜ Clear</button>
           <span style="color:var(--text-secondary);font-size:11px">Show drivers:</span>
         </div>
         <div class="flex flex-wrap gap-2 mb-3" id="pos-drivers">
@@ -2157,16 +2171,19 @@
           }).map(dn => {
             const info = driverMap[dn];
             const colour = info.team_colour ? teamColor(info.team_colour) : '#666';
-            const checked = posSelectedDrivers.includes(dn) ? 'checked' : '';
             return `<label class="flex items-center gap-1.5 text-xs cursor-pointer" style="color:var(--text-primary)">
-              <input type="checkbox" class="pos-cb" value="${dn}" data-acronym="${info.acronym}" onclick="posToggleDriver(${dn}, ${sessionId})" ${checked}>
+              <input type="checkbox" class="pos-cb" value="${dn}" data-acronym="${info.acronym}" checked>
               <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colour}"></span>
               ${info.acronym}
             </label>`;
           }).join('')}
         </div>
         <div class="text-xs mb-2" style="color:var(--text-muted);text-align:center">
-          <strong>P1 on top</strong> — lines stepping right show position holds. Uncheck drivers to focus.
+          <strong>P1 on top</strong> — check/uncheck drivers to focus. Toggle checkboxes then click <strong>Plot Chart</strong>.
+        </div>
+        <div class="flex items-center gap-3 mb-3">
+          <button onclick="renderPosChart()" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">📈 Plot Chart</button>
+          <span class="text-xs" style="color:var(--text-muted)">Click to update chart after toggling drivers</span>
         </div>
         <div class="relative" style="height:450px">
           <canvas id="pos-chart-canvas"></canvas>
@@ -2175,91 +2192,81 @@
 
       el.innerHTML = html;
 
-      // Build dataset for selected drivers only
-      const renderPosChart = () => {
-        if (posChartInstance) { posChartInstance.destroy(); posChartInstance = null; }
-
-        const labels = [];
-        for (let i = 1; i <= maxLap; i++) labels.push(i);
-
-        const DRIVER_COLORS = ['#e10600','#16a34a','#3b82f6','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#dc2626','#6366f1','#d946ef','#22c55e','#eab308','#64748b','#0ea5e9','#a855f7','#10b981','#9ca3af'];
-
-        const showDrivers = posSelectedDrivers.length > 0 ? allDrivers.filter(dn => posSelectedDrivers.includes(dn)) : allDrivers;
-        const sortedShown = [...showDrivers].sort((a, b) => {
-          const aLast = lapPositions[allLaps[allLaps.length - 1]]?.find(e => e.driver_number === a);
-          const bLast = lapPositions[allLaps[allLaps.length - 1]]?.find(e => e.driver_number === b);
-          return (aLast?.position || 99) - (bLast?.position || 99);
-        });
-
-        let colorIdx = 0;
-        const datasets = [];
-        for (const dn of sortedShown) {
-          const info = driverMap[dn];
-          const color = info.team_colour ? `#${info.team_colour.replace('#', '')}` : DRIVER_COLORS[colorIdx % DRIVER_COLORS.length];
-          colorIdx++;
-          const data = [];
-          for (let i = 1; i <= maxLap; i++) {
-            const entry = lapPositions[i]?.find(e => e.driver_number === dn);
-            data.push(entry?.position || null);
-          }
-          datasets.push({ label: info.acronym || `#${dn}`, data, borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 1.5, pointHoverRadius: 5, tension: 0, spanGaps: true, fill: false, stepped: 'before' });
-        }
-
-        setTimeout(() => {
-          const canvas = document.getElementById('pos-chart-canvas');
-          if (!canvas) return;
-          const ctx = canvas.getContext('2d');
-          const isLight = document.documentElement.classList.contains('light');
-          const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
-          const textColor = isLight ? '#64748b' : '#8b949e';
-          const maxPos = Math.max(...timeline.map(e => e.position));
-
-          posChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: { labels, datasets },
-            options: {
-              responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
-              interaction: { mode: 'index', intersect: false },
-              plugins: {
-                legend: { position: 'bottom', labels: { color: textColor, font: { size: 9 }, boxWidth: 12, padding: 6, usePointStyle: true, pointStyle: 'line' } },
-                tooltip: { callbacks: { title: (items) => `Lap ${items[0].label}`, label: (ctx) => { const v = ctx.parsed.y; return v ? `${ctx.dataset.label}: P${v}${v === 1 ? ' 🏆' : ''}` : null; } } },
-              },
-              scales: {
-                x: { title: { display: true, text: 'Lap', color: textColor, font: { size: 11 } }, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } }, min: 1 },
-                y: { title: { display: true, text: 'Race Position', color: textColor, font: { size: 11 } }, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 }, stepSize: 1, callback: (v) => `P${v}` }, min: 1, max: maxPos + 0.5, reverse: true },
-              },
-              elements: { line: { stepped: 'before' } },
-            },
-          });
-        }, 50);
-      };
-
+      // Initial render
       renderPosChart();
     } catch(e) {
       el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
     }
   }
 
-  function posSelectAll(sessionId) {
-    document.querySelectorAll('.pos-cb').forEach(cb => cb.checked = true);
-    posSelectedDrivers = [];
-    document.querySelectorAll('.pos-cb:checked').forEach(cb => posSelectedDrivers.push(parseInt(cb.value)));
-    loadPositionHistory(sessionId);
-  }
-  function posDeselectAll(sessionId) {
-    document.querySelectorAll('.pos-cb').forEach(cb => cb.checked = false);
-    posSelectedDrivers = [];
-    loadPositionHistory(sessionId);
-  }
-  function posToggleDriver(dn, sessionId) {
-    const cb = document.querySelector(`.pos-cb[value="${dn}"]`);
-    if (cb.checked) {
-      if (!posSelectedDrivers.includes(dn)) posSelectedDrivers.push(dn);
-    } else {
-      posSelectedDrivers = posSelectedDrivers.filter(d => d !== dn);
+  function renderPosChart() {
+    if (!posChartData) return;
+    if (posChartInstance) { posChartInstance.destroy(); posChartInstance = null; }
+
+    const { lapPositions, driverMap, allDrivers, maxLap, allLaps, timeline } = posChartData;
+    const labels = [];
+    for (let i = 1; i <= maxLap; i++) labels.push(i);
+
+    const DRIVER_COLORS = ['#e10600','#16a34a','#3b82f6','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#dc2626','#6366f1','#d946ef','#22c55e','#eab308','#64748b','#0ea5e9','#a855f7','#10b981','#9ca3af'];
+
+    // Read checked state directly from DOM
+    const selected = [];
+    document.querySelectorAll('.pos-cb:checked').forEach(cb => selected.push(parseInt(cb.value)));
+    const showDrivers = selected.length > 0 ? allDrivers.filter(dn => selected.includes(dn)) : allDrivers;
+    const sortedShown = [...showDrivers].sort((a, b) => {
+      const aLast = lapPositions[allLaps[allLaps.length - 1]]?.find(e => e.driver_number === a);
+      const bLast = lapPositions[allLaps[allLaps.length - 1]]?.find(e => e.driver_number === b);
+      return (aLast?.position || 99) - (bLast?.position || 99);
+    });
+
+    let colorIdx = 0;
+    const datasets = [];
+    for (const dn of sortedShown) {
+      const info = driverMap[dn];
+      const color = info.team_colour ? `#${info.team_colour.replace('#', '')}` : DRIVER_COLORS[colorIdx % DRIVER_COLORS.length];
+      colorIdx++;
+      const data = [];
+      for (let i = 1; i <= maxLap; i++) {
+        const entry = lapPositions[i]?.find(e => e.driver_number === dn);
+        data.push(entry?.position || null);
+      }
+      datasets.push({ label: info.acronym || `#${dn}`, data, borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 1.5, pointHoverRadius: 5, tension: 0, spanGaps: true, fill: false, stepped: 'before' });
     }
-    // Re-render chart without reloading everything
-    loadPositionHistory(sessionId);
+
+    setTimeout(() => {
+      const canvas = document.getElementById('pos-chart-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const isLight = document.documentElement.classList.contains('light');
+      const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+      const textColor = isLight ? '#64748b' : '#8b949e';
+      const maxPos = Math.max(...timeline.map(e => e.position));
+
+      posChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'bottom', labels: { color: textColor, font: { size: 9 }, boxWidth: 12, padding: 6, usePointStyle: true, pointStyle: 'line' } },
+            tooltip: { callbacks: { title: (items) => `Lap ${items[0].label}`, label: (ctx) => { const v = ctx.parsed.y; return v ? `${ctx.dataset.label}: P${v}${v === 1 ? ' 🏆' : ''}` : null; } } },
+          },
+          scales: {
+            x: { title: { display: true, text: 'Lap', color: textColor, font: { size: 11 } }, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } }, min: 1 },
+            y: { title: { display: true, text: 'Race Position', color: textColor, font: { size: 11 } }, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 }, stepSize: 1, callback: (v) => `P${v}` }, min: 1, max: maxPos + 0.5, reverse: true },
+          },
+          elements: { line: { stepped: 'before' } },
+        },
+      });
+    }, 50);
+  }
+
+  function posSelectAll() {
+    document.querySelectorAll('.pos-cb').forEach(cb => cb.checked = true);
+  }
+  function posDeselectAll() {
+    document.querySelectorAll('.pos-cb').forEach(cb => cb.checked = false);
   }
 
   async function compareDrivers(sessionId) {
@@ -2489,6 +2496,88 @@
         </div>
         <div class="mt-6 text-xs" style="color:var(--text-muted)">
           F1 is a trademark of Formula One Licensing B.V. This is an unofficial data analysis project.
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Guide (How to Read Each Section) ──
+  function showGuide() {
+    currentView = 'guide';
+    document.getElementById('content').innerHTML = `
+      <div class="card p-6 max-w-3xl mx-auto">
+        <h2 class="text-xl font-bold mb-5">📖 How to Read the Analysis</h2>
+
+        <div class="mb-6">
+          <h3 class="font-semibold text-sm mb-2">🏆 Best Sector Times</h3>
+          <p class="text-sm mb-1" style="color:var(--text-secondary)">Shows each driver's fastest time in Sector 1 (S1), Sector 2 (S2), and Sector 3 (S3), plus their theoretical best lap. Each cell is colour-coded: green = top 3, darker = faster. Hover for exact time.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> A driver topping all 3 sectors is on for pole. A driver with a big S3 advantage is strong on straights.</p>
+        </div>
+
+        <div class="mb-6">
+          <h3 class="font-semibold text-sm mb-2">⏱️ Qualifying Evolution</h3>
+          <p class="text-sm mb-1" style="color:var(--text-secondary)">Tracks lap time progression per driver across all qualifying runs. The chart shows each driver's improvement or decline; the table below shows each run's time, compound, and position change.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> Steep downward slopes = big improvements. Drivers who plateau early may not have more pace left.</p>
+        </div>
+
+        <div class="mb-6">
+          <h3 class="font-semibold text-sm mb-2">📈 Lap Distribution</h3>
+          <p class="text-sm mb-1" style="color:var(--text-secondary)">Distribution of all lap times per driver as a box plot or scatter. Shows median, consistency (spread), and outliers. Each driver card shows avg pace and interval to the fastest average.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> Tight clusters = consistent pace. Wide spread = inconsistent. Outliers above could mean traffic or mistakes.</p>
+        </div>
+
+        <div class="mb-6">
+          <h3 class="font-semibold text-sm mb-2">🏁 Position History</h3>
+          <p class="text-sm mb-1" style="color:var(--text-secondary)">Lap-by-lap race position for every driver. P1 is at the top. Each step right shows the driver held position for that lap. Use the checkboxes + <strong>Plot Chart</strong> button to focus on specific battles.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> Crossing lines = overtakes. A flat line at the top = dominant win. Late-race climbs = strong recovery drive.</p>
+        </div>
+
+        <div class="mb-6">
+          <h3 class="font-semibold text-sm mb-2">⛽ Pit Strategy Battle</h3>
+          <p class="text-sm mb-1" style="color:var(--text-secondary)">Race position over time with undercut/overlay analysis. The table lists every pit stop (lap, driver, tyre, time lost). The chart shows how pit windows affect track position.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> A driver pitting earlier (undercut) can leapfrog ahead by having fresh tyres. Compare out-lap times to spot undercut attempts.</p>
+        </div>
+
+        <div class="mb-6">
+          <h3 class="font-semibold text-sm mb-2">🛞 Tyre Strategy Timeline</h3>
+          <p class="text-sm mb-1" style="color:var(--text-secondary)">Visual timeline of every driver's tyre stints. Coloured bars show compound (Soft/Medium/Hard/Intermediate/Wet), and the legend at the bottom shows the colour codes.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> Splitting strategies between drivers at the same team. A long middle stint on Hards = one-stop gamble. Multiple short stints = aggressive.</p>
+        </div>
+
+        <div class="mb-6">
+          <h3 class="font-semibold text-sm mb-2">⛽ Pit Stop Analysis</h3>
+          <p class="text-sm mb-1" style="color:var(--text-secondary)">Details every pit stop: lap number, driver, from/to compound, and time lost. The chart plots pit stop times per lap with colour-coded compound transitions.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> Consistent sub-2.5s pit stops = strong crew. Slow stops (&gt;3.5s) cost track position. Double-stacks can bunch lap times.</p>
+        </div>
+
+        <div class="mb-6">
+          <h3 class="font-semibold text-sm mb-2">📊 Gap Timeline</h3>
+          <p class="text-sm mb-1" style="color:var(--text-secondary)">Cumulative gap to the race leader per lap for each driver. The line at 0 is the leader. Check/uncheck drivers and click <strong>Plot Gaps</strong> to focus on specific battles. Use the dropdown to pick a reference driver instead of leader.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> A rising line = losing time to leader. A flat/falling line = matching or gaining on the leader. Diverging lines after a pit stop show undercut success.</p>
+        </div>
+
+        <div class="mb-6">
+          <h3 class="font-semibold text-sm mb-2">🔄 Overtake Analysis</h3>
+          <p class="text-sm mb-1" style="color:var(--text-secondary)">Tracks every position change lap by lap. Green bars = positions gained, red = positions lost. The table ranks drivers by net overtakes (gained minus lost).</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> High gain + low loss = clean aggressive driving. High loss = either car issues or being vulnerable on straights.</p>
+        </div>
+
+        <div class="mb-6">
+          <h3 class="font-semibold text-sm mb-2">🛞 Tyre Degradation</h3>
+          <p class="text-sm mb-1" style="color:var(--text-secondary)">Scatter plot of lap time vs tyre age for two selected drivers. Each compound is a different series. Solid lines = Driver 1, dashed = Driver 2. The steeper the upward trend, the faster the tyres are degrading.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> A shallow slope on old tyres = good deg management. A sudden spike = performance cliff when tyres are completely gone.</p>
+        </div>
+
+        <div class="mb-6">
+          <h3 class="font-semibold text-sm mb-2">🔬 Driver Comparison</h3>
+          <p class="text-sm mb-1" style="color:var(--text-secondary)">Head-to-head for any two drivers across the session: fastest lap, avg pace, sector times, top speed. Ideal for comparing teammates or title rivals.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> Teammate gaps in qualifying reveal who has the edge. In races, compare stint lengths and deg to see who manages tyres better.</p>
+        </div>
+
+        <div class="mb-6">
+          <h3 class="font-semibold text-sm mb-2">🏆 Championship Standings</h3>
+          <p class="text-sm mb-1" style="color:var(--text-secondary)">Season-long driver and constructor points. Includes a points-progression chart to visualise momentum swings across rounds and a race-by-race results table.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> Steep climb = dominant run. Flat mid-season = development battle. Late surge = team found pace.</p>
         </div>
       </div>
     `;
