@@ -3100,30 +3100,10 @@
 
   // ── Init ──
   initTheme();
-  const savedView = localStorage.getItem('f1-view');
-  const savedState = localStorage.getItem('f1-state');
-  if (savedView === 'standings') {
-    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-    const nav = document.getElementById('nav-standings');
-    if (nav) nav.classList.add('active');
-    loadChampionship();
-  } else if (savedView === 'sessions' && savedState) {
-    try {
-      const s = JSON.parse(savedState);
-      if (s.meetingId && s.meetingName) {
-        loadSessions(s.meetingId, s.meetingName);
-      } else { loadRaces(); }
-    } catch(e) { loadRaces(); }
-  } else if (savedView === 'session' && savedState) {
-    try {
-      const s = JSON.parse(savedState);
-      if (s.meetingId && s.sessionId && s.sessionName && s.sessionType) {
-        loadSession(s.sessionId, s.meetingId, s.meetingName, s.sessionName, s.sessionType);
-      } else { loadRaces(); }
-    } catch(e) { loadRaces(); }
-  } else {
-    loadRaces();
-  }
+  // Always start at races list on page load.
+  // Saved state (localStorage) is only used during navigation within the app.
+  clearState();
+  loadRaces();
   </script>
 
   <!-- Floating Table of Contents -->
