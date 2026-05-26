@@ -1404,30 +1404,34 @@
     try {
       const data = await api(`/analytics/qualifying-summary?meeting_id=${meetingId}`);
       const drivers = data.drivers;
-      const sessions = data.sessions;
+      const segments = data.segments || ['Q1', 'Q2', 'Q3'];
+      const sessionInfo = data.session;
 
       if (!drivers || drivers.length === 0) {
         el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No qualifying data available</div>';
         return;
       }
 
-      const sessionKeys = sessions.map(s => s.session_name);
       let html = '';
 
       // ── Stat cards ──
       const fastest = drivers[0];
+      const lastSeg = segments[segments.length - 1];
       const mostImproved = [...drivers]
         .filter(d => d.total_improvement !== null && d.total_improvement < 0)
         .sort((a, b) => a.total_improvement - b.total_improvement)[0];
       const driverCount = drivers.length;
-      const q3Count = drivers.filter(d => d.best_laps['Qualifying 3']).length;
 
       html += `
+        <div class="text-xs mb-3" style="color:var(--text-muted)">
+          <strong>${sessionInfo ? sessionInfo.session_name + ' — ' : ''}</strong>
+          Segments detected: ${segments.join(' → ')}
+        </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <div class="card p-3 text-center">
             <div class="text-xs" style="color:var(--text-muted)">⏱️ Pole</div>
             <div class="font-bold text-sm" style="color:${teamColor(fastest.team_colour)}">${fastest.acronym}</div>
-            <div class="text-xs font-mono" style="color:var(--text-secondary)">${fastest.best_laps[sessionKeys[sessionKeys.length-1]]?.toFixed(3)}s</div>
+            <div class="text-xs font-mono" style="color:var(--text-secondary)">${fastest.best_laps[lastSeg]?.toFixed(3)}s</div>
           </div>
           <div class="card p-3 text-center">
             <div class="text-xs" style="color:var(--text-muted)">📈 Most Improved</div>
@@ -1439,17 +1443,17 @@
             <div class="font-bold text-lg">${driverCount}</div>
           </div>
           <div class="card p-3 text-center">
-            <div class="text-xs" style="color:var(--text-muted)">🏁 Q3 Participants</div>
-            <div class="font-bold text-lg" style="color:#f59e0b">${q3Count}</div>
+            <div class="text-xs" style="color:var(--text-muted)">🏁 Q3</div>
+            <div class="font-bold text-lg" style="color:#f59e0b">${data.q3_drivers || '—'}</div>
           </div>
         </div>`;
 
-      // ── Grouped Bar Chart (only if multiple sessions) ──
-      if (drivers.length >= 2 && sessionKeys.length >= 2) {
+      // ── Grouped Bar Chart (only if multiple segments) ──
+      if (drivers.length >= 2 && segments.length >= 2) {
         html += `<div class="relative" style="height:400px;margin-bottom:16px">
           <canvas id="qevo-chart-canvas-${meetingId}"></canvas>
         </div>`;
-      } else if (sessionKeys.length === 1) {
+      } else if (segments.length === 1) {
         html += `<div class="text-xs mb-4" style="color:var(--text-muted)">
           ℹ️ Only 1 qualifying session found in the data — showing best lap ranking table below.
         </div>`;
@@ -1462,11 +1466,11 @@
             <thead>
               <tr>
                 <th>Pos</th><th>Driver</th><th>Team</th>`;
-      for (const sk of sessionKeys) {
-        html += `<th class="text-right font-mono">${sk}</th>`;
+      for (const seg of segments) {
+        html += `<th class="text-right font-mono">${seg}</th>`;
       }
-      html += `<th class="text-right">Q3→Q1 Δ</th>
-                <th class="text-right">Sessions</th>
+      html += `<th class="text-right">Last→First Δ</th>
+                <th class="text-right">Segments</th>
               </tr>
             </thead>
             <tbody>
@@ -1480,10 +1484,10 @@
           <td class="font-medium" style="color:${teamC}">${d.acronym}</td>
           <td>${teamBadge(d.team_name, d.team_colour)}</td>`;
 
-        for (const sk of sessionKeys) {
-          const lap = d.best_laps[sk];
-          const isBest = i === 0 && lap !== undefined;
-          html += `<td class="text-right font-mono" style="${isBest ? 'font-weight:700' : ''}">${lap ? lap.toFixed(3) + 's' : '<span style="color:var(--text-muted)">—</span>'}</td>`;
+        for (const seg of segments) {
+          const lap = d.best_laps[seg];
+          const isPole = i === 0 && seg === lastSeg && lap !== undefined;
+          html += `<td class="text-right font-mono" style="${isPole ? 'font-weight:700' : ''}">${lap ? lap.toFixed(3) + 's' : '<span style="color:var(--text-muted)">—</span>'}</td>`;
         }
 
         // Delta column
@@ -1494,7 +1498,7 @@
           html += `<td class="text-right" style="color:var(--text-muted)">—</td>`;
         }
 
-        html += `<td class="text-right" style="color:var(--text-secondary)">${d.sessions_participated}/${sessionKeys.length}</td>`;
+        html += `<td class="text-right" style="color:var(--text-secondary)">${d.segments_completed}/${segments.length}</td>`;
         html += `</tr>`;
       }
 
@@ -1510,7 +1514,7 @@
       el.innerHTML = html;
 
       // ── Chart init ──
-      if (drivers.length >= 2 && sessionKeys.length >= 2) {
+      if (drivers.length >= 2 && segments.length >= 2) {
         setTimeout(() => {
           const canvas = document.getElementById(`qevo-chart-canvas-${meetingId}`);
           if (!canvas) return;
@@ -1526,7 +1530,7 @@
           const datasets = [];
           chartDrivers.forEach((d, idx) => {
             const color = d.team_colour ? teamColor(d.team_colour) : DRV_COLORS[idx % DRV_COLORS.length];
-            const data = sessionKeys.map(sk => d.best_laps[sk] || null);
+            const data = segments.map(seg => d.best_laps[seg] || null);
             datasets.push({
               label: d.acronym,
               data: data,
@@ -1541,7 +1545,7 @@
           qevoChartInstance = new Chart(ctx, {
             type: 'bar',
             data: {
-              labels: sessionKeys,
+              labels: segments,
               datasets: datasets,
             },
             options: {

@@ -514,12 +514,14 @@ async def qualifying_summary(
     meeting_id: int = Query(..., description="Meeting ID"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Qualifying summary across all 3 sessions (Q1→Q2→Q3).
+    """Qualifying summary across Q1→Q2→Q3 segments.
 
-    For each driver, returns best lap time per qualifying session,
-    plus improvement deltas. Shows progression across qualifying stages.
+    Splits a single qualifying session into Q1/Q2/Q3 segments
+    based on driver count per lap number (heuristic: when count
+    drops below 20→Q1 ends, below 15→Q2 ends).
+    Returns best lap per driver per segment + improvement deltas.
     """
-    # Get all qualifying sessions for this meeting, sorted chronologically
+    # Get all qualifying sessions for this meeting (exclude sprint)
     sess_result = await db.execute(
         select(Session)
         .where(
@@ -539,16 +541,7 @@ async def qualifying_summary(
         for s in sessions
     ]
 
-    # Fetch lap data for ALL qualifying sessions at once
     session_ids = [s.id for s in sessions]
-    lap_result = await db.execute(
-        select(Lap).where(
-            Lap.session_id.in_(session_ids),
-            Lap.lap_duration.isnot(None),
-            Lap.lap_duration > 0,
-        )
-    )
-    all_laps = lap_result.scalars().all()
 
     # Fetch driver info from the first qualifying session
     drv_result = await db.execute(
@@ -563,54 +556,102 @@ async def qualifying_summary(
             "team_colour": d.team_colour,
         }
 
-    # Session name lookup
-    session_name_map = {s.id: s.session_name for s in sessions}
-
-    # Group by driver_number, then within that by session_name
     from collections import defaultdict
 
-    driver_session_laps = defaultdict(lambda: defaultdict(list))
-    for l in all_laps:
-        sn = session_name_map.get(l.session_id, "Unknown")
-        driver_session_laps[l.driver_number][sn].append(l.lap_duration)
+    all_drivers_list = []
+    all_laps_by_session = {}
 
+    for ses in sessions:
+        sid = ses.id
+        # Fetch laps for this session
+        lap_result = await db.execute(
+            select(Lap).where(
+                Lap.session_id == sid,
+                Lap.lap_duration.isnot(None),
+                Lap.lap_duration > 0,
+                Lap.lap_duration < 600,
+            )
+        )
+        session_laps = lap_result.scalars().all()
+        all_laps_by_session[sid] = session_laps
+
+        if not session_laps:
+            continue
+
+        # Determine Q1/Q2/Q3 boundaries based on driver count per lap
+        lap_driver_count = defaultdict(set)
+        for l in session_laps:
+            lap_driver_count[l.lap_number].add(l.driver_number)
+
+        sorted_laps = sorted(lap_driver_count.keys())
+
+        # Find transition points
+        q2_start_lap = None
+        q3_start_lap = None
+
+        for ln in sorted_laps:
+            cnt = len(lap_driver_count[ln])
+            if q2_start_lap is None and cnt <= 15:
+                q2_start_lap = ln
+            if q3_start_lap is None and cnt <= 10:
+                q3_start_lap = ln
+
+        # Define segments
+        segments = [
+            ("Q1", 1, (q2_start_lap or 999) - 1),
+            ("Q2", (q2_start_lap or 999), (q3_start_lap or 999) - 1),
+            ("Q3", (q3_start_lap or 999), 9999),
+        ]
+
+        # Group laps by driver and segment
+        for l in session_laps:
+            segment = None
+            for seg_name, seg_start, seg_end in segments:
+                if seg_start <= l.lap_number <= seg_end:
+                    segment = seg_name
+                    break
+            if segment is None:
+                continue
+
+            dn = l.driver_number
+            # Store in combined structure
+            all_drivers_list.append({
+                "driver_number": dn,
+                "segment": segment,
+                "lap_duration": l.lap_duration,
+            })
+
+    # Compute best lap per driver per segment
+    driver_segment_best = defaultdict(lambda: defaultdict(list))
+    for entry in all_drivers_list:
+        driver_segment_best[entry["driver_number"]][entry["segment"]].append(entry["lap_duration"])
+
+    # Standard segment order
+    segment_order = ["Q1", "Q2", "Q3"]
     drivers_data = []
-    all_drivers_best = []
+    all_drivers_by_final = []
 
-    for dn, session_laps_map in driver_session_laps.items():
+    for dn, segments in driver_segment_best.items():
         info = driver_info_map.get(dn, {})
         best_laps = {}
-        total_improvement = None
-        has_q1 = False
-        has_q3 = False
-
         prev_best = None
+        total_improvement = None
+        completed_segments = []
 
-        # Get best lap per session (sorted by session order)
-        for s in sessions:
-            sn = s.session_name
-            laps_in_session = session_laps_map.get(sn, [])
-            if laps_in_session:
-                best = min(laps_in_session)
-                best_laps[sn] = round(best, 3)
-                if sn == "Qualifying 1":
-                    has_q1 = True
-                if sn == "Qualifying 3":
-                    has_q3 = True
-                if prev_best is not None:
-                    pass  # improvement computed below across all sessions
+        for seg in segment_order:
+            times = segments.get(seg, [])
+            if times:
+                best = min(times)
+                best_laps[seg] = round(best, 3)
+                completed_segments.append(seg)
                 prev_best = best
 
-        # Total improvement from first to last session
-        session_names_ordered = [s.session_name for s in sessions if s.session_name in best_laps]
-        if len(session_names_ordered) >= 2:
-            first_best = best_laps.get(session_names_ordered[0])
-            last_best = best_laps.get(session_names_ordered[-1])
+        # Total improvement
+        if len(completed_segments) >= 2:
+            first_best = best_laps.get(completed_segments[0])
+            last_best = best_laps.get(completed_segments[-1])
             if first_best and last_best:
                 total_improvement = round(last_best - first_best, 3)
-
-        # Count sessions participated
-        sessions_participated = len(best_laps)
 
         drivers_data.append({
             "driver_number": dn,
@@ -619,15 +660,15 @@ async def qualifying_summary(
             "team_name": info.get("team_name", "Unknown"),
             "team_colour": info.get("team_colour", ""),
             "best_laps": best_laps,
-            "sessions_participated": sessions_participated,
+            "segments_completed": len(completed_segments),
             "total_improvement": total_improvement,
         })
 
-        # For overall ranking
-        if best_laps and session_names_ordered:
-            final_best = best_laps.get(session_names_ordered[-1])
+        # For final ranking: use best lap from last completed segment
+        if completed_segments:
+            final_best = best_laps.get(completed_segments[-1])
             if final_best:
-                all_drivers_best.append({
+                all_drivers_by_final.append({
                     "driver_number": dn,
                     "acronym": info.get("acronym", f"#{dn}"),
                     "full_name": info.get("full_name", "Unknown"),
@@ -636,13 +677,21 @@ async def qualifying_summary(
                     "best_lap": final_best,
                 })
 
-    # Sort drivers by their final best lap
-    all_drivers_best.sort(key=lambda x: x["best_lap"])
-    driver_order = {d["driver_number"]: i for i, d in enumerate(all_drivers_best)}
+    # Sort by final segment best lap
+    all_drivers_by_final.sort(key=lambda x: x["best_lap"])
+    driver_order = {d["driver_number"]: i for i, d in enumerate(all_drivers_by_final)}
     drivers_data.sort(key=lambda d: driver_order.get(d["driver_number"], 999))
+
+    # Segment availability info
+    q2_drivers = sum(1 for d in drivers_data if "Q2" in d["best_laps"])
+    q3_drivers = sum(1 for d in drivers_data if "Q3" in d["best_laps"])
 
     return {
         "meeting_id": meeting_id,
-        "sessions": session_list,
+        "session": session_list[0] if session_list else None,
+        "segments": [s for s in segment_order if any(s in d["best_laps"] for d in drivers_data)],
         "drivers": drivers_data,
+        "total_drivers": len(drivers_data),
+        "q2_drivers": q2_drivers,
+        "q3_drivers": q3_drivers,
     }
