@@ -1444,10 +1444,14 @@
           </div>
         </div>`;
 
-      // ── Grouped Bar Chart ──
+      // ── Grouped Bar Chart (only if multiple sessions) ──
       if (drivers.length >= 2 && sessionKeys.length >= 2) {
         html += `<div class="relative" style="height:400px;margin-bottom:16px">
           <canvas id="qevo-chart-canvas-${meetingId}"></canvas>
+        </div>`;
+      } else if (sessionKeys.length === 1) {
+        html += `<div class="text-xs mb-4" style="color:var(--text-muted)">
+          ℹ️ Only 1 qualifying session found in the data — showing best lap ranking table below.
         </div>`;
       }
 

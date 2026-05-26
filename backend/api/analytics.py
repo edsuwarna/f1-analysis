@@ -525,6 +525,7 @@ async def qualifying_summary(
         .where(
             Session.meeting_id == meeting_id,
             Session.session_type == "Qualifying",
+            Session.session_name.not_like("Sprint%"),
         )
         .order_by(Session.date_start)
     )
