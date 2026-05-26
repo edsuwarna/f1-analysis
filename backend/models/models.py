@@ -19,7 +19,7 @@ class Meeting(Base):
     __tablename__ = "meetings"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    meeting_key = Column(Integer, unique=True, nullable=False, comment="OpenF1 API meeting key")
+    meeting_key = Column(Integer, unique=True, nullable=True, comment="OpenF1 API meeting key")
     year = Column(Integer, nullable=False, index=True)
     name = Column(String(100), nullable=False)
     official_name = Column(String(200))
@@ -55,7 +55,7 @@ class Session(Base):
     __tablename__ = "sessions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    session_key = Column(Integer, unique=True, nullable=False, comment="OpenF1 API session key")
+    session_key = Column(Integer, unique=True, nullable=True, comment="OpenF1 API session key")
     meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=False, index=True)
     session_type = Column(String(30), nullable=False)  # Practice, Qualifying, Race, Sprint
     session_name = Column(String(50))  # "Practice 1", "Qualifying", "Race"
@@ -70,6 +70,7 @@ class Session(Base):
 
     __table_args__ = (
         Index("idx_sessions_meeting_type", "meeting_id", "session_type"),
+        UniqueConstraint("meeting_id", "session_name", name="uq_meeting_session"),
     )
 
 
@@ -192,7 +193,7 @@ class Weather(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False, index=True)
-    timestamp = Column(Float, comment="Session time in seconds")
+    timestamp = Column(DateTime(timezone=False), comment="Weather recording time")
     air_temp = Column(Float, comment="Air temperature in Celsius")
     track_temp = Column(Float, comment="Track temperature in Celsius")
     humidity = Column(Integer, comment="Humidity percentage")

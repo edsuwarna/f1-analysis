@@ -37,7 +37,7 @@ async def sector_trends(
         LEFT JOIN session_drivers sd ON sd.session_id = s.id AND sd.driver_number = l.driver_number
         WHERE m.year = :year
           AND s.session_type = :session_type
-          AND l.is_valid = true
+          AND l.duration_sector_1 IS NOT NULL AND l.duration_sector_1 > 0
         GROUP BY m.name, m.id, s.session_name, l.driver_number, sd.full_name, sd.name_acronym, sd.team_name
         ORDER BY m.date_start, best_lap NULLS LAST
     """)

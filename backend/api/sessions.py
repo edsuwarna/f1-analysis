@@ -97,7 +97,8 @@ async def get_sector_times(session_id: int, db: AsyncSession = Depends(get_db)):
                 MIN(lap_duration) FILTER (WHERE lap_duration IS NOT NULL AND lap_duration > 0) AS best_lap,
                 COUNT(*) AS total_laps
             FROM laps
-            WHERE session_id = :sid AND is_valid = true
+            WHERE session_id = :sid
+              AND duration_sector_1 IS NOT NULL AND duration_sector_1 > 0
             GROUP BY driver_number
         )
         SELECT

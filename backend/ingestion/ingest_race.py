@@ -111,7 +111,27 @@ def fetch_and_store_meeting(engine, year: int, gp_name: str, session_types: list
 
 
 def _store_meeting(engine, event, year: int) -> int:
-    """Store meeting info, return meeting_id."""
+    """Store meeting info, return meeting_id.
+
+    Maps Fast-F1 event schedule columns to our DB schema.
+    Fast-F1 schedule columns: RoundNumber, Country, Location, OfficialEventName,
+    EventDate, EventName, EventFormat, Session1-5Date/DateUtc, etc.
+    """
+    # Extract timezone offset from Session1Date (it's timezone-aware)
+    gmt_offset = ""
+    try:
+        s1_date = event.get("Session1Date")
+        if pd.notna(s1_date) and s1_date.tz is not None:
+            offset = s1_date.tz.utcoffset(s1_date)
+            if offset:
+                total_seconds = int(offset.total_seconds())
+                hours = total_seconds // 3600
+                minutes = (total_seconds % 3600) // 60
+                sign = "+" if hours >= 0 else "-"
+                gmt_offset = f"{sign}{abs(hours):02d}:{minutes:02d}"
+    except Exception:
+        pass
+
     with SASession(engine) as session:
         # Check if exists
         existing = session.execute(
@@ -119,53 +139,44 @@ def _store_meeting(engine, event, year: int) -> int:
             {"y": year, "n": event["EventName"]},
         ).fetchone()
 
+        # Use Session1DateUtc for start, Session5DateUtc for end (UTC timestamps)
+        date_start = _pdts_to_dt(event.get("Session1DateUtc"))
+        date_end = _pdts_to_dt(event.get("Session5DateUtc"))
+
         if existing:
             log.info(f"  Meeting already exists (ID: {existing[0]}), updating...")
             meeting_id = existing[0]
-            stmt = text("""
+            session.execute(text("""
                 UPDATE meetings SET
-                    official_name = :official,
-                    location = :loc,
-                    country_code = :cc,
-                    country_name = :cn,
-                    circuit_name = :circuit,
-                    circuit_type = :ctype,
-                    date_start = :ds,
-                    date_end = :de,
+                    official_name = :official, location = :loc,
+                    country_name = :cn, date_start = :ds, date_end = :de,
                     gmt_offset = :gmt
                 WHERE id = :id
-            """)
-            session.execute(stmt, {
+            """), {
                 "id": meeting_id,
-                "official": str(event.get("EventName", "")),
+                "official": str(event.get("OfficialEventName", event["EventName"])),
                 "loc": str(event.get("Location", "")),
-                "cc": str(event.get("CountryCode", "")),
                 "cn": str(event.get("Country", "")),
-                "circuit": str(event.get("CircuitName", "")),
-                "ctype": str(event.get("CircuitType", "")),
-                "ds": _parse_date(event, "Session1Date", "Session1Time"),
-                "de": _parse_date(event, "Session5Date", "Session5Time"),
-                "gmt": str(event.get("Timezone", "")),
+                "ds": date_start,
+                "de": date_end,
+                "gmt": gmt_offset,
             })
         else:
             stmt = text("""
-                INSERT INTO meetings (year, name, official_name, location, country_code,
-                    country_name, circuit_name, circuit_type, date_start, date_end, gmt_offset)
-                VALUES (:y, :n, :official, :loc, :cc, :cn, :circuit, :ctype, :ds, :de, :gmt)
+                INSERT INTO meetings (year, name, official_name, location,
+                    country_name, date_start, date_end, gmt_offset)
+                VALUES (:y, :n, :official, :loc, :cn, :ds, :de, :gmt)
                 RETURNING id
             """)
             result = session.execute(stmt, {
                 "y": year,
                 "n": event["EventName"],
-                "official": str(event.get("EventName", "")),
+                "official": str(event.get("OfficialEventName", event["EventName"])),
                 "loc": str(event.get("Location", "")),
-                "cc": str(event.get("CountryCode", "")),
                 "cn": str(event.get("Country", "")),
-                "circuit": str(event.get("CircuitName", "")),
-                "ctype": str(event.get("CircuitType", "")),
-                "ds": _parse_date(event, "Session1Date", "Session1Time"),
-                "de": _parse_date(event, "Session5Date", "Session5Time"),
-                "gmt": str(event.get("Timezone", "")),
+                "ds": date_start,
+                "de": date_end,
+                "gmt": gmt_offset,
             })
             meeting_id = result.scalar()
 
@@ -173,31 +184,32 @@ def _store_meeting(engine, event, year: int) -> int:
         return meeting_id
 
 
-def _parse_date(event, date_col, time_col):
-    """Parse date from event schedule."""
+def _pdts_to_dt(val):
+    """Convert a pandas Timestamp (possibly with tz) to tz-naive datetime or None."""
+    if val is None or (hasattr(val, 'empty') and val.empty) or (hasattr(val, 'size') and val.size == 0):
+        return None
     try:
-        d = event.get(date_col)
-        t = event.get(time_col)
-        if pd.notna(d):
-            from datetime import datetime
-            if pd.notna(t) and t:
-                return datetime.combine(
-                    pd.Timestamp(d).date(),
-                    pd.Timestamp(t).time()
-                )
-            return pd.Timestamp(d).to_pydatetime()
+        if pd.isna(val):
+            return None
+        if hasattr(val, 'to_pydatetime'):
+            dt = val.to_pydatetime()
+            if dt.tzinfo is not None:
+                # Convert to UTC and make naive (UTC stored in DB)
+                from datetime import timezone
+                dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+            return dt
+        return val
     except Exception:
-        pass
-    return None
+        return None
 
 
 def _store_session(engine, fastf1_session, meeting_id: int):
     """Store a single session's data."""
-    with SASession(engine) as session:
-        # Check existing
-        existing = session.execute(
-            text("SELECT id FROM sessions WHERE session_key = :sk"),
-            {"sk": int(fastf1_session.session_info.get("SessionKey", 0))},
+    with SASession(engine) as db_session:
+        # Check existing — use meeting_id + session_name as unique key
+        existing = db_session.execute(
+            text("SELECT id FROM sessions WHERE meeting_id = :mid AND session_name = :sname"),
+            {"mid": meeting_id, "sname": fastf1_session.name},
         ).fetchone()
 
         if existing:
@@ -208,26 +220,23 @@ def _store_session(engine, fastf1_session, meeting_id: int):
         sname = fastf1_session.name
         stype = SESSION_TYPE_MAP.get(sname, "Practice")
 
-        # Fix: get session start time
+        # Get session start time
         date_start = None
-        date_end = None
         try:
-            date_start = fastf1_session.date
-            if hasattr(fastf1_session, "session_info"):
-                info = fastf1_session.session_info
-                if info:
-                    from datetime import datetime
-                    date_start = datetime.fromisoformat(str(info.get("StartDate", "")).replace("Z", "+00:00")) if info.get("StartDate") else date_start
+            date_start = _pdts_to_dt(fastf1_session.date)
         except Exception:
             pass
 
+        # Fast-F1 doesn't always have session_key like OpenF1
+        session_key = None
+
         # Insert session
-        res = session.execute(text("""
+        res = db_session.execute(text("""
             INSERT INTO sessions (session_key, meeting_id, session_type, session_name, date_start)
             VALUES (:sk, :mid, :stype, :sname, :ds)
             RETURNING id
         """), {
-            "sk": int(fastf1_session.session_info.get("SessionKey", 0)) if hasattr(fastf1_session, "session_info") else 0,
+            "sk": session_key,
             "mid": meeting_id,
             "stype": stype,
             "sname": sname,
@@ -237,18 +246,18 @@ def _store_session(engine, fastf1_session, meeting_id: int):
         log.info(f"    📝 Created session ID: {session_id} ({sname})")
 
         # Store drivers
-        _store_drivers(session, fastf1_session, session_id)
+        _store_drivers(db_session, fastf1_session, session_id)
 
         # Store laps
-        _store_laps(session, fastf1_session, session_id)
+        _store_laps(db_session, fastf1_session, session_id)
 
         # Store stints (tyre data)
-        _store_stints(session, fastf1_session, session_id)
+        _store_stints(db_session, fastf1_session, session_id)
 
         # Store weather
-        _store_weather(session, fastf1_session, session_id)
+        _store_weather(db_session, fastf1_session, session_id)
 
-        session.commit()
+        db_session.commit()
         return session_id
 
 
