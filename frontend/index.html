@@ -3261,60 +3261,55 @@
       const drivers = data.drivers;
       const labels = drivers.map(d => d.acronym);
       const maxSpeeds = drivers.map(d => d.max_speed);
-      const avgSpeeds = drivers.map(d => d.avg_speed);
-      const p95Speeds = drivers.map(d => d.p95_speed);
       const colors = drivers.map(d => d.team_colour ? `#${d.team_colour.replace('#','')}` : '#666');
 
-      // Build chart
+      // Build chart — horizontal bar, top speed only
+      const chartContainer = document.createElement('div');
+      chartContainer.style.cssText = 'position:relative;height:' + Math.max(250, drivers.length * 28) + 'px';
       const ctx = document.createElement('canvas');
+      chartContainer.appendChild(ctx);
       el.innerHTML = '';
-      el.appendChild(ctx);
+      el.appendChild(chartContainer);
 
       speedtrapChartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
           labels: labels,
-          datasets: [
-            {
-              label: 'Max Speed (km/h)',
-              data: maxSpeeds,
-              backgroundColor: colors.map(c => c + 'CC'),
-              borderColor: colors,
-              borderWidth: 1,
-              borderRadius: 3,
-              order: 1,
-            },
-            {
-              label: 'P95 Speed (km/h)',
-              data: p95Speeds,
-              backgroundColor: colors.map(c => c + '66'),
-              borderColor: colors,
-              borderWidth: 1,
-              borderRadius: 3,
-              order: 2,
-            },
-          ]
+          datasets: [{
+            label: 'Max Speed (km/h)',
+            data: maxSpeeds,
+            backgroundColor: colors.map(c => c + 'CC'),
+            borderColor: colors,
+            borderWidth: 1,
+            borderRadius: 3,
+          }]
         },
         options: {
+          indexAxis: 'y',
           responsive: true,
+          maintainAspectRatio: false,
           plugins: {
-            legend: { position: 'top', labels: { color: '#8b949e', font: { size: 11 } } },
+            legend: { display: false },
             tooltip: {
               callbacks: {
                 afterBody: function(context) {
                   const idx = context[0].dataIndex;
                   const d = drivers[idx];
-                  return `${d.full_name} (${d.team_name})\nAvg speed: ${d.avg_speed} km/h`;
+                  return `${d.full_name} (${d.team_name})\nP95: ${d.p95_speed} km/h · Avg: ${d.avg_speed} km/h`;
                 }
               }
             }
           },
           scales: {
-            x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { display: false } },
-            y: {
+            x: {
               beginAtZero: true,
-              ticks: { color: '#8b949e', font: { size: 10 }, callback: v => v + ' km/h' },
+              title: { display: true, text: 'km/h', color: '#8b949e', font: { size: 10 } },
+              ticks: { color: '#8b949e', font: { size: 10 } },
               grid: { color: 'rgba(255,255,255,0.05)' },
+            },
+            y: {
+              ticks: { color: '#8b949e', font: { size: 10 } },
+              grid: { display: false },
             }
           }
         }
