@@ -3707,10 +3707,11 @@
     el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading season analysis...</div>';
 
     try {
-      const [progression, h2h, pitStop] = await Promise.all([
+      const [progression, h2h, pitStop, driverForm] = await Promise.all([
         api('/analytics/season-progression?year=2026'),
         api('/analytics/head-to-head?year=2026'),
         api('/analytics/pit-stop-championship?year=2026'),
+        api('/analytics/driver-form?year=2026'),
       ]);
 
       let html = `
@@ -3833,9 +3834,42 @@
             </div>
           </div>
         </div>
+
+        <!-- Driver Form Tracker -->
+        <div class="card p-5 mb-6">
+          <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+            <h3 class="font-semibold text-sm">🔥 Driver Form Tracker
+              <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Finishing position trend per round — P1 at top = hot streak</span>
+            </h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="collapse-body closed">
+            <div class="flex flex-wrap gap-2 mb-3" id="form-drivers">
+              ${driverForm.drivers.map((d, i) => `
+                <label class="flex items-center gap-1.5 text-xs cursor-pointer" style="color:var(--text-primary)">
+                  <input type="checkbox" class="form-cb" value="${d.driver_number}" data-acronym="${d.acronym}" data-avg="${d.avg_finish}" ${i < 5 ? 'checked' : ''}>
+                  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${d.team_colour || '#666'}"></span>
+                  ${d.acronym} <span class="text-xs" style="color:var(--text-muted)">(${d.avg_finish})</span>
+                </label>
+              `).join('')}
+            </div>
+            <div class="flex gap-2 mb-3">
+              <button onclick="plotDriverForm()" class="bg-f1-red text-white px-3 py-1.5 rounded text-xs font-medium hover:opacity-90 transition">📈 Plot Form</button>
+              <button onclick="formSelectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">✅ Select All</button>
+              <button onclick="formDeselectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">⬜ Clear</button>
+            </div>
+            <div class="relative" style="height:380px">
+              <canvas id="form-chart"></canvas>
+            </div>
+            <div id="form-chart-status" class="text-xs mt-2" style="color:var(--text-muted);text-align:center">
+              Select drivers and click Plot Form. <strong>Lower line = better position</strong> (P1 at top)
+            </div>
+          </div>
+        </div>
       `;
 
       el.innerHTML = html;
+      formData = driverForm;
     } catch(e) {
       el.innerHTML = '<div class="text-center py-20" style="color:#dc2626">Error: ' + e.message + '</div>';
     }
@@ -3849,6 +3883,109 @@
   }
   function progDeselectAll() {
     document.querySelectorAll('.prog-cb').forEach(cb => cb.checked = false);
+  }
+
+  // ── Driver Form Tracker ──
+  let formData = null;
+  let formChartInstance = null;
+
+  function formSelectAll() {
+    document.querySelectorAll('.form-cb').forEach(cb => cb.checked = true);
+  }
+  function formDeselectAll() {
+    document.querySelectorAll('.form-cb').forEach(cb => cb.checked = false);
+  }
+
+  async function plotDriverForm() {
+    const el = document.getElementById('form-chart');
+    if (!el) return;
+
+    if (formChartInstance) { formChartInstance.destroy(); formChartInstance = null; }
+
+    if (!formData) {
+      formData = await api('/analytics/driver-form?year=2026');
+    }
+
+    // Get selected drivers
+    const selected = [];
+    document.querySelectorAll('.form-cb:checked').forEach(cb => {
+      selected.push(parseInt(cb.value));
+    });
+
+    if (selected.length === 0) {
+      document.getElementById('form-chart-status').textContent = '⚠️ Select at least one driver';
+      return;
+    }
+
+    const rounds = formData.rounds;
+    const labels = rounds.map(r => r.race_name.replace(/ Grand Prix$/, '').substring(0, 4));
+    const driverMap = {};
+    formData.drivers.forEach(d => { driverMap[d.driver_number] = d; });
+
+    const datasets = [];
+    const fallbackColors = ['#e10600','#1e63a8','#16a34a','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#dc2626','#84cc16','#14b8a6','#f97316','#6366f1','#d946ef','#0ea5e9','#22c55e','#eab308','#a855f7','#3b82f6','#ef4444','#10b981','#f59e0b','#6b7280'];
+
+    selected.forEach((dn, idx) => {
+      const info = driverMap[dn];
+      const color = info && info.team_colour ? info.team_colour : fallbackColors[idx % fallbackColors.length];
+      const data = rounds.map(r => {
+        const result = info ? info.results.find(res => res.meeting_id === r.meeting_id && res.session_name === 'Race') : null;
+        return result ? result.position : null;
+      });
+      datasets.push({
+        label: info ? info.acronym : '#' + dn,
+        data: data,
+        borderColor: color,
+        backgroundColor: color + '22',
+        borderWidth: idx < 5 ? 3 : 1.5,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+        spanGaps: true,
+        tension: 0.2,
+        fill: false,
+      });
+    });
+
+    const ctx = el.getContext('2d');
+    const isLight = document.documentElement.classList.contains('light');
+    const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+    const textColor = isLight ? '#64748b' : '#8b949e';
+
+    formChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        interaction: { mode: 'nearest', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { color: textColor, font: { size: 10 }, boxWidth: 12, padding: 8 } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const pos = ctx.parsed.y;
+                if (pos === null) return ctx.dataset.label + ': DNP';
+                const posStr = pos === 1 ? 'P1 🏆' : 'P' + pos;
+                return ctx.dataset.label + ': ' + posStr;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { title: { display: true, text: 'Round', color: textColor, font: { size: 10 } },
+            grid: { color: gridColor }, ticks: { color: textColor, font: { size: 9 } } },
+          y: {
+            title: { display: true, text: 'Finishing Position', color: textColor, font: { size: 10 } },
+            grid: { color: gridColor }, ticks: { color: textColor, font: { size: 9 } },
+            reverse: true,
+            min: 1,
+            max: 22,
+          }
+        }
+      }
+    });
+    document.getElementById('form-chart-status').textContent = 'Showing form for ' + selected.length + ' drivers';
   }
 
   async function plotSeasonProgression() {

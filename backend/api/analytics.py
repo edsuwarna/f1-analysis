@@ -1292,3 +1292,148 @@ async def pit_stop_championship(
         "total_stops": sum(t["total_stops"] for t in teams_output),
         "overall_fastest_stop": all_stops[0] if all_stops else None,
     }
+
+
+SPRINT_POINTS = {1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1}
+RACE_POINTS = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10,
+               6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
+
+
+@router.get("/driver-form")
+async def driver_form(
+    year: int = Query(2026),
+    db: AsyncSession = Depends(get_db),
+):
+    """Driver finishing position form — position & points per driver per round.
+
+    Returns each driver's finishing result for every Race session, sorted
+    chronologically. Perfect for a form tracker / momentum chart.
+    """
+    # Get race finish positions per driver per round
+    query = text("""
+        WITH race_sessions AS (
+            SELECT id, meeting_id, session_name, date_start
+            FROM sessions
+            WHERE session_name IN ('Race', 'Sprint')
+              AND meeting_id IN (SELECT id FROM meetings WHERE year = :year)
+        ),
+        round_order AS (
+            SELECT DISTINCT m.id AS meeting_id, m.name AS race_name, m.date_start
+            FROM meetings m WHERE m.year = :year
+            ORDER BY m.date_start
+        ),
+        finish_positions AS (
+            SELECT DISTINCT ON (s.meeting_id, s.session_name, l.driver_number)
+                s.meeting_id,
+                s.session_name,
+                l.driver_number,
+                l.position,
+                l.lap_duration IS NOT NULL AND l.lap_duration > 10 AS finished
+            FROM laps l
+            JOIN race_sessions s ON s.id = l.session_id
+            WHERE l.position IS NOT NULL AND l.position > 0
+              AND l.lap_number > 0
+            ORDER BY s.meeting_id, s.session_name, l.driver_number, l.lap_number DESC
+        ),
+        driver_list AS (
+            SELECT DISTINCT ON (sd.driver_number)
+                sd.driver_number,
+                sd.full_name,
+                sd.name_acronym,
+                sd.team_name,
+                sd.team_colour
+            FROM session_drivers sd
+            JOIN sessions s ON s.id = sd.session_id
+            JOIN meetings m ON m.id = s.meeting_id
+            WHERE m.year = :year2
+            ORDER BY sd.driver_number, s.date_start DESC
+        )
+        SELECT
+            ro.race_name,
+            ro.meeting_id,
+            ro.date_start,
+            fp.driver_number,
+            fp.position,
+            fp.session_name,
+            fp.finished,
+            dl.full_name,
+            dl.name_acronym,
+            dl.team_name,
+            dl.team_colour
+        FROM round_order ro
+        LEFT JOIN finish_positions fp ON fp.meeting_id = ro.meeting_id
+        LEFT JOIN driver_list dl ON dl.driver_number = fp.driver_number
+        ORDER BY ro.date_start, ro.race_name, fp.position NULLS LAST
+    """)
+    result = await db.execute(query, {"year": year, "year2": year})
+    rows = result.fetchall()
+
+    if not rows:
+        return {"year": year, "rounds": [], "drivers": []}
+
+    from collections import defaultdict, OrderedDict
+
+    # Build rounds list (chronological)
+    rounds_map = OrderedDict()
+    driver_data = defaultdict(lambda: {
+        "acronym": "", "full_name": "", "team_name": "", "team_colour": "",
+        "results": [],
+    })
+
+    for r in rows:
+        key = (r.meeting_id, r.race_name)
+        if key not in rounds_map:
+            rounds_map[key] = {
+                "meeting_id": r.meeting_id,
+                "race_name": r.race_name,
+                "date_start": str(r.date_start) if r.date_start else "",
+            }
+
+        if r.driver_number is None:
+            continue
+
+        dn = r.driver_number
+        info = driver_data[dn]
+        if not info["acronym"]:
+            info["acronym"] = r.name_acronym or f"#{dn}"
+            info["full_name"] = r.full_name or ""
+            info["team_name"] = r.team_name or ""
+            info["team_colour"] = r.team_colour or ""
+
+        pts = 0
+        if r.session_name == "Sprint":
+            pts = SPRINT_POINTS.get(r.position, 0)
+        else:
+            pts = RACE_POINTS.get(r.position, 0)
+
+        info["results"].append({
+            "meeting_id": r.meeting_id,
+            "race_name": r.race_name,
+            "session_name": r.session_name,
+            "position": r.position,
+            "points": pts,
+            "dnf": not r.finished,
+        })
+
+    # Sort drivers by their best avg finish
+    driver_list = []
+    for dn, data in driver_data.items():
+        race_results = [r for r in data["results"] if r["session_name"] == "Race"]
+        avg_pos = sum(r["position"] for r in race_results if r["position"]) / len(race_results) if race_results else 99
+        driver_list.append({
+            "driver_number": dn,
+            "acronym": data["acronym"],
+            "full_name": data["full_name"],
+            "team_name": data["team_name"],
+            "team_colour": data["team_colour"],
+            "avg_finish": round(avg_pos, 1),
+            "results": data["results"],
+        })
+
+    driver_list.sort(key=lambda x: x["avg_finish"])
+
+    return {
+        "year": year,
+        "rounds": list(rounds_map.values()),
+        "drivers": driver_list,
+    }
