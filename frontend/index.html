@@ -505,7 +505,11 @@
 
         <!-- Sector Times -->
         <div class="card p-5 mb-6">
-          <h3 class="font-semibold text-sm mb-4">🏆 Best Sector Times</h3>
+          <h3 class="font-semibold text-sm mb-4">🏆 Best Sector Times
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">
+              🟣=Overall Best 🟢=Top 3 🟡=Others
+            </span>
+          </h3>
           <div class="overflow-x-auto">
             <table>
               <thead>
@@ -527,16 +531,28 @@
       } else {
         sectors.forEach((d, i) => {
           const bestS1 = d.best_sector_1 === Math.min(...sectors.filter(x=>x.best_sector_1).map(x=>x.best_sector_1));
+          const topS1 = [...sectors].filter(x => x.best_sector_1).sort((a,b) => a.best_sector_1 - b.best_sector_1).slice(0,3);
           const bestS2 = d.best_sector_2 === Math.min(...sectors.filter(x=>x.best_sector_2).map(x=>x.best_sector_2));
+          const topS2 = [...sectors].filter(x => x.best_sector_2).sort((a,b) => a.best_sector_2 - b.best_sector_2).slice(0,3);
           const bestS3 = d.best_sector_3 === Math.min(...sectors.filter(x=>x.best_sector_3).map(x=>x.best_sector_3));
+          const topS3 = [...sectors].filter(x => x.best_sector_3).sort((a,b) => a.best_sector_3 - b.best_sector_3).slice(0,3);
+          const s1Color = bestS1 ? '#a855f7' : topS1.includes(d) && d.best_sector_1 ? '#16a34a' : d.best_sector_1 ? '#eab308' : '';
+          const s2Color = bestS2 ? '#a855f7' : topS2.includes(d) && d.best_sector_2 ? '#16a34a' : d.best_sector_2 ? '#eab308' : '';
+          const s3Color = bestS3 ? '#a855f7' : topS3.includes(d) && d.best_sector_3 ? '#16a34a' : d.best_sector_3 ? '#eab308' : '';
+          const s1Bold = bestS1 || (topS1.includes(d) && d.best_sector_1) ? 'font-weight:700' : '';
+          const s2Bold = bestS2 || (topS2.includes(d) && d.best_sector_2) ? 'font-weight:700' : '';
+          const s3Bold = bestS3 || (topS3.includes(d) && d.best_sector_3) ? 'font-weight:700' : '';
+          const bestLapS1 = d.best_sector_1 === Math.min(...sectors.filter(x=>x.best_sector_1).map(x=>x.best_sector_1));
+          const bestLapS2 = d.best_sector_2 === Math.min(...sectors.filter(x=>x.best_sector_2).map(x=>x.best_sector_2));
+          const bestLapS3 = d.best_sector_3 === Math.min(...sectors.filter(x=>x.best_sector_3).map(x=>x.best_sector_3));
           html += `
             <tr>
               <td style="color:var(--text-secondary)">${i + 1}</td>
               <td class="font-medium">${d.acronym || '—'}</td>
               <td><span class="team-dot" style="background:${teamColor(d.team_colour)}"></span>${d.team || '—'}</td>
-              <td class="text-right font-mono ${bestS1 ? 'font-bold' : ''}" style="${bestS1 ? 'color:#16a34a' : ''}">${formatTime(d.best_sector_1)}</td>
-              <td class="text-right font-mono ${bestS2 ? 'font-bold' : ''}" style="${bestS2 ? 'color:#16a34a' : ''}">${formatTime(d.best_sector_2)}</td>
-              <td class="text-right font-mono ${bestS3 ? 'font-bold' : ''}" style="${bestS3 ? 'color:#16a34a' : ''}">${formatTime(d.best_sector_3)}</td>
+              <td class="text-right font-mono ${bestS1 ? 'font-bold' : ''}" style="${s1Color ? 'color:' + s1Color : ''}${s1Bold ? ';' + s1Bold : ''}">${formatTime(d.best_sector_1)}</td>
+              <td class="text-right font-mono ${bestS2 ? 'font-bold' : ''}" style="${s2Color ? 'color:' + s2Color : ''}${s2Bold ? ';' + s2Bold : ''}">${formatTime(d.best_sector_2)}</td>
+              <td class="text-right font-mono ${bestS3 ? 'font-bold' : ''}" style="${s3Color ? 'color:' + s3Color : ''}${s3Bold ? ';' + s3Bold : ''}">${formatTime(d.best_sector_3)}</td>
               <td class="text-right font-mono font-bold">${formatTime(d.best_lap)}</td>
               <td class="text-right" style="color:var(--text-secondary)">${d.total_laps}</td>
             </tr>
@@ -804,11 +820,12 @@
       </div>`;
 
       // Stats summary
-      // Delta legend
+      // Legend
       html += `
-        <div class="flex gap-4 justify-center mb-4 text-xs" style="color:var(--text-secondary)">
-          <span>🟢 <strong style="color:#16a34a">Hijau</strong> = ${d1name} lebih cepat (Δ negatif)</span>
-          <span>🔴 <strong style="color:#dc2626">Merah</strong> = ${d2name} lebih cepat (Δ positif)</span>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 justify-center mb-4 text-xs" style="color:var(--text-secondary)">
+          <span>🟢 <strong style="color:#16a34a">Hijau</strong> = ${d1name} unggul</span>
+          <span>🟡 <strong style="color:#eab308">Kuning</strong> = ${d2name} unggul</span>
+          <span>Δ = ${d1name} - ${d2name}</span>
         </div>`;
       const avgA = timesA.filter(t => t).reduce((s, t) => s + t, 0) / timesA.filter(t => t).length || 0;
       const avgB = timesB.filter(t => t).reduce((s, t) => s + t, 0) / timesB.filter(t => t).length || 0;
@@ -870,12 +887,12 @@
             <td class="text-right font-mono">${formatTime(a.lap_duration)}</td>
             <td class="text-right font-mono font-bold" style="${color}">${delta !== null ? (delta > 0 ? '+' : '') + delta.toFixed(3) : '—'}</td>
             <td class="text-right font-mono">${formatTime(b.lap_duration)}</td>
-            <td class="text-right font-mono" style="${a.sector_1 && b.sector_1 ? (a.sector_1 < b.sector_1 ? 'color:#16a34a;font-weight:700' : 'color:var(--text-muted)') : ''}">${formatTime(a.sector_1)}</td>
-            <td class="text-right font-mono" style="${a.sector_1 && b.sector_1 ? (a.sector_1 > b.sector_1 ? 'color:#16a34a;font-weight:700' : 'color:var(--text-muted)') : ''}">${formatTime(b.sector_1)}</td>
-            <td class="text-right font-mono" style="${a.sector_2 && b.sector_2 ? (a.sector_2 < b.sector_2 ? 'color:#16a34a;font-weight:700' : 'color:var(--text-muted)') : ''}">${formatTime(a.sector_2)}</td>
-            <td class="text-right font-mono" style="${a.sector_2 && b.sector_2 ? (a.sector_2 > b.sector_2 ? 'color:#16a34a;font-weight:700' : 'color:var(--text-muted)') : ''}">${formatTime(b.sector_2)}</td>
-            <td class="text-right font-mono" style="${a.sector_3 && b.sector_3 ? (a.sector_3 < b.sector_3 ? 'color:#16a34a;font-weight:700' : 'color:var(--text-muted)') : ''}">${formatTime(a.sector_3)}</td>
-            <td class="text-right font-mono" style="${a.sector_3 && b.sector_3 ? (a.sector_3 > b.sector_3 ? 'color:#16a34a;font-weight:700' : 'color:var(--text-muted)') : ''}">${formatTime(b.sector_3)}</td>
+            <td class="text-right font-mono" style="${a.sector_1 && b.sector_1 ? (a.sector_1 < b.sector_1 ? 'color:#16a34a;font-weight:700' : 'color:#eab308;font-weight:600') : ''}">${formatTime(a.sector_1)}</td>
+            <td class="text-right font-mono" style="${a.sector_1 && b.sector_1 ? (a.sector_1 > b.sector_1 ? 'color:#16a34a;font-weight:700' : 'color:#eab308;font-weight:600') : ''}">${formatTime(b.sector_1)}</td>
+            <td class="text-right font-mono" style="${a.sector_2 && b.sector_2 ? (a.sector_2 < b.sector_2 ? 'color:#16a34a;font-weight:700' : 'color:#eab308;font-weight:600') : ''}">${formatTime(a.sector_2)}</td>
+            <td class="text-right font-mono" style="${a.sector_2 && b.sector_2 ? (a.sector_2 > b.sector_2 ? 'color:#16a34a;font-weight:700' : 'color:#eab308;font-weight:600') : ''}">${formatTime(b.sector_2)}</td>
+            <td class="text-right font-mono" style="${a.sector_3 && b.sector_3 ? (a.sector_3 < b.sector_3 ? 'color:#16a34a;font-weight:700' : 'color:#eab308;font-weight:600') : ''}">${formatTime(a.sector_3)}</td>
+            <td class="text-right font-mono" style="${a.sector_3 && b.sector_3 ? (a.sector_3 > b.sector_3 ? 'color:#16a34a;font-weight:700' : 'color:#eab308;font-weight:600') : ''}">${formatTime(b.sector_3)}</td>
           </tr>
         `;
       }
