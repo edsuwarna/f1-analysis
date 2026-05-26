@@ -93,8 +93,21 @@
   .light .text-gray-400 { color: var(--text-secondary) !important; }
   .light .text-gray-500 { color: var(--text-muted) !important; }
   .light .text-gray-700 { color: var(--text-primary) !important; }
-  .light .text-red-400 { color: #dc2626 !important; }
   .light .text-green-400 { color: #16a34a !important; }
+  .light .text-red-400 { color: #dc2626 !important; }
+
+  /* ── Sector Colors ── */
+  .sector-s1 { color: #ff6b6b; }
+  .sector-s2 { color: #0ea5e9; }
+  .sector-s3 { color: #a855f7; }
+
+  /* ── Collapse Sections ── */
+  .collapse-header { cursor: pointer; user-select: none; }
+  .collapse-header:hover { opacity: .8; }
+  .collapse-icon { transition: transform .2s; font-size: 12px; color: var(--text-muted); display: inline-block; }
+  .collapse-icon.open { transform: rotate(180deg); }
+  .collapse-body { overflow: hidden; }
+  .collapse-body.closed { display: none; }
 
   /* ── Tyre Timeline ── */
   .tyme-row {
@@ -505,11 +518,15 @@
 
         <!-- Sector Times -->
         <div class="card p-5 mb-6">
-          <h3 class="font-semibold text-sm mb-4">🏆 Best Sector Times
-            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">
-              🟣 Tercepat seluruh pembalap · 🟢 Top 3 · 🟡 Di luar Top 3
-            </span>
-          </h3>
+          <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+            <h3 class="font-semibold text-sm">🏆 Best Sector Times
+              <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">
+                🟣 Tercepat · 🟢 Top 3 · 🟡 Di luar Top 3
+              </span>
+            </h3>
+            <span class="collapse-icon open">▼</span>
+          </div>
+          <div class="collapse-body">
           <div class="overflow-x-auto">
             <table>
               <thead>
@@ -517,9 +534,9 @@
                   <th>#</th>
                   <th>Driver</th>
                   <th>Team</th>
-                  <th class="text-right">Sector 1</th>
-                  <th class="text-right">Sector 2</th>
-                  <th class="text-right">Sector 3</th>
+                  <th class="text-right"><span class="sector-s1">Sector 1</span></th>
+                  <th class="text-right"><span class="sector-s2">Sector 2</span></th>
+                  <th class="text-right"><span class="sector-s3">Sector 3</span></th>
                   <th class="text-right">Best Lap</th>
                   <th class="text-right">Laps</th>
                 </tr>
@@ -559,7 +576,7 @@
           `;
         });
       }
-      html += `</tbody></table></div></div>`;
+      html += `</tbody></table></div></div></div>`;
 
       // ── Tyre Strategy Timeline ──
       if (stints.length > 0) {
@@ -572,7 +589,11 @@
 
         html += `
           <div class="card p-5 mb-6">
-            <h3 class="font-semibold text-sm mb-4">🛞 Tyre Strategy Timeline</h3>
+            <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+              <h3 class="font-semibold text-sm">🛞 Tyre Strategy Timeline</h3>
+              <span class="collapse-icon open">▼</span>
+            </div>
+            <div class="collapse-body">
             ${renderTyreTimeline(stints, driverMap)}
             <div class="overflow-x-auto mt-4">
               <table>
@@ -593,7 +614,7 @@
             </tr>
           `;
         }
-        html += `</tbody></table></div></div>`;
+        html += `</tbody></table></div></div></div>`;
       }
 
       // ── Pit Stop Analysis ──
@@ -611,7 +632,11 @@
 
         html += `
           <div class="card p-5 mb-6">
-            <h3 class="font-semibold text-sm mb-4">⛽ Pit Stop Analysis</h3>
+            <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+              <h3 class="font-semibold text-sm">⛽ Pit Stop Analysis</h3>
+              <span class="collapse-icon open">▼</span>
+            </div>
+            <div class="collapse-body">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
               <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
                 <div class="font-bold" style="color:var(--text-primary)">${pits.length}</div>
@@ -694,7 +719,7 @@
             </tr>
           `;
         }
-        html += `</tbody></table></div></div>`;
+        html += `</tbody></table></div></div></div>`;
       }
 
       // ── Weather Timeline ──
@@ -719,7 +744,11 @@
 
         html += `
           <div class="card p-5 mb-6">
-            <h3 class="font-semibold text-sm mb-4">🌤️ Weather Impact</h3>
+            <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+              <h3 class="font-semibold text-sm">🌤️ Weather Impact</h3>
+              <span class="collapse-icon open">▼</span>
+            </div>
+            <div class="collapse-body">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
               <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
                 <div class="font-bold" style="color:var(--text-primary)">${Math.min(...airTemps).toFixed(1)}° - ${Math.max(...airTemps).toFixed(1)}°</div>
@@ -742,7 +771,7 @@
             <div class="relative" style="height:200px">
               <canvas id="weather-chart-${sessionId}"></canvas>
             </div>
-          </div>
+          </div></div>
         `;
 
         // Init weather chart after DOM render
@@ -752,7 +781,11 @@
       // Compare button
       html += `
         <div class="card p-5">
-          <h3 class="font-semibold text-sm mb-4">🤜🤛 Driver Comparison</h3>
+          <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+            <h3 class="font-semibold text-sm">🤜🤛 Driver Comparison</h3>
+            <span class="collapse-icon open">▼</span>
+          </div>
+          <div class="collapse-body">
           <div class="flex flex-wrap gap-3 items-center">
             <select id="comp-drv1">
               ${drivers.map(d => `<option value="${d.driver_number}">${d.full_name} (${d.name_acronym})</option>`).join('')}
@@ -764,7 +797,7 @@
             <button onclick="compareDrivers(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">Compare</button>
           </div>
           <div id="comp-result" class="mt-4"></div>
-        </div>
+        </div></div>
       `;
 
       el.innerHTML = html;
@@ -865,12 +898,12 @@
                 <th class="text-right">${d1name}</th>
                 <th class="text-right">Δ</th>
                 <th class="text-right">${d2name}</th>
-                <th class="text-right">S1 ${d1name}</th>
-                <th class="text-right">S1 ${d2name}</th>
-                <th class="text-right">S2 ${d1name}</th>
-                <th class="text-right">S2 ${d2name}</th>
-                <th class="text-right">S3 ${d1name}</th>
-                <th class="text-right">S3 ${d2name}</th>
+                <th class="text-right"><span class='sector-s1'>S1</span> ${d1name}</th>
+                <th class="text-right"><span class='sector-s1'>S1</span> ${d2name}</th>
+                <th class="text-right"><span class='sector-s2'>S2</span> ${d1name}</th>
+                <th class="text-right"><span class='sector-s2'>S2</span> ${d2name}</th>
+                <th class="text-right"><span class='sector-s3'>S3</span> ${d1name}</th>
+                <th class="text-right"><span class='sector-s3'>S3</span> ${d2name}</th>
               </tr>
             </thead>
             <tbody>
@@ -977,6 +1010,14 @@
     } catch(e) {
       el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
     }
+  }
+
+  // ── Collapse Toggle ──
+  function toggleCollapse(header) {
+    const body = header.nextElementSibling;
+    const icon = header.querySelector('.collapse-icon');
+    if (body) body.classList.toggle('closed');
+    if (icon) icon.classList.toggle('open');
   }
 
   function showAbout() {
