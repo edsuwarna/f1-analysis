@@ -1029,19 +1029,7 @@ async def head_to_head(
     """
     # Get qualifying finishing positions and race finishing positions per driver per round
     query = text("""
-        WITH driver_info AS (
-            SELECT DISTINCT ON (sd.driver_number)
-                sd.driver_number,
-                sd.name_acronym,
-                sd.team_name,
-                sd.team_colour
-            FROM session_drivers sd
-            JOIN sessions s ON s.id = sd.session_id
-            JOIN meetings m ON m.id = s.meeting_id
-            WHERE m.year = :year
-            ORDER BY sd.driver_number, s.date_start DESC
-        ),
-        round_order AS (
+        WITH round_order AS (
             SELECT DISTINCT m.id AS meeting_id, m.name AS race_name, m.date_start
             FROM meetings m
             WHERE m.year = :year
@@ -1089,16 +1077,23 @@ async def head_to_head(
     result = await db.execute(query, {"year": year, "year2": year, "year3": year})
     rows = result.fetchall()
 
-    # Get all drivers
+    # Get all drivers (only those who raced or qualified)
     drv_result = await db.execute(
         text("""
-            SELECT DISTINCT ON (driver_number)
-                driver_number, name_acronym, team_name, team_colour
+            SELECT DISTINCT ON (sd.driver_number)
+                sd.driver_number, sd.name_acronym, sd.team_name, sd.team_colour
             FROM session_drivers sd
             JOIN sessions s ON s.id = sd.session_id
             JOIN meetings m ON m.id = s.meeting_id
             WHERE m.year = :year
-            ORDER BY driver_number, s.date_start DESC
+              AND EXISTS (
+                SELECT 1 FROM laps l
+                JOIN sessions s2 ON s2.id = l.session_id
+                WHERE l.driver_number = sd.driver_number
+                  AND (s2.session_type = 'Qualifying' OR s2.session_name = 'Race')
+                  AND s2.meeting_id IN (SELECT id FROM meetings WHERE year = :year)
+              )
+            ORDER BY sd.driver_number, s.date_start DESC
         """), {"year": year}
     )
     all_drivers = drv_result.fetchall()
@@ -1346,6 +1341,13 @@ async def driver_form(
             JOIN sessions s ON s.id = sd.session_id
             JOIN meetings m ON m.id = s.meeting_id
             WHERE m.year = :year2
+              AND EXISTS (
+                SELECT 1 FROM laps l
+                JOIN sessions s2 ON s2.id = l.session_id
+                WHERE l.driver_number = sd.driver_number
+                  AND (s2.session_type = 'Qualifying' OR s2.session_name = 'Race')
+                  AND s2.meeting_id IN (SELECT id FROM meetings WHERE year = :year2)
+              )
             ORDER BY sd.driver_number, s.date_start DESC
         )
         SELECT
