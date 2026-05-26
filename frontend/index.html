@@ -712,17 +712,23 @@
     el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading session data...</div>';
 
     try {
-      const [sectors, drivers, stints, pits, weather] = await Promise.all([
+      const [sectors, drivers, stints, pits, weather, circuitData] = await Promise.all([
         api(`/sessions/${sessionId}/sectors`),
         api(`/sessions/${sessionId}/drivers`),
         api(`/sessions/${sessionId}/stints`),
         api(`/sessions/${sessionId}/pit-stops`),
         api(`/sessions/${sessionId}/weather`),
+        api(`/meetings/${meetingId}/circuit`).catch(() => null),
       ]);
 
       // Build driver map
       const driverMap = {};
       drivers.forEach(d => { driverMap[d.driver_number] = d; });
+
+      // Render circuit inline (avoids separate loadCircuitInfo DOM update)
+      const circuitHtml = circuitData && circuitData.circuit_name
+        ? renderCircuitInline(circuitData)
+        : '<div class="text-center py-4" style="color:var(--text-muted)">No circuit data</div>';
 
       let html = `
         <!-- Sticky session bar -->
@@ -770,7 +776,7 @@
             <span class="collapse-icon">▼</span>
           </div>
           <div class="collapse-body" id="circuit-body-${meetingId}">
-            <div class="text-center py-8" style="color:var(--text-muted)">Loading circuit info...</div>
+            ${circuitHtml}
           </div>
         </div>
 
@@ -1271,7 +1277,6 @@
       `;
 
       el.innerHTML = html;
-      loadCircuitInfo(meetingId);
     } catch(e) {
       el.innerHTML = `<div class="text-center py-20" style="color:#dc2626">Error: ${e.message}</div>`;
     }
@@ -3207,33 +3212,18 @@
   }
 
   // ── Circuit Detail ──
-  async function loadCircuitInfo(meetingId) {
-    const body = document.getElementById(`circuit-body-${meetingId}`);
-    if (!body) return;
-    try {
-      const data = await api(`/meetings/${meetingId}/circuit`);
-      if (!data || !data.circuit_name) {
-        body.innerHTML = '<div class="text-center py-4" style="color:var(--text-muted)">No circuit data available</div>';
-        return;
-      }
-
-      const isLight = document.documentElement.classList.contains('light');
-      const textColor = isLight ? '#1e293b' : '#e1e1e6';
-      const mutedColor = 'var(--text-muted)';
-
-      body.innerHTML = `
+  function renderCircuitInline(data) {
+    const isLight = document.documentElement.classList.contains('light');
+    const textColor = isLight ? '#1e293b' : '#e1e1e6';
+    const mutedColor = 'var(--text-muted)';
+    return `
         <div class="flex flex-col lg:flex-row gap-6">
-          <!-- Track image -->
           <div class="flex-1">
-            <img src="${data.image_url || ''}" alt="${data.circuit_name}" style="width:100%;max-width:480px;border-radius:8px;border:1px solid var(--border-color)" onerror="this.style.display='none'">
+            <img src="${data.image_url || ''}" alt="${data.circuit_name}" style="width:100%;max-width:480px;border-radius:8px;border:1px solid var(--border-color)" onerror="this.style.display='none'" loading="lazy">
           </div>
-
-          <!-- Track details -->
           <div class="flex-1">
             <h4 class="font-semibold text-base mb-2">${data.circuit_name}</h4>
             <p class="text-sm mb-3" style="color:${textColor};line-height:1.6">${data.description || ''}</p>
-
-            <!-- Specs grid -->
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
               <div class="text-center p-3 rounded" style="background:var(--badge-soft);border:1px solid var(--border-color)">
                 <div class="text-lg font-bold">${data.length_km || '?'}</div>
@@ -3256,17 +3246,13 @@
                 <div class="text-xs" style="color:${mutedColor}">Lap Record ${data.lap_record_driver ? '(' + data.lap_record_driver + ')' : ''}</div>
               </div>
             </div>
-
-            <!-- Fun fact -->
-            ${data.fun_fact ? `
-            <div class="mt-4 p-3 rounded text-sm" style="background:rgba(225,6,0,.08);border:1px solid rgba(225,6,0,.2);color:${textColor}">
-              <span style="font-weight:600;color:#e10600">💡 Did You Know?</span><br>
-              ${data.fun_fact}
-            </div>` : ''}
+            ${data.fun_fact ? '<div class="mt-3 text-xs italic" style="color:var(--text-muted)">💡 ' + data.fun_fact + '</div>' : ''}
           </div>
         </div>
       `;
-    } catch(e) {
+  }
+
+
       body.innerHTML = `<div class="text-center py-4" style="color:#dc2626">Error: ${e.message}</div>`;
     }
   }
@@ -3385,39 +3371,87 @@
         el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No teammate data available</div>';
         return;
       }
-      let html = '<h2 class="text-xl font-bold mb-4">🤜 Team Mate Battle 2026</h2>';
-      html += '<p class="text-sm mb-6" style="color:var(--text-secondary)">Head-to-head comparison of teammates across all race weekends.</p>';
+      let html = \`
+        <div class="mb-6">
+          <h2 class="text-xl font-bold">🤜 Team Mate Battle 2026</h2>
+          <p class="text-sm" style="color:var(--text-secondary)">\${data.total_teams || 0} teams · Head-to-head across all race weekends</p>
+        </div>
+      \`;
       for (const team of battles) {
         const tc = team.team_colour || '#666';
-        const dList = team.drivers.join(' vs ');
+        const dList = team.drivers;
         const qw = team.qual_wins || {};
         const rw = team.race_wins || {};
-        const qStr = Object.entries(qw).map(([d, w]) => `${d}: ${w}`).join(', ');
-        const rStr = Object.entries(rw).map(([d, w]) => `${d}: ${w}`).join(', ');
 
-        html += `
-          <div class="card p-5 mb-4">
-            <div class="flex items-center gap-3 mb-3">
-              <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${tc}"></span>
-              <h3 class="font-semibold">${team.team_name || 'Unknown'}</h3>
-              <span class="text-xs" style="color:var(--text-secondary)">${dList}</span>
+        const d1 = dList[0] || '';
+        const d2 = dList[1] || '';
+        const qWins1 = qw[d1] || 0;
+        const qWins2 = qw[d2] || 0;
+        const qTotal = qWins1 + qWins2 || 1;
+        const rWins1 = rw[d1] || 0;
+        const rWins2 = rw[d2] || 0;
+        const rTotal = rWins1 + rWins2 || 1;
+
+        html += \`
+          <div class="card p-5 mb-4" style="border-left:4px solid \${tc}">
+            <div class="flex items-center gap-3 mb-4">
+              <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:\${tc};border:2px solid rgba(255,255,255,0.2)"></span>
+              <h3 class="font-semibold text-base" style="color:\${tc}">\${team.team_name || 'Unknown'}</h3>
             </div>
-            <div class="grid grid-cols-2 gap-4 text-sm">
-              <div class="card p-3 text-center">
-                <div class="text-xs" style="color:var(--text-muted)">⏱️ Qualifying Wins</div>
-                <div class="mt-1">${qStr || '<span style="color:var(--text-muted)">No data</span>'}</div>
+
+            <div class="grid grid-cols-2 gap-4 mb-4">
+              <div class="text-center p-3 rounded" style="background:\${tc}18;border:1px solid \${tc}44">
+                <div class="text-lg font-bold" style="color:\${tc}">\${d1}</div>
               </div>
-              <div class="card p-3 text-center">
-                <div class="text-xs" style="color:var(--text-muted)">🏁 Race Pace Wins</div>
-                <div class="mt-1">${rStr || '<span style="color:var(--text-muted)">No data</span>'}</div>
+              <div class="text-center p-3 rounded" style="background:var(--bg-primary);border:1px solid var(--border-color)">
+                <div class="text-lg font-bold" style="color:var(--text-secondary)">\${d2}</div>
               </div>
             </div>
-          </div>`;
+
+            <!-- Qualifying -->
+            <div class="mb-3">
+              <div class="flex items-center justify-between text-xs mb-1" style="color:var(--text-muted)">
+                <span>⏱️ Qualifying</span>
+                <span>\${qTotal} rounds</span>
+              </div>
+              <div class="flex items-center gap-1" style="height:26px">
+                <div class="text-xs font-bold text-right pr-2" style="color:\${tc};min-width:28px;flex-shrink:0">\${qWins1}</div>
+                <div class="flex-1" style="height:20px;background:var(--bg-primary);border-radius:5px;overflow:hidden">
+                  <div style="width:\${(qWins1/qTotal*100).toFixed(0)}%;height:100%;background:linear-gradient(90deg, \${tc}, \${tc}bb);border-radius:5px;float:left"></div>
+                  <div style="width:\${(qWins2/qTotal*100).toFixed(0)}%;height:100%;background:linear-gradient(90deg, #666, #999);border-radius:5px;float:right"></div>
+                </div>
+                <div class="text-xs font-bold text-left pl-2" style="color:#999;min-width:28px;flex-shrink:0">\${qWins2}</div>
+              </div>
+              <div class="flex justify-between text-xs mt-0.5" style="color:var(--text-muted)">
+                <span>\${(qWins1/qTotal*100).toFixed(0)}%</span>
+                <span>\${(qWins2/qTotal*100).toFixed(0)}%</span>
+              </div>
+            </div>
+
+            <!-- Race -->
+            <div>
+              <div class="flex items-center justify-between text-xs mb-1" style="color:var(--text-muted)">
+                <span>🏁 Race Pace</span>
+                <span>\${rTotal} rounds</span>
+              </div>
+              <div class="flex items-center gap-1" style="height:26px">
+                <div class="text-xs font-bold text-right pr-2" style="color:\${tc};min-width:28px;flex-shrink:0">\${rWins1}</div>
+                <div class="flex-1" style="height:20px;background:var(--bg-primary);border-radius:5px;overflow:hidden">
+                  <div style="width:\${(rWins1/rTotal*100).toFixed(0)}%;height:100%;background:linear-gradient(90deg, \${tc}, \${tc}bb);border-radius:5px;float:left"></div>
+                  <div style="width:\${(rWins2/rTotal*100).toFixed(0)}%;height:100%;background:linear-gradient(90deg, #666, #999);border-radius:5px;float:right"></div>
+                </div>
+                <div class="text-xs font-bold text-left pl-2" style="color:#999;min-width:28px;flex-shrink:0">\${rWins2}</div>
+              </div>
+              <div class="flex justify-between text-xs mt-0.5" style="color:var(--text-muted)">
+                <span>\${(rWins1/rTotal*100).toFixed(0)}%</span>
+                <span>\${(rWins2/rTotal*100).toFixed(0)}%</span>
+              </div>
+            </div>
+          </div>\`;
       }
-      html += `<div class="text-xs mt-4" style="color:var(--text-muted);text-align:center">${data.total_teams || 0} teams · Based on fastest qualifying & race lap per weekend</div>`;
       el.innerHTML = html;
     } catch(e) {
-      el.innerHTML = `<div class="text-center py-20" style="color:#dc2626">Error: ${e.message}</div>`;
+      el.innerHTML = \`<div class="text-center py-20" style="color:#dc2626">Error: \${e.message}</div>\`;
     }
   }
 
@@ -3714,7 +3748,7 @@
           </div>
           <div class="collapse-body">
             <div class="flex flex-wrap gap-2 mb-3" id="prog-drivers">
-              ${progression.drivers.slice(0, 15).map((d, i) => `
+              ${progression.drivers.map((d, i) => `
                 <label class="flex items-center gap-1.5 text-xs cursor-pointer" style="color:var(--text-primary)">
                   <input type="checkbox" class="prog-cb" value="${d.driver_number}" data-acronym="${d.acronym}" ${i < 10 ? 'checked' : ''}>
                   <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${d.team_colour || '#666'}"></span>
