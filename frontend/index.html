@@ -2692,16 +2692,22 @@
       const maxPts = drivers[0]?.points || 1;
       html += `
         <div class="card p-5 mb-6">
-          <h3 class="font-semibold text-sm mb-4">👨‍👩‍👧‍👦 Driver Standings</h3>
-          <div class="overflow-x-auto">
-            <table>
-              <thead>
-                <tr>
-                  <th>Pos</th><th>Driver</th><th>Team</th>
-                  <th class="text-right">Points</th><th>Progress</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div class="collapse-header flex items-center justify-between mb-2" onclick="toggleCollapse(this)">
+            <h3 class="font-semibold text-sm">👨‍👩‍👧‍👦 Driver Standings
+              <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">${drivers.length} drivers · season points</span>
+            </h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="collapse-body closed">
+            <div class="overflow-x-auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Pos</th><th>Driver</th><th>Team</th>
+                    <th class="text-right">Points</th><th>Progress</th>
+                  </tr>
+                </thead>
+                <tbody>
       `;
 
       for (const d of drivers) {
@@ -2722,19 +2728,25 @@
           </tr>
         `;
       }
-      html += `</tbody></table></div></div>`;
+      html += `</tbody></table></div></div></div>`;
 
       // Constructor standings
       const maxCPts = constructors[0]?.points || 1;
       html += `
         <div class="card p-5 mb-6">
-          <h3 class="font-semibold text-sm mb-4">🏭 Constructor Standings</h3>
-          <div class="overflow-x-auto">
-            <table>
-              <thead>
-                <tr><th>Pos</th><th>Team</th><th class="text-right">Points</th><th>Progress</th></tr>
-              </thead>
-              <tbody>
+          <div class="collapse-header flex items-center justify-between mb-2" onclick="toggleCollapse(this)">
+            <h3 class="font-semibold text-sm">🏭 Constructor Standings
+              <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">${constructors.length} teams · season points</span>
+            </h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="collapse-body closed">
+            <div class="overflow-x-auto">
+              <table>
+                <thead>
+                  <tr><th>Pos</th><th>Team</th><th class="text-right">Points</th><th>Progress</th></tr>
+                </thead>
+                <tbody>
       `;
       for (const c of constructors) {
         const pct = (c.points / maxCPts * 100).toFixed(0);
@@ -2751,7 +2763,7 @@
           </tr>
         `;
       }
-      html += `</tbody></table></div></div>`;
+      html += `</tbody></table></div></div></div>`;
 
       // Race results per round — collapsible cards, Race + Sprint separated
       html += `
