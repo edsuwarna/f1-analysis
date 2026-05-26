@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: f1-postgres
+    environment:
+      POSTGRES_DB: f1_analysis
+      POSTGRES_USER: f1_user
+      POSTGRES_PASSWORD: f1_pass_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U f1_user -d f1_analysis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    container_name: f1-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://f1_user:f1_pass_secret@postgres:5432/f1_analysis
+      CACHE_DIR: /app/cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+
+  ingestion:
+    build:
+      context: .
+      dockerfile: docker/ingestion.Dockerfile
+    container_name: f1-ingestion
+    volumes:
+      - ./backend:/app/backend
+      - f1_cache:/app/cache
+    environment:
+      DATABASE_URL: postgresql+psycopg2://f1_user:f1_pass_secret@postgres:5432/f1_analysis
+      CACHE_DIR: /app/cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - ingestion
+    # Run manually: docker compose run --rm ingestion python -m backend.ingestion.ingest_race
+    command: tail -f /dev/null  # Keeps container alive for manual commands
+
+volumes:
+  postgres_data:
+  f1_cache:
