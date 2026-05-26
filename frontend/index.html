@@ -94,6 +94,98 @@
   .light .text-gray-700 { color: var(--text-primary) !important; }
   .light .text-red-400 { color: #dc2626 !important; }
   .light .text-green-400 { color: #16a34a !important; }
+
+  /* ── Tyre Timeline ── */
+  .tyme-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 3px;
+    height: 26px;
+  }
+  .tyme-row:hover .tyme-bar-seg {
+    opacity: .85;
+    filter: brightness(1.15);
+  }
+  .tyme-label {
+    width: 44px;
+    font-size: 10px;
+    font-weight: 700;
+    text-align: right;
+    padding-right: 8px;
+    flex-shrink: 0;
+    letter-spacing: .5px;
+  }
+  .tyme-track {
+    flex: 1;
+    position: relative;
+    height: 22px;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .tyme-bar-seg {
+    position: absolute;
+    height: 100%;
+    border-radius: 3px;
+    min-width: 3px;
+    display: flex;
+    align-items: center;
+    padding: 0 3px;
+    font-size: 8px;
+    font-weight: 700;
+    color: rgba(255,255,255,.9);
+    letter-spacing: .3px;
+    transition: opacity .15s, filter .15s;
+    cursor: pointer;
+  }
+  .tyme-soft { background: #e10600; }
+  .tyme-medium { background: #d97706; }
+  .tyme-hard { background: #6b7280; }
+  .tyme-inter { background: #2d7d46; }
+  .tyme-wet { background: #1a5c7a; }
+  .tyme-scale {
+    display: flex;
+    margin-left: 52px;
+    height: 16px;
+    position: relative;
+  }
+  .tyme-tick {
+    position: absolute;
+    font-size: 9px;
+    color: var(--text-muted);
+    transform: translateX(-50%);
+  }
+  .tyme-legend {
+    display: flex;
+    gap: 12px;
+    margin: 8px 0 4px 52px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    flex-wrap: wrap;
+  }
+  .tyme-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .tyme-legend-dot {
+    width: 10px; height: 10px; border-radius: 2px; display: inline-block;
+  }
+  .tyme-tooltip {
+    position: fixed;
+    background: #1e293b;
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    pointer-events: none;
+    z-index: 100;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,.3);
+    display: none;
+  }
+  .light .tyme-tooltip { background: #334155; }
 </style>
 </head>
 <body>
@@ -117,9 +209,10 @@
     </div>
   </div>
 
+  <div class="tyme-tooltip" id="tyme-tooltip"></div>
+
   <script>
   // API URL — relative path (local dev via FastAPI)
-  // CF Pages: build.sh ganti API_URL otomatis pas build
   const API = '';
   let meetings = [];
   let currentView = 'races';
@@ -174,6 +267,89 @@
   function teamColor(colour) {
     if (!colour) return '#666';
     return '#' + colour;
+  }
+
+  // ── Tyre Strategy Timeline ──
+  function renderTyreTimeline(stints, driverMap) {
+    if (!stints || stints.length === 0) return '';
+
+    const byDriver = {};
+    let maxLap = 0;
+    stints.forEach(s => {
+      if (!byDriver[s.driver_number]) byDriver[s.driver_number] = [];
+      byDriver[s.driver_number].push(s);
+      if (s.lap_end > maxLap) maxLap = s.lap_end;
+    });
+
+    // Sort drivers by first stint lap_start
+    const sorted = Object.entries(byDriver).sort((a, b) =>
+      Math.min(...a[1].map(x => x.lap_start)) - Math.min(...b[1].map(x => x.lap_start))
+    );
+
+    let html = `<div class="overflow-x-auto pb-2">`;
+    html += `<div style="min-width:500px">`;
+
+    // Legend
+    html += `<div class="tyme-legend">
+      <span class="tyme-legend-item"><span class="tyme-legend-dot tyme-soft"></span>SOFT</span>
+      <span class="tyme-legend-item"><span class="tyme-legend-dot tyme-medium"></span>MEDIUM</span>
+      <span class="tyme-legend-item"><span class="tyme-legend-dot tyme-hard"></span>HARD</span>
+      <span class="tyme-legend-item"><span class="tyme-legend-dot tyme-inter"></span>INTERMEDIATE</span>
+      <span class="tyme-legend-item"><span class="tyme-legend-dot tyme-wet"></span>WET</span>
+      <span style="color:var(--text-muted);margin-left:8px">${maxLap} laps · ${stints.length} stints</span>
+    </div>`;
+
+    // Lap scale header
+    const tickStep = maxLap > 60 ? 10 : maxLap > 30 ? 5 : 2;
+    html += `<div class="tyme-scale">`;
+    for (let i = 1; i <= maxLap; i += tickStep) {
+      html += `<div class="tyme-tick" style="left:${((i-1)/(maxLap-1))*100}%">${i}</div>`;
+    }
+    html += `</div>`;
+
+    // Driver rows
+    for (const [dn, sts] of sorted) {
+      const drv = driverMap[parseInt(dn)];
+      const label = drv ? drv.name_acronym : dn;
+      const colour = drv ? teamColor(drv.team_colour) : '#666';
+
+      html += `<div class="tyme-row">
+        <div class="tyme-label" style="color:${colour}">${label}</div>
+        <div class="tyme-track">`;
+
+      for (const s of sts) {
+        const pctStart = ((s.lap_start - 1) / Math.max(maxLap - 1, 1)) * 100;
+        const pctWidth = Math.max(((s.lap_end - s.lap_start + 1) / Math.max(maxLap - 1, 1)) * 100, 1.5);
+        const comp = (s.compound || 'SOFT').toLowerCase();
+        const cls = comp === 'soft' ? 'tyme-soft' : comp === 'medium' ? 'tyme-medium' : comp === 'hard' ? 'tyme-hard' : comp === 'intermediate' ? 'tyme-inter' : 'tyme-wet';
+        const showLabel = pctWidth > 7;
+        const ageOpt = s.tyre_age_at_start > 0 ? ` (used ${s.tyre_age_at_start} laps)` : ' (fresh)';
+
+        html += `<div class="tyme-bar-seg ${cls}"
+          style="left:${pctStart}%;width:${pctWidth}%"
+          onmouseenter="showTymeTip(event,'${s.compound || '?'} · L${s.lap_start}-${s.lap_end}${ageOpt}')"
+          onmouseleave="hideTymeTip()">`;
+        if (showLabel) html += s.compound;
+        html += `</div>`;
+      }
+
+      html += `</div></div>`;
+    }
+
+    html += `</div></div>`;
+    return html;
+  }
+
+  let tymeTipEl = null;
+  function showTymeTip(e, text) {
+    if (!tymeTipEl) tymeTipEl = document.getElementById('tyme-tooltip');
+    tymeTipEl.textContent = text;
+    tymeTipEl.style.display = 'block';
+    tymeTipEl.style.left = (e.clientX + 12) + 'px';
+    tymeTipEl.style.top = (e.clientY - 30) + 'px';
+  }
+  function hideTymeTip() {
+    if (tymeTipEl) tymeTipEl.style.display = 'none';
   }
 
   // ── Views ──
@@ -312,8 +488,9 @@
       }
       html += `</tbody></table></div></div>`;
 
-      // Stints (tyre strategy)
+      // ── Tyre Strategy Timeline ──
       if (stints.length > 0) {
+        // Build stint-by-driver for the table (keeping the detail)
         const stintByDriver = {};
         stints.forEach(s => {
           if (!stintByDriver[s.driver_number]) stintByDriver[s.driver_number] = [];
@@ -322,17 +499,18 @@
 
         html += `
           <div class="card p-5 mb-6">
-            <h3 class="font-semibold text-sm mb-4">🛞 Tyre Strategy</h3>
-            <div class="overflow-x-auto">
+            <h3 class="font-semibold text-sm mb-4">🛞 Tyre Strategy Timeline</h3>
+            ${renderTyreTimeline(stints, driverMap)}
+            <div class="overflow-x-auto mt-4">
               <table>
-                <thead><tr><th>Driver</th><th>Team</th><th colspan="6">Stints</th></tr></thead>
+                <thead><tr><th>Driver</th><th>Team</th><th colspan="6">Stint Detail</th></tr></thead>
                 <tbody>
         `;
-        const topDrivers = Object.entries(stintByDriver).slice(0, 10);
+        const topDrivers = Object.entries(stintByDriver);
         for (const [dn, sts] of topDrivers) {
           const drv = driverMap[parseInt(dn)];
           const stintCells = sts.map(s =>
-            `<span class="text-xs mr-1">${compoundBadge(s.compound)} <span style="color:var(--text-secondary)">L${s.lap_start}-${s.lap_end}</span></span>`
+            `<span class="text-xs mr-2">${compoundBadge(s.compound)} <span style="color:var(--text-secondary)">L${s.lap_start}-${s.lap_end}</span></span>`
           ).join('');
           html += `
             <tr>
@@ -437,12 +615,12 @@
     document.getElementById('content').innerHTML = `
       <div class="card p-8 max-w-2xl mx-auto text-center">
         <h2 class="text-xl font-bold mb-4">🏎️ F1 Analysis 2026</h2>
-        <p style="color:var(--text-secondary)" class="mb-6">Real-time Formula 1 telemetry, sector times, tyre strategy, and driver comparison platform.</p>
+        <p style="color:var(--text-secondary)" class="mb-6">Formula 1 sector times, tyre strategy, and driver comparison platform.</p>
         <div class="text-left text-sm" style="color:var(--text-secondary)">
           <p><strong>Data Source:</strong> OpenF1 API + FastAPI Backend</p>
           <p><strong>Database:</strong> PostgreSQL 18</p>
-          <p><strong>Status:</strong> ✅ Phase 1 Complete (Ingestion + API)</p>
           <p><strong>Season:</strong> 2026 (5 active races)</p>
+          <p><strong>Features:</strong> Sector times · Tyre strategy timeline · Driver comparison</p>
         </div>
         <div class="mt-6 text-xs" style="color:var(--text-muted)">
           F1 is a trademark of Formula One Licensing B.V. This is an unofficial project.
