@@ -14,28 +14,56 @@ router = APIRouter()
 # ── Race Engineers (per driver_number, based on DB data) ──
 # Known as of 2026 season. PRs welcome for corrections & updates.
 RACE_ENGINEERS = {
-    1: "Will Joseph",              # Norris (McLaren)
+    1: "Will Joseph",              # Norris (McLaren) — champion #1
     3: "Gianpiero Lambiase",       # Verstappen (Red Bull)
     5: None,                       # Bortoleto (Audi) — rookie
-    6: None,                       # Hadjar (Red Bull) — rookie
-    10: "Karel Loos",              # Gasly (Alpine)
-    11: None,                      # Perez (Cadillac)
-    12: None,                      # Antonelli (Mercedes) — rookie
+    6: "Richard Wood",             # Hadjar (Red Bull) — rookie
+    10: "Josh Peckett",            # Gasly (Alpine)
+    11: "Hugh Bird",               # Perez (Cadillac)
+    12: "Giacomo Tortora",         # Antonelli (Mercedes) — rookie
     14: "Chris Cronin",            # Alonso (Aston Martin)
     16: "Bryan Bozzi",             # Leclerc (Ferrari)
-    18: "Henry Howe",              # Stroll (Aston Martin)
-    23: "James Gough",             # Albon (Williams)
-    27: None,                      # Hulkenberg (Audi)
+    18: "Ben Michell",             # Stroll (Aston Martin)
+    23: "James Urwin",             # Albon (Williams)
+    27: "Ed Regan",                # Hulkenberg (Audi)
     30: None,                      # Lawson (Racing Bulls)
-    31: None,                      # Ocon (Haas)
-    41: None,                      # Lindblad (Racing Bulls)
-    43: None,                      # Colapinto (Alpine)
+    31: None,                      # Ocon (Haas) — TBC
+    41: None,                      # Lindblad (Racing Bulls) — rookie
+    43: "Gaetan Jego",             # Colapinto (Alpine)
     44: "Riccardo Adami",          # Hamilton (Ferrari)
-    55: None,                      # Sainz (Williams)
+    55: "Xavi Marcos",             # Sainz (Williams)
     63: "Marcus Dudley",           # Russell (Mercedes)
-    77: None,                      # Bottas (Cadillac)
+    77: None,                      # Bottas (Cadillac) — TBC
     81: "Tom Stallard",            # Piastri (McLaren)
-    87: None,                      # Bearman (Haas)
+    87: "Ronan O'Hare",            # Bearman (Haas)
+}
+
+# ── 2026 Team-Specific Headshots ──
+# Override OpenF1's static headshots with F1's 2026 team-specific media URLs.
+# Ensures each driver shows the correct team race suit, not an old one.
+HEADSHOT_2026 = {
+    1:  "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/mclaren/lannor01/2026mclarenlannor01right.webp",
+    3:  "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/redbullracing/maxver01/2026redbullracingmaxver01right.webp",
+    5:  "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/audi/gabbor01/2026audigabbor01right.webp",
+    6:  "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/redbullracing/isahad01/2026redbullracingisahad01right.webp",
+    10: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/alpine/piegas01/2026alpinepiegas01right.webp",
+    11: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/cadillac/serper01/2026cadillacserper01right.webp",
+    12: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/mercedes/andant01/2026mercedesandant01right.webp",
+    14: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/astonmartin/feralo01/2026astonmartinferalo01right.webp",
+    16: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/ferrari/chalec01/2026ferrarichalec01right.webp",
+    18: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/astonmartin/lanstr01/2026astonmartinlanstr01right.webp",
+    23: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/williams/alealb01/2026williamsalealb01right.webp",
+    27: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/audi/nichul01/2026audinichul01right.webp",
+    30: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/racingbulls/lialaw01/2026racingbullslialaw01right.webp",
+    31: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/haasf1team/estoco01/2026haasf1teamestoco01right.webp",
+    41: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/racingbulls/arvlin01/2026racingbullsarvlin01right.webp",
+    43: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/alpine/fracol01/2026alpinefracol01right.webp",
+    44: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/ferrari/lewham01/2026ferrarilewham01right.webp",
+    55: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/williams/carsai01/2026williamscarsai01right.webp",
+    63: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/mercedes/georus01/2026mercedesgeorus01right.webp",
+    77: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/cadillac/valbot01/2026cadillacvalbot01right.webp",
+    81: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/mclaren/oscpia01/2026mclarenoscpia01right.webp",
+    87: "https://media.formula1.com/image/upload/c_lfill,w_128/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/haasf1team/olibea01/2026haasf1teamolibea01right.webp",
 }
 
 # ── Team reference data ──
@@ -43,7 +71,7 @@ RACE_ENGINEERS = {
 TEAM_INFO = {
     "Alpine": {
         "full_name": "Alpine F1 Team",
-        "team_principal": "Oliver Oakes",
+        "team_principal": "Flavio Briatore",
         "technical_director": "David Sanchez",
         "base": "Enstone, United Kingdom",
         "power_unit": "Mercedes",
@@ -54,7 +82,7 @@ TEAM_INFO = {
     },
     "Aston Martin": {
         "full_name": "Aston Martin Aramco F1 Team",
-        "team_principal": "Andy Cowell",
+        "team_principal": "Adrian Newey",
         "technical_director": "Dan Fallows",
         "base": "Silverstone, United Kingdom",
         "power_unit": "Honda",
@@ -131,7 +159,7 @@ TEAM_INFO = {
     },
     "Racing Bulls": {
         "full_name": "Visa Cash App Racing Bulls",
-        "team_principal": "Laurent Mekies",
+        "team_principal": "Alan Permane",
         "technical_director": "Tim Goss",
         "base": "Faenza, Italy",
         "power_unit": "Red Bull Ford",
@@ -142,7 +170,7 @@ TEAM_INFO = {
     },
     "Red Bull Racing": {
         "full_name": "Oracle Red Bull Racing",
-        "team_principal": "Christian Horner",
+        "team_principal": "Laurent Mekies",
         "technical_director": "Pierre Waché",
         "base": "Milton Keynes, United Kingdom",
         "power_unit": "Red Bull Ford",
@@ -243,12 +271,13 @@ async def get_teams(
     drv_result = await db.execute(driver_query, {"year": year})
     drivers_by_team = defaultdict(list)
     for d in drv_result.fetchall():
+        hs_url = HEADSHOT_2026.get(d.driver_number) or (d.headshot_url or "")
         drivers_by_team[d.team_name].append({
             "driver_number": d.driver_number,
             "full_name": d.full_name,
             "acronym": d.name_acronym,
             "team_colour": d.team_colour or "",
-            "headshot_url": d.headshot_url or "",
+            "headshot_url": hs_url,
             "race_engineer": RACE_ENGINEERS.get(d.driver_number, None),
         })
 

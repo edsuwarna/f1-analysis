@@ -10,6 +10,7 @@ from backend.core.database import get_db
 from backend.models.models import (
     Session, SessionDriver, Lap, Stint, PitStop, Weather, Telemetry
 )
+from backend.api.teams import HEADSHOT_2026
 
 router = APIRouter()
 
@@ -47,7 +48,7 @@ async def get_session_drivers(session_id: int, db: AsyncSession = Depends(get_db
             "name_acronym": d.name_acronym,
             "team_name": d.team_name,
             "team_colour": d.team_colour,
-            "headshot_url": d.headshot_url,
+            "headshot_url": HEADSHOT_2026.get(d.driver_number) or (d.headshot_url or ""),
         }
         for d in drivers
     ]
