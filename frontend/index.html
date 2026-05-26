@@ -50,6 +50,7 @@
   .bg-f1-red { background: #e10600; }
   .sector-badge { font-variant-numeric: tabular-nums; }
   .team-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  .team-badge { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; line-height: 1.4; }
   .nav-link { color: var(--text-secondary); cursor: pointer; padding: 8px 16px; border-radius: 6px; transition: all .15s; }
   .nav-link:hover { color: var(--text-primary); background: var(--hover-bg); }
   .nav-link.active { color: #fff; background: #e10600; }
@@ -281,6 +282,13 @@
   function teamColor(colour) {
     if (!colour) return '#666';
     return '#' + colour;
+  }
+
+  // ── Team Badge ──
+  function teamBadge(teamName, colour) {
+    const c = teamColor(colour);
+    const acronym = (teamName || '').replace(/ F1 Team$/, '').replace(/ Team$/, '').substring(0, 12);
+    return `<span class="team-badge" style="background:${c};color:#fff;border:1px solid rgba(255,255,255,0.1)">${acronym}</span>`;
   }
 
   // ── Tyre Strategy Timeline ──
@@ -566,7 +574,7 @@
             <tr>
               <td style="color:var(--text-secondary)">${i + 1}</td>
               <td class="font-medium">${d.acronym || '—'}</td>
-              <td><span class="team-dot" style="background:${teamColor(d.team_colour)}"></span>${d.team || '—'}</td>
+              <td>${teamBadge(d.team, d.team_colour)}</td>
               <td class="text-right font-mono ${bestS1 ? 'font-bold' : ''}" style="${s1Color ? 'color:' + s1Color : ''}${s1Bold ? ';' + s1Bold : ''}">${formatTime(d.best_sector_1)}</td>
               <td class="text-right font-mono ${bestS2 ? 'font-bold' : ''}" style="${s2Color ? 'color:' + s2Color : ''}${s2Bold ? ';' + s2Bold : ''}">${formatTime(d.best_sector_2)}</td>
               <td class="text-right font-mono ${bestS3 ? 'font-bold' : ''}" style="${s3Color ? 'color:' + s3Color : ''}${s3Bold ? ';' + s3Bold : ''}">${formatTime(d.best_sector_3)}</td>
@@ -609,7 +617,7 @@
           html += `
             <tr>
               <td class="font-medium">${drv ? drv.name_acronym : dn}</td>
-              <td><span class="team-dot" style="background:${teamColor(drv?.team_colour)}"></span>${drv?.team_name || '—'}</td>
+              <td>${teamBadge(drv?.team_name, drv?.team_colour)}</td>
               <td colspan="6">${stintCells}</td>
             </tr>
           `;
@@ -711,7 +719,7 @@
           html += `
             <tr>
               <td class="font-medium">${drv ? drv.name_acronym : dn}</td>
-              <td><span class="team-dot" style="background:${teamColor(drv?.team_colour)}"></span>${drv?.team_name || '—'}</td>
+              <td>${teamBadge(drv?.team_name, drv?.team_colour)}</td>
               <td class="text-right">${stops.length}</td>
               <td class="text-right font-mono">${avgStop.toFixed(1)}s</td>
               <td class="text-right font-mono" style="color:#16a34a">${fastestStop.toFixed(1)}s</td>
