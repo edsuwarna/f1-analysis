@@ -798,7 +798,7 @@ async def teammate_battle(
     result = await db.execute(query, {"year": year})
     rows = result.fetchall()
 
-    from collections import defaultdict
+    from collections import defaultdict, Counter
 
     # Group by team + meeting
     teams = defaultdict(lambda: defaultdict(list))
@@ -834,25 +834,36 @@ async def teammate_battle(
         race_wins = defaultdict(int)
         qual_wins = defaultdict(int)
         points = defaultdict(int)
-        total_drivers = set()
+
+        # Count how many meetings each driver appeared in
+        driver_appearances = Counter()
+        for meeting_key, drivers in meetings.items():
+            seen_in_this_meeting = set()
+            for d in drivers:
+                acr = d["acronym"]
+                if acr not in seen_in_this_meeting:
+                    driver_appearances[acr] += 1
+                    seen_in_this_meeting.add(acr)
+
+        # Keep only the 2 most frequent drivers
+        top2 = [acr for acr, _ in driver_appearances.most_common(2)]
 
         for meeting_key, drivers in sorted(meetings.items()):
-            if len(drivers) >= 2:
+            # Only compare the top 2 drivers
+            main_drivers = [d for d in drivers if d["acronym"] in top2]
+            if len(main_drivers) >= 2:
                 # Sort drivers by this meeting's best qual lap for comparison
-                d_sorted = sorted(drivers, key=lambda d: d["best_qual_lap"] if d["best_qual_lap"] else float("inf"))
+                d_sorted = sorted(main_drivers, key=lambda d: d["best_qual_lap"] if d["best_qual_lap"] else float("inf"))
                 if len(d_sorted) >= 2:
                     winner = d_sorted[0]["acronym"]
                     qual_wins[winner] += 1
 
-                d_race = sorted(drivers, key=lambda d: d["best_race_lap"] if d["best_race_lap"] else float("inf"))
+                d_race = sorted(main_drivers, key=lambda d: d["best_race_lap"] if d["best_race_lap"] else float("inf"))
                 if len(d_race) >= 2:
                     winner = d_race[0]["acronym"]
                     race_wins[winner] += 1
 
-            for d in drivers:
-                total_drivers.add(d["acronym"])
-
-        driver_list = sorted(total_drivers)
+        driver_list = sorted(top2)
         battle.append({
             "team_name": team,
             "team_colour": team_colour,
