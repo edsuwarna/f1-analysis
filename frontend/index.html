@@ -3386,38 +3386,53 @@
         return;
       }
       let html = '<h2 class="text-xl font-bold mb-4">🤜 Team Mate Battle 2026</h2>';
-      html += '<p class="text-sm mb-6" style="color:var(--text-secondary)">Head-to-head comparison of teammates across all race weekends.</p>';
+      html += '<p class="text-sm mb-6" style="color:var(--text-secondary)">' + data.total_teams + ' teams · Head-to-head across all race weekends</p>';
       for (const team of battles) {
         const tc = team.team_colour || '#666';
-        const dList = team.drivers.join(' vs ');
+        const dList = team.drivers;
         const qw = team.qual_wins || {};
         const rw = team.race_wins || {};
-        const qStr = Object.entries(qw).map(([d, w]) => `${d}: ${w}`).join(', ');
-        const rStr = Object.entries(rw).map(([d, w]) => `${d}: ${w}`).join(', ');
+        const d1 = dList[0] || '';
+        const d2 = dList[1] || '';
+        const qWins1 = qw[d1] || 0;
+        const qWins2 = qw[d2] || 0;
+        const qTotal = qWins1 + qWins2 || 1;
+        const rWins1 = rw[d1] || 0;
+        const rWins2 = rw[d2] || 0;
+        const rTotal = rWins1 + rWins2 || 1;
 
-        html += `
-          <div class="card p-5 mb-4">
-            <div class="flex items-center gap-3 mb-3">
-              <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${tc}"></span>
-              <h3 class="font-semibold">${team.team_name || 'Unknown'}</h3>
-              <span class="text-xs" style="color:var(--text-secondary)">${dList}</span>
-            </div>
-            <div class="grid grid-cols-2 gap-4 text-sm">
-              <div class="card p-3 text-center">
-                <div class="text-xs" style="color:var(--text-muted)">⏱️ Qualifying Wins</div>
-                <div class="mt-1">${qStr || '<span style="color:var(--text-muted)">No data</span>'}</div>
-              </div>
-              <div class="card p-3 text-center">
-                <div class="text-xs" style="color:var(--text-muted)">🏁 Race Pace Wins</div>
-                <div class="mt-1">${rStr || '<span style="color:var(--text-muted)">No data</span>'}</div>
-              </div>
-            </div>
-          </div>`;
+        html += '<div class="card p-5 mb-4" style="border-left:4px solid ' + tc + '">';
+        html += '<div class="flex items-center gap-3 mb-4">';
+        html += '<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:' + tc + ';border:2px solid rgba(255,255,255,0.2)"></span>';
+        html += '<h3 class="font-semibold text-base" style="color:' + tc + '">' + team.team_name + '</h3></div>';
+
+        html += '<div class="grid grid-cols-2 gap-4 mb-4">';
+        html += '<div class="text-center p-3 rounded" style="background:' + tc + '18;border:1px solid ' + tc + '44">';
+        html += '<div class="text-lg font-bold" style="color:' + tc + '">' + d1 + '</div></div>';
+        html += '<div class="text-center p-3 rounded" style="background:var(--bg-primary);border:1px solid var(--border-color)">';
+        html += '<div class="text-lg font-bold" style="color:var(--text-secondary)">' + d2 + '</div></div></div>';
+
+        html += '<div class="mb-3"><div class="flex items-center justify-between text-xs mb-1" style="color:var(--text-muted)"><span>\u23f1\ufe0f Qualifying</span><span>' + qTotal + ' rounds</span></div>';
+        html += '<div class="flex items-center gap-1" style="height:26px">';
+        html += '<div class="text-xs font-bold text-right pr-2" style="color:' + tc + ';min-width:28px">' + qWins1 + '</div>';
+        html += '<div class="flex-1" style="height:20px;background:var(--bg-primary);border-radius:5px;overflow:hidden">';
+        html += '<div style="width:' + Math.round(qWins1/qTotal*100) + '%;height:100%;background:linear-gradient(90deg,' + tc + ',' + tc + 'bb);border-radius:5px;float:left"></div>';
+        html += '<div style="width:' + Math.round(qWins2/qTotal*100) + '%;height:100%;background:linear-gradient(90deg,#666,#999);border-radius:5px;float:right"></div></div>';
+        html += '<div class="text-xs font-bold text-left pl-2" style="color:#999;min-width:28px">' + qWins2 + '</div></div>';
+        html += '<div class="flex justify-between text-xs mt-0.5" style="color:var(--text-muted)"><span>' + Math.round(qWins1/qTotal*100) + '%</span><span>' + Math.round(qWins2/qTotal*100) + '%</span></div></div>';
+
+        html += '<div><div class="flex items-center justify-between text-xs mb-1" style="color:var(--text-muted)"><span>\ud83c\udfc1 Race Pace</span><span>' + rTotal + ' rounds</span></div>';
+        html += '<div class="flex items-center gap-1" style="height:26px">';
+        html += '<div class="text-xs font-bold text-right pr-2" style="color:' + tc + ';min-width:28px">' + rWins1 + '</div>';
+        html += '<div class="flex-1" style="height:20px;background:var(--bg-primary);border-radius:5px;overflow:hidden">';
+        html += '<div style="width:' + Math.round(rWins1/rTotal*100) + '%;height:100%;background:linear-gradient(90deg,' + tc + ',' + tc + 'bb);border-radius:5px;float:left"></div>';
+        html += '<div style="width:' + Math.round(rWins2/rTotal*100) + '%;height:100%;background:linear-gradient(90deg,#666,#999);border-radius:5px;float:right"></div></div>';
+        html += '<div class="text-xs font-bold text-left pl-2" style="color:#999;min-width:28px">' + rWins2 + '</div></div>';
+        html += '<div class="flex justify-between text-xs mt-0.5" style="color:var(--text-muted)"><span>' + Math.round(rWins1/rTotal*100) + '%</span><span>' + Math.round(rWins2/rTotal*100) + '%</span></div></div></div>';
       }
-      html += `<div class="text-xs mt-4" style="color:var(--text-muted);text-align:center">${data.total_teams || 0} teams · Based on fastest qualifying & race lap per weekend</div>`;
       el.innerHTML = html;
     } catch(e) {
-      el.innerHTML = `<div class="text-center py-20" style="color:#dc2626">Error: ${e.message}</div>`;
+      el.innerHTML = '<div class="text-center py-20" style="color:#dc2626">Error: ' + e.message + '</div>';
     }
   }
 
@@ -3714,7 +3729,7 @@
           </div>
           <div class="collapse-body">
             <div class="flex flex-wrap gap-2 mb-3" id="prog-drivers">
-              ${progression.drivers.slice(0, 15).map((d, i) => `
+              ${progression.drivers.map((d, i) => `
                 <label class="flex items-center gap-1.5 text-xs cursor-pointer" style="color:var(--text-primary)">
                   <input type="checkbox" class="prog-cb" value="${d.driver_number}" data-acronym="${d.acronym}" ${i < 10 ? 'checked' : ''}>
                   <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${d.team_colour || '#666'}"></span>
