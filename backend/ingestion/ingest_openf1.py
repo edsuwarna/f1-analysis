@@ -275,8 +275,94 @@ def _store_session(engine, meeting_id: int, session_key: int,
         time.sleep(REQUEST_DELAY)
         _store_weather(session, session_key, session_id)
 
+        # Store telemetry (car_data) — needs engine for parallel connection
+        time.sleep(REQUEST_DELAY)
+        _store_telemetry(engine, session_key, session_id)
+
         session.commit()
         return session_id
+
+
+def _store_telemetry(engine, session_key: int, session_id: int):
+    """Store car telemetry data from OpenF1 /v1/car_data endpoint."""
+    log.info("      📡 Fetching telemetry...")
+    try:
+        # Get list of drivers first
+        drivers = api_get("drivers", {"session_key": session_key})
+        if not drivers:
+            log.info("      ⏭️ No drivers for telemetry")
+            return
+
+        driver_numbers = [d["driver_number"] for d in drivers if "driver_number" in d]
+
+        total_stored = 0
+        for dn in driver_numbers:
+            time.sleep(REQUEST_DELAY)
+            car_data = api_get("car_data", {"session_key": session_key, "driver_number": dn})
+            if not car_data:
+                continue
+
+            batch = []
+            for entry in car_data:
+                # Parse timestamp from OpenF1 date field
+                ts_str = entry.get("date")
+                ts = None
+                if ts_str:
+                    try:
+                        dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                        if dt.tzinfo is not None:
+                            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+                        ts = dt.timestamp()
+                    except (ValueError, TypeError):
+                        pass
+
+                # OpenF1 uses uppercase X, Y for track coordinates
+                x_val = entry.get("X") or entry.get("x")
+                y_val = entry.get("Y") or entry.get("y")
+
+                batch.append({
+                    "sid": session_id,
+                    "dn": dn,
+                    "ln": entry.get("lap_number"),
+                    "ts": ts,
+                    "speed": entry.get("speed"),
+                    "rpm": entry.get("rpm"),
+                    "gear": entry.get("gear"),
+                    "throttle": entry.get("throttle"),
+                    "brake": entry.get("brake"),
+                    "drs": entry.get("drs"),
+                    "x": x_val,
+                    "y": y_val,
+                })
+
+            if batch:
+                # Insert in batches of 1000
+                BATCH_SIZE = 1000
+                for i in range(0, len(batch), BATCH_SIZE):
+                    sub = batch[i:i + BATCH_SIZE]
+                    with SASession(engine) as sasession:
+                        sasession.execute(text("""
+                            INSERT INTO telemetry
+                                (session_id, driver_number, lap_number, timestamp,
+                                 speed, rpm, gear, throttle, brake, drs, x, y)
+                            VALUES
+                                (:sid, :dn, :ln, :ts,
+                                 :speed, :rpm, :gear, :throttle, :brake, :drs, :x, :y)
+                            ON CONFLICT DO NOTHING
+                        """), sub)
+                        sasession.commit()
+                total_stored += len(batch)
+                log.info(f"      📡 Stored {len(batch)} telemetry rows for driver #{dn}")
+
+        if total_stored > 0:
+            log.info(f"      📡 Total telemetry stored: {total_stored}")
+        else:
+            log.info("      ⏭️ No telemetry data available")
+
+    except Exception as e:
+        log.warning(f"      ⚠️ Telemetry error: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 def _store_drivers(sasession, session_key: int, session_id: int):
