@@ -3,9 +3,9 @@ services:
     image: postgres:18
     container_name: f1-postgres
     environment:
-      POSTGRES_DB: f1_analysis
-      POSTGRES_USER: f1_user
-      POSTGRES_PASSWORD: f1_pass_secret
+      POSTGRES_DB: ${POSTGRES_DB:-f1_analysis}
+      POSTGRES_USER: ${POSTGRES_USER:-f1_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-f1_pass_secret}
     ports:
       - "5432:5432"
     volumes:
@@ -13,7 +13,7 @@ services:
       - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U f1_user -d f1_analysis"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-f1_user} -d ${POSTGRES_DB:-f1_analysis}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,7 +29,7 @@ services:
       - ./backend:/app/backend
       - ./frontend:/app/frontend
     environment:
-      DATABASE_URL: postgresql+asyncpg://f1_user:f1_pass_secret@postgres:5432/f1_analysis
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-f1_user}:${POSTGRES_PASSWORD:-f1_pass_secret}@postgres:5432/${POSTGRES_DB:-f1_analysis}
       CACHE_DIR: /app/cache
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
     depends_on:
@@ -48,15 +48,14 @@ services:
       - ./migrations:/app/migrations
       - f1_cache:/app/cache
     environment:
-      DATABASE_URL: postgresql+psycopg2://f1_user:f1_pass_secret@postgres:5432/f1_analysis
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-f1_user}:${POSTGRES_PASSWORD:-f1_pass_secret}@postgres:5432/${POSTGRES_DB:-f1_analysis}
       CACHE_DIR: /app/cache
     depends_on:
       postgres:
         condition: service_healthy
     profiles:
       - ingestion
-    # Run manually: docker compose run --rm ingestion python -m backend.ingestion.ingest_race
-    command: tail -f /dev/null  # Keeps container alive for manual commands
+    command: tail -f /dev/null
 
 volumes:
   postgres_data:
