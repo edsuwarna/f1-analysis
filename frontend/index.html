@@ -295,6 +295,42 @@
   }
   .toc-item:hover { background: var(--hover-bg); color: var(--text-primary); }
   .toc-item:active { background: rgba(225,6,0,.1); color: #e10600; }
+
+  /* ── Sticky Top Bar ── */
+  .top-bar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 12px 0 10px;
+    margin: -24px -16px 20px;
+    padding-left: 16px;
+    padding-right: 16px;
+    transition: background .2s, border-color .2s;
+  }
+  .top-bar.session-bar {
+    margin-top: -8px;
+    padding: 10px 16px 8px;
+    font-size: 13px;
+  }
+  .top-bar.session-bar .gp-title {
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .top-bar.session-bar .stats-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin-top: 2px;
+    color: var(--text-secondary);
+    font-size: 11px;
+  }
+  @media (min-width: 768px) {
+    .top-bar { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; }
+    .top-bar.session-bar { padding: 10px 24px 8px; }
+  }
+  .top-bar-spacer { height: 0; }
 </style>
 </head>
 <body>
@@ -687,22 +723,21 @@
       drivers.forEach(d => { driverMap[d.driver_number] = d; });
 
       let html = `
-        <div class="mb-6">
-          <button onclick="loadSessions(${meetingId}, '${meetingName.replace(/'/g, "\\'")}')" class="text-sm nav-link" style="display:inline">&larr; Back</button>
-          <h2 class="text-xl font-bold mt-2">${meetingName} — ${sessionName}</h2>
+        <!-- Sticky session bar -->
+        <div class="top-bar session-bar">
+          <button onclick="loadSessions(${meetingId}, '${meetingName.replace(/'/g, "\\'")}')" class="text-sm" style="color:#e10600;cursor:pointer;display:inline">&larr; Back</button>
+          <div class="gp-title">${meetingName} — ${sessionName}</div>
+          <div class="stats-row">
+            <span>👨‍👩‍👧‍👦 ${drivers.length} drivers</span>
+            <span>🏁 ${sessionType}</span>
+            ${sectors.length > 0 ? `<span>⏱️ ${sectors[0].total_laps || '?'} laps (max)</span>` : ''}
+            ${pits.length > 0 ? `<span>⛽ ${pits.length} pit stops</span>` : ''}
+            ${stints.length > 0 ? `<span>🛞 ${[...new Set(stints.map(s => s.compound))].filter(Boolean).length} compounds</span>` : ''}
+            ${weather.length > 0 && weather[0].track_temp ? `<span>🌡️ ${weather[0].track_temp}°C track</span>` : ''}
+          </div>
         </div>
 
-        <!-- Session Stats Strip -->
-        <div class="flex flex-wrap gap-3 mb-5 text-xs stats-strip" style="color:var(--text-secondary)">
-          <span>👨‍👩‍👧‍👦 <strong style="color:var(--text-primary)">${drivers.length}</strong> drivers</span>
-          <span>🏁 <strong style="color:var(--text-primary)">${sessionType}</strong></span>
-          ${sectors.length > 0 ? `<span>⏱️ <strong style="color:var(--text-primary)">${sectors[0].total_laps || '?'}</strong> laps (max)</span>` : ''}
-          ${pits.length > 0 ? `<span>⛽ <strong style="color:var(--text-primary)">${pits.length}</strong> pit stops</span>` : ''}
-          ${stints.length > 0 ? `<span>🛞 <strong style="color:var(--text-primary)">${[...new Set(stints.map(s => s.compound))].filter(Boolean).length}</strong> compounds</span>` : ''}
-          ${weather.length > 0 && weather[0].track_temp ? `<span>🌡️ <strong style="color:var(--text-primary)">${weather[0].track_temp}°C</strong> track</span>` : ''}
-        </div>
-
-        <!-- Sector Times (auto-loaded) -->
+        <!-- Analysis Sections (collapsible) -->
         <div class="card p-5 mb-6">
           <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
             <h3 class="font-semibold text-sm">🏆 Best Sector Times
