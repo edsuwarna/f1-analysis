@@ -199,8 +199,19 @@ async def championship_standings(
             "session_name": session_name,
         })
 
-    # Build race list
-    for (rname, mid), results in sorted(race_results.items()):
+    # Build race list ordered by date (latest first)
+    race_order = []  # [(rname, mid), ...] in chronological order
+    seen = set()
+    for r in rows:
+        key = (r.race_name, r.meeting_id)
+        if key not in seen:
+            seen.add(key)
+            race_order.append((key, str(r.date_start) if r.date_start else ""))
+    # Sort by date descending (latest first)
+    race_order.sort(key=lambda x: x[1], reverse=True)
+
+    for (rname, mid), _ in race_order:
+        results = race_results[(rname, mid)]
         results.sort(key=lambda x: x["position"])
         race_list.append({
             "meeting_id": mid,
