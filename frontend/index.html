@@ -4,29 +4,96 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>F1 Analysis 2026</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com">
+  {
+    darkMode: 'class'
+  }
+</script>
 <style>
-  body { background: #0f1115; color: #e1e1e6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-  .card { background: #1a1d24; border: 1px solid #2d3139; border-radius: 10px; }
+  :root {
+    --bg-primary: #0f1115;
+    --bg-card: #1a1d24;
+    --border-color: #2d3139;
+    --text-primary: #e1e1e6;
+    --text-secondary: #8b949e;
+    --text-muted: #6b7280;
+    --table-border: #1f2329;
+    --hover-bg: rgba(255,255,255,.03);
+    --hover-card-border: #6b7280;
+    --input-bg: #1a1d24;
+    --badge-soft: #333;
+    --badge-soft-text: #e1e1e6;
+  }
+  .light {
+    --bg-primary: #f5f6f8;
+    --bg-card: #ffffff;
+    --border-color: #e2e8f0;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+    --table-border: #e2e8f0;
+    --hover-bg: rgba(0,0,0,.02);
+    --hover-card-border: #94a3b8;
+    --input-bg: #ffffff;
+    --badge-soft: #e2e8f0;
+    --badge-soft-text: #475569;
+  }
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    transition: background .2s, color .2s;
+  }
+  .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; transition: background .2s, border-color .2s; }
   .f1-red { color: #e10600; }
   .bg-f1-red { background: #e10600; }
-  .border-f1 { border-color: #2d3139; }
   .sector-badge { font-variant-numeric: tabular-nums; }
   .team-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
-  .nav-link { color: #8b949e; cursor: pointer; padding: 8px 16px; border-radius: 6px; transition: all .15s; }
-  .nav-link:hover { color: #fff; background: rgba(255,255,255,.05); }
+  .nav-link { color: var(--text-secondary); cursor: pointer; padding: 8px 16px; border-radius: 6px; transition: all .15s; }
+  .nav-link:hover { color: var(--text-primary); background: var(--hover-bg); }
   .nav-link.active { color: #fff; background: #e10600; }
+  .light .nav-link.active { color: #fff; }
   .loading { opacity: .5; pointer-events: none; }
   table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; padding: 10px 12px; font-size: 11px; text-transform: uppercase; color: #8b949e; border-bottom: 1px solid #2d3139; }
-  td { padding: 8px 12px; border-bottom: 1px solid #1f2329; font-size: 13px; }
-  tr:hover td { background: rgba(255,255,255,.03); }
+  th { text-align: left; padding: 10px 12px; font-size: 11px; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--table-border); font-size: 13px; transition: background .15s; }
+  tr:hover td { background: var(--hover-bg); }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-  .badge-soft { background: #333; color: #e1e1e6; }
-  .badge-medium { background: #555; color: #fff; }
-  .badge-hard { background: #777; color: #fff; }
+  .badge-soft { background: var(--badge-soft); color: var(--badge-soft-text); }
+  .badge-medium { background: #d97706; color: #fff; }
+  .light .badge-medium { background: #f59e0b; color: #fff; }
+  .badge-hard { background: #6b7280; color: #fff; }
   .badge-inter { background: #2d7d46; color: #fff; }
   .badge-wet { background: #1a5c7a; color: #fff; }
+  select, input {
+    background: var(--input-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    transition: background .2s, border-color .2s;
+  }
+  .theme-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--text-primary);
+    transition: all .2s;
+  }
+  .theme-btn:hover {
+    background: var(--hover-bg);
+    border-color: var(--hover-card-border);
+  }
+  .light .text-gray-400 { color: var(--text-secondary) !important; }
+  .light .text-gray-500 { color: var(--text-muted) !important; }
+  .light .text-gray-700 { color: var(--text-primary) !important; }
+  .light .text-red-400 { color: #dc2626 !important; }
+  .light .text-green-400 { color: #16a34a !important; }
 </style>
 </head>
 <body>
@@ -34,18 +101,19 @@
     <!-- Header -->
     <div class="flex items-center justify-between mb-8">
       <div>
-        <h1 class="text-2xl font-bold"><span class="f1-red">F1</span> Analysis <span class="text-sm text-gray-500">2026</span></h1>
-        <p class="text-sm text-gray-400 mt-1">Telemetry, sector times &amp; race data</p>
+        <h1 class="text-2xl font-bold"><span class="f1-red">F1</span> Analysis <span class="text-sm" style="color:var(--text-muted)">2026</span></h1>
+        <p class="text-sm mt-1" style="color:var(--text-secondary)">Telemetry, sector times &amp; race data</p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 items-center">
         <button onclick="loadRaces()" class="nav-link active" id="nav-races">🏁 Races</button>
         <button onclick="showAbout()" class="nav-link" id="nav-about">ℹ️ About</button>
+        <button onclick="toggleTheme()" class="theme-btn" id="theme-btn" title="Toggle theme">🌙</button>
       </div>
     </div>
 
     <!-- Main Content -->
     <div id="content">
-      <div class="text-center py-20 text-gray-500">Loading 2026 race data...</div>
+      <div class="text-center py-20" style="color:var(--text-muted)">Loading 2026 race data...</div>
     </div>
   </div>
 
@@ -55,6 +123,22 @@
   const API = '';
   let meetings = [];
   let currentView = 'races';
+
+  // ── Theme Toggle ──
+  function toggleTheme() {
+    const html = document.documentElement;
+    const isLight = html.classList.toggle('light');
+    localStorage.setItem('f1-theme', isLight ? 'light' : 'dark');
+    document.getElementById('theme-btn').textContent = isLight ? '☀️' : '🌙';
+  }
+
+  function initTheme() {
+    const saved = localStorage.getItem('f1-theme');
+    if (saved === 'light') {
+      document.documentElement.classList.add('light');
+      document.getElementById('theme-btn').textContent = '☀️';
+    }
+  }
 
   // ── Navigation ──
   document.querySelectorAll('.nav-link').forEach(el => {
@@ -96,12 +180,12 @@
   async function loadRaces() {
     currentView = 'races';
     const el = document.getElementById('content');
-    el.innerHTML = '<div class="text-center py-20 text-gray-500">Loading...</div>';
+    el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading...</div>';
     try {
       meetings = await api('/meetings');
       renderRaceList();
     } catch(e) {
-      el.innerHTML = `<div class="text-center py-20 text-red-400">Error: ${e.message}</div>`;
+      el.innerHTML = `<div class="text-center py-20" style="color:#dc2626">Error: ${e.message}</div>`;
     }
   }
 
@@ -111,34 +195,34 @@
     let html = `
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       ${completed.map(m => `
-        <div class="card p-5 cursor-pointer hover:border-gray-500 transition" onclick="loadSessions(${m.id}, '${m.name}')">
+        <div class="card p-5 cursor-pointer hover:border-gray-500 transition" onclick="loadSessions(${m.id}, '${m.name.replace(/'/g, "\\'")}')">
           <div class="flex items-center gap-3 mb-3">
             <span class="text-2xl">🏎️</span>
             <div>
               <div class="font-semibold text-sm">${m.name}</div>
-              <div class="text-xs text-gray-400">${m.location}, ${m.country_name}</div>
+              <div class="text-xs" style="color:var(--text-secondary)">${m.location}, ${m.country_name}</div>
             </div>
           </div>
-          <div class="flex justify-between text-xs text-gray-400">
+          <div class="flex justify-between text-xs" style="color:var(--text-secondary)">
             <span>🗓️ ${m.date_start ? m.date_start.slice(0,10) : 'TBD'}</span>
             <span>🏟️ ${m.circuit_name || '—'}</span>
           </div>
         </div>
       `).join('')}
       </div>
-      <div class="mt-6 text-xs text-gray-500 text-center">${completed.length} race weekend(s)</div>
+      <div class="mt-6 text-xs text-center" style="color:var(--text-muted)">${completed.length} race weekend(s)</div>
     `;
     el.innerHTML = html;
   }
 
   async function loadSessions(meetingId, meetingName) {
     const el = document.getElementById('content');
-    el.innerHTML = '<div class="text-center py-20 text-gray-500">Loading sessions...</div>';
+    el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading sessions...</div>';
     try {
       const sessions = await api(`/meetings/${meetingId}/sessions`);
       let html = `
         <div class="mb-6">
-          <button onclick="loadRaces()" class="text-sm text-gray-400 hover:text-white transition">&larr; Back to races</button>
+          <button onclick="loadRaces()" class="text-sm nav-link" style="display:inline">&larr; Back to races</button>
           <h2 class="text-xl font-bold mt-2">${meetingName}</h2>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -146,12 +230,12 @@
       for (const s of sessions) {
         const icon = s.session_type === 'Race' ? '🏁' : s.session_type === 'Qualifying' ? '⏱️' : '🔧';
         html += `
-          <div class="card p-5 cursor-pointer hover:border-gray-500 transition" onclick="loadSession(${s.id}, ${meetingId}, '${meetingName}', '${s.session_name}')">
+          <div class="card p-5 cursor-pointer hover:border-gray-500 transition" onclick="loadSession(${s.id}, ${meetingId}, '${meetingName.replace(/'/g, "\\'")}', '${s.session_name.replace(/'/g, "\\'")}')">
             <div class="flex items-center gap-3">
               <span class="text-2xl">${icon}</span>
               <div>
                 <div class="font-semibold text-sm">${s.session_name}</div>
-                <div class="text-xs text-gray-400">${s.session_type}</div>
+                <div class="text-xs" style="color:var(--text-secondary)">${s.session_type}</div>
               </div>
             </div>
           </div>
@@ -160,13 +244,13 @@
       html += `</div>`;
       el.innerHTML = html;
     } catch(e) {
-      el.innerHTML = `<div class="text-center py-20 text-red-400">Error: ${e.message}</div>`;
+      el.innerHTML = `<div class="text-center py-20" style="color:#dc2626">Error: ${e.message}</div>`;
     }
   }
 
   async function loadSession(sessionId, meetingId, meetingName, sessionName) {
     const el = document.getElementById('content');
-    el.innerHTML = '<div class="text-center py-20 text-gray-500">Loading session data...</div>';
+    el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading session data...</div>';
 
     try {
       const [sectors, drivers, stints, pits] = await Promise.all([
@@ -182,7 +266,7 @@
 
       let html = `
         <div class="mb-6">
-          <button onclick="loadSessions(${meetingId}, '${meetingName}')" class="text-sm text-gray-400 hover:text-white transition">&larr; Back</button>
+          <button onclick="loadSessions(${meetingId}, '${meetingName.replace(/'/g, "\\'")}')" class="text-sm nav-link" style="display:inline">&larr; Back</button>
           <h2 class="text-xl font-bold mt-2">${meetingName} — ${sessionName}</h2>
         </div>
 
@@ -206,7 +290,7 @@
               <tbody>
       `;
       if (sectors.length === 0) {
-        html += `<tr><td colspan="8" class="text-center text-gray-500 py-8">No sector data available</td></tr>`;
+        html += `<tr><td colspan="8" class="text-center py-8" style="color:var(--text-muted)">No sector data available</td></tr>`;
       } else {
         sectors.forEach((d, i) => {
           const bestS1 = d.best_sector_1 === Math.min(...sectors.filter(x=>x.best_sector_1).map(x=>x.best_sector_1));
@@ -214,14 +298,14 @@
           const bestS3 = d.best_sector_3 === Math.min(...sectors.filter(x=>x.best_sector_3).map(x=>x.best_sector_3));
           html += `
             <tr>
-              <td class="text-gray-400">${i + 1}</td>
+              <td style="color:var(--text-secondary)">${i + 1}</td>
               <td class="font-medium">${d.acronym || '—'}</td>
               <td><span class="team-dot" style="background:${teamColor(d.team_colour)}"></span>${d.team || '—'}</td>
-              <td class="text-right font-mono ${bestS1 ? 'text-green-400 font-bold' : ''}">${formatTime(d.best_sector_1)}</td>
-              <td class="text-right font-mono ${bestS2 ? 'text-green-400 font-bold' : ''}">${formatTime(d.best_sector_2)}</td>
-              <td class="text-right font-mono ${bestS3 ? 'text-green-400 font-bold' : ''}">${formatTime(d.best_sector_3)}</td>
+              <td class="text-right font-mono ${bestS1 ? 'font-bold' : ''}" style="${bestS1 ? 'color:#16a34a' : ''}">${formatTime(d.best_sector_1)}</td>
+              <td class="text-right font-mono ${bestS2 ? 'font-bold' : ''}" style="${bestS2 ? 'color:#16a34a' : ''}">${formatTime(d.best_sector_2)}</td>
+              <td class="text-right font-mono ${bestS3 ? 'font-bold' : ''}" style="${bestS3 ? 'color:#16a34a' : ''}">${formatTime(d.best_sector_3)}</td>
               <td class="text-right font-mono font-bold">${formatTime(d.best_lap)}</td>
-              <td class="text-right text-gray-400">${d.total_laps}</td>
+              <td class="text-right" style="color:var(--text-secondary)">${d.total_laps}</td>
             </tr>
           `;
         });
@@ -248,7 +332,7 @@
         for (const [dn, sts] of topDrivers) {
           const drv = driverMap[parseInt(dn)];
           const stintCells = sts.map(s =>
-            `<span class="text-xs mr-1">${compoundBadge(s.compound)} <span class="text-gray-400">L${s.lap_start}-${s.lap_end}</span></span>`
+            `<span class="text-xs mr-1">${compoundBadge(s.compound)} <span style="color:var(--text-secondary)">L${s.lap_start}-${s.lap_end}</span></span>`
           ).join('');
           html += `
             <tr>
@@ -266,11 +350,11 @@
         <div class="card p-5">
           <h3 class="font-semibold text-sm mb-4">🤜🤛 Driver Comparison</h3>
           <div class="flex flex-wrap gap-3 items-center">
-            <select id="comp-drv1" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm">
+            <select id="comp-drv1">
               ${drivers.map(d => `<option value="${d.driver_number}">${d.full_name} (${d.name_acronym})</option>`).join('')}
             </select>
-            <span class="text-gray-500">vs</span>
-            <select id="comp-drv2" class="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm">
+            <span style="color:var(--text-secondary)">vs</span>
+            <select id="comp-drv2">
               ${drivers.map(d => `<option value="${d.driver_number}">${d.full_name} (${d.name_acronym})</option>`).join('')}
             </select>
             <button onclick="compareDrivers(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">Compare</button>
@@ -281,7 +365,7 @@
 
       el.innerHTML = html;
     } catch(e) {
-      el.innerHTML = `<div class="text-center py-20 text-red-400">Error: ${e.message}</div>`;
+      el.innerHTML = `<div class="text-center py-20" style="color:#dc2626">Error: ${e.message}</div>`;
     }
   }
 
@@ -289,7 +373,7 @@
     const d1 = document.getElementById('comp-drv1').value;
     const d2 = document.getElementById('comp-drv2').value;
     const el = document.getElementById('comp-result');
-    el.innerHTML = '<div class="text-center py-8 text-gray-500">Comparing...</div>';
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Comparing...</div>';
 
     try {
       const data = await api(`/sessions/${sessionId}/compare/${d1}/${d2}`);
@@ -321,12 +405,12 @@
         const a = lapsA[i] || {};
         const b = lapsB[i] || {};
         const delta = a.lap_duration && b.lap_duration ? (a.lap_duration - b.lap_duration) : null;
-        const color = delta ? (delta < 0 ? 'text-green-400' : 'text-red-400') : '';
+        const color = delta ? (delta < 0 ? 'color:#16a34a' : 'color:#dc2626') : '';
         html += `
           <tr>
-            <td class="text-gray-400">${i + 1}</td>
+            <td style="color:var(--text-secondary)">${i + 1}</td>
             <td class="text-right font-mono">${formatTime(a.lap_duration)}</td>
-            <td class="text-right font-mono ${color} font-bold">${delta !== null ? (delta > 0 ? '+' : '') + delta.toFixed(3) : '—'}</td>
+            <td class="text-right font-mono font-bold" style="${color}">${delta !== null ? (delta > 0 ? '+' : '') + delta.toFixed(3) : '—'}</td>
             <td class="text-right font-mono">${formatTime(b.lap_duration)}</td>
             <td class="text-right font-mono">${formatTime(a.sector_1)}</td>
             <td class="text-right font-mono">${formatTime(b.sector_1)}</td>
@@ -340,7 +424,7 @@
       html += `</tbody></table></div>`;
       el.innerHTML = html;
     } catch(e) {
-      el.innerHTML = `<div class="text-center py-8 text-red-400">Error: ${e.message}</div>`;
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
     }
   }
 
@@ -349,14 +433,14 @@
     document.getElementById('content').innerHTML = `
       <div class="card p-8 max-w-2xl mx-auto text-center">
         <h2 class="text-xl font-bold mb-4">🏎️ F1 Analysis 2026</h2>
-        <p class="text-gray-400 mb-6">Real-time Formula 1 telemetry, sector times, tyre strategy, and driver comparison platform.</p>
-        <div class="text-left text-sm text-gray-400 space-y-2">
+        <p style="color:var(--text-secondary)" class="mb-6">Real-time Formula 1 telemetry, sector times, tyre strategy, and driver comparison platform.</p>
+        <div class="text-left text-sm" style="color:var(--text-secondary)">
           <p><strong>Data Source:</strong> OpenF1 API + FastAPI Backend</p>
           <p><strong>Database:</strong> PostgreSQL 18</p>
           <p><strong>Status:</strong> ✅ Phase 1 Complete (Ingestion + API)</p>
-          <p><strong>Season:</strong> 2026 (7 races ingested)</p>
+          <p><strong>Season:</strong> 2026 (5 active races)</p>
         </div>
-        <div class="mt-6 text-xs text-gray-500">
+        <div class="mt-6 text-xs" style="color:var(--text-muted)">
           F1 is a trademark of Formula One Licensing B.V. This is an unofficial project.
         </div>
       </div>
@@ -364,6 +448,7 @@
   }
 
   // ── Init ──
+  initTheme();
   loadRaces();
   </script>
 </body>
