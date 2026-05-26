@@ -1269,6 +1269,42 @@
         </div>
       </div>
       ` : ''}
+
+      <!-- ⚡ Speed Trap Analysis -->
+      <div class="card p-5 mt-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm">⚡ Speed Trap Analysis
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Top speed &amp; average speed per driver</span>
+          </h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body closed">
+          <div id="speedtrap-chart-area">
+            <div class="text-center py-8" style="color:var(--text-muted)">
+              <button onclick="loadSpeedTraps(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">⚡ Load Speed Traps</button>
+              <div class="mt-2 text-xs">Max speed (km/h) per driver from telemetry data. Shows top speed, P95, and average.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 🌤️ Weather Timeline -->
+      <div class="card p-5 mt-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm">🌤️ Weather Timeline
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Temperature, humidity &amp; conditions during session</span>
+          </h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body closed">
+          <div id="weather-chart-area">
+            <div class="text-center py-8" style="color:var(--text-muted)">
+              <button onclick="loadWeather(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">🌤️ Load Weather Timeline</button>
+              <div class="mt-2 text-xs">Air temp, track temp, humidity, and rainfall changes throughout the session.</div>
+            </div>
+          </div>
+        </div>
+      </div>
       `;
 
       el.innerHTML = html;
@@ -1285,6 +1321,8 @@
   let lapdistChartInstance = null;
   let overtakeChartInstance = null;
   let pitStrategyChartInstance = null;
+  let speedtrapChartInstance = null;
+  let weatherChartInstance = null;
 
   // ── Tyre Degradation ──
   async function loadDegradation(sessionId) {
@@ -3205,6 +3243,270 @@
       renderTrackMap();
     }, 400);
     document.getElementById('trackmap-playbtn').textContent = '⏸ Pause';
+  }
+
+  // ── Speed Trap Analysis ──
+  async function loadSpeedTraps(sessionId) {
+    const el = document.getElementById('speedtrap-chart-area');
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading speed trap data...</div>';
+    if (speedtrapChartInstance) { speedtrapChartInstance.destroy(); speedtrapChartInstance = null; }
+
+    try {
+      const data = await api(`/analytics/sessions/${sessionId}/speed-traps`);
+      if (!data.drivers || data.drivers.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No telemetry data available</div>';
+        return;
+      }
+
+      const drivers = data.drivers;
+      const labels = drivers.map(d => d.acronym);
+      const maxSpeeds = drivers.map(d => d.max_speed);
+      const avgSpeeds = drivers.map(d => d.avg_speed);
+      const p95Speeds = drivers.map(d => d.p95_speed);
+      const colors = drivers.map(d => d.team_colour ? `#${d.team_colour.replace('#','')}` : '#666');
+
+      // Build chart
+      const ctx = document.createElement('canvas');
+      el.innerHTML = '';
+      el.appendChild(ctx);
+
+      speedtrapChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Max Speed (km/h)',
+              data: maxSpeeds,
+              backgroundColor: colors.map(c => c + 'CC'),
+              borderColor: colors,
+              borderWidth: 1,
+              borderRadius: 3,
+              order: 1,
+            },
+            {
+              label: 'P95 Speed (km/h)',
+              data: p95Speeds,
+              backgroundColor: colors.map(c => c + '66'),
+              borderColor: colors,
+              borderWidth: 1,
+              borderRadius: 3,
+              order: 2,
+            },
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'top', labels: { color: '#8b949e', font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                afterBody: function(context) {
+                  const idx = context[0].dataIndex;
+                  const d = drivers[idx];
+                  return `${d.full_name} (${d.team_name})\nAvg speed: ${d.avg_speed} km/h`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { display: false } },
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#8b949e', font: { size: 10 }, callback: v => v + ' km/h' },
+              grid: { color: 'rgba(255,255,255,0.05)' },
+            }
+          }
+        }
+      });
+
+      // Stats table
+      let tableHtml = `
+        <div class="mt-4 overflow-x-auto">
+          <table class="text-xs w-full">
+            <thead>
+              <tr>
+                <th>Pos</th>
+                <th>Driver</th>
+                <th>Team</th>
+                <th style="text-align:right">Max Speed</th>
+                <th style="text-align:right">P95</th>
+                <th style="text-align:right">Avg Speed</th>
+                <th style="text-align:right">Samples</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      drivers.forEach((d, i) => {
+        const tc = d.team_colour ? `#${d.team_colour.replace('#','')}` : '#666';
+        tableHtml += `
+          <tr>
+            <td><span class="badge badge-soft">#${i+1}</span></td>
+            <td><span class="team-dot" style="background:${tc}"></span>${d.acronym}</td>
+            <td style="color:${tc}">${d.team_name}</td>
+            <td style="text-align:right;font-weight:700">${d.max_speed} <span style="color:var(--text-muted);font-weight:400">km/h</span></td>
+            <td style="text-align:right">${d.p95_speed} km/h</td>
+            <td style="text-align:right">${d.avg_speed} km/h</td>
+            <td style="text-align:right;color:var(--text-muted)">${d.data_points.toLocaleString()}</td>
+          </tr>
+        `;
+      });
+      tableHtml += `</tbody></table></div>`;
+
+      el.insertAdjacentHTML('beforeend', tableHtml);
+
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
+  }
+
+  // ── Weather Timeline ──
+  async function loadWeather(sessionId) {
+    const el = document.getElementById('weather-chart-area');
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading weather data...</div>';
+    if (weatherChartInstance) { weatherChartInstance.destroy(); weatherChartInstance = null; }
+
+    try {
+      const data = await api(`/sessions/${sessionId}/weather`);
+      if (!data || data.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No weather data available for this session</div>';
+        return;
+      }
+
+      // Build labels (time or index)
+      const labels = data.map((w, i) => {
+        if (w.timestamp) {
+          const t = new Date(w.timestamp);
+          return t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        }
+        return `T${i}`;
+      });
+
+      const airTemps = data.map(w => w.air_temp);
+      const trackTemps = data.map(w => w.track_temp);
+      const humidities = data.map(w => w.humidity);
+      const rainfall = data.map(w => w.rainfall || 0);
+
+      const ctx = document.createElement('canvas');
+      el.innerHTML = '';
+      el.appendChild(ctx);
+
+      weatherChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Track Temp (°C)',
+              data: trackTemps,
+              borderColor: '#e10600',
+              backgroundColor: 'rgba(225,6,0,0.1)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 2,
+              yAxisID: 'y',
+            },
+            {
+              label: 'Air Temp (°C)',
+              data: airTemps,
+              borderColor: '#f59e0b',
+              backgroundColor: 'rgba(245,158,11,0.1)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 2,
+              yAxisID: 'y',
+            },
+            {
+              label: 'Humidity (%)',
+              data: humidities,
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59,130,246,0.1)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 2,
+              yAxisID: 'y1',
+            },
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top', labels: { color: '#8b949e', font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                afterBody: function(context) {
+                  const idx = context[0].dataIndex;
+                  const w = data[idx];
+                  if (w.rainfall) {
+                    return `🌧️ Rainfall: ${w.rainfall}mm\n💨 Wind: ${w.wind_speed || 'N/A'} km/h`;
+                  }
+                  if (w.wind_speed) return `💨 Wind: ${w.wind_speed} km/h`;
+                  return '';
+                }
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { color: '#8b949e', font: { size: 10 }, maxTicksLimit: 12 }, grid: { display: false } },
+            y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              title: { display: true, text: 'Temperature (°C)', color: '#8b949e', font: { size: 10 } },
+              ticks: { color: '#8b949e', font: { size: 10 } },
+              grid: { color: 'rgba(255,255,255,0.05)' },
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              title: { display: true, text: 'Humidity (%)', color: '#8b949e', font: { size: 10 } },
+              ticks: { color: '#8b949e', font: { size: 10 } },
+              grid: { display: false },
+              min: 0,
+              max: 100,
+            },
+          }
+        }
+      });
+
+      // Summary stats
+      const avgTrack = (trackTemps.reduce((a,b) => a+b, 0) / trackTemps.length).toFixed(1);
+      const avgAir = (airTemps.reduce((a,b) => a+b, 0) / airTemps.length).toFixed(1);
+      const avgHum = (humidities.reduce((a,b) => a+b, 0) / humidities.length).toFixed(1);
+      const maxTrack = Math.max(...trackTemps).toFixed(1);
+      const minTrack = Math.min(...trackTemps).toFixed(1);
+      const hasRain = rainfall.some(r => r > 0);
+
+      el.insertAdjacentHTML('beforeend', `
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-2 mt-4">
+          <div class="card p-2 text-center">
+            <div class="text-xs" style="color:var(--text-muted)">Avg Track</div>
+            <div class="font-bold" style="color:#e10600">${avgTrack}°C</div>
+          </div>
+          <div class="card p-2 text-center">
+            <div class="text-xs" style="color:var(--text-muted)">Avg Air</div>
+            <div class="font-bold" style="color:#f59e0b">${avgAir}°C</div>
+          </div>
+          <div class="card p-2 text-center">
+            <div class="text-xs" style="color:var(--text-muted)">Avg Humidity</div>
+            <div class="font-bold" style="color:#3b82f6">${avgHum}%</div>
+          </div>
+          <div class="card p-2 text-center">
+            <div class="text-xs" style="color:var(--text-muted)">Track Range</div>
+            <div class="font-bold">${minTrack}°C → ${maxTrack}°C</div>
+          </div>
+          <div class="card p-2 text-center">
+            <div class="text-xs" style="color:var(--text-muted)">Rainfall</div>
+            <div class="font-bold">${hasRain ? '🌧️ Yes' : '☀️ No'}</div>
+          </div>
+        </div>
+      `);
+
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
   }
 
   // ── Circuit Detail ──

@@ -465,6 +465,62 @@ async def get_pit_strategy(
     }
 
 
+@router.get("/sessions/{session_id}/speed-traps")
+async def get_speed_traps(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Speed trap analysis — max speed per driver in a session.
+
+    Returns each driver's top speed, average speed, and fastest sector speeds
+    for identifying top-speed performance.
+    """
+    query = text("""
+        SELECT
+            t.driver_number,
+            sd.full_name,
+            sd.name_acronym,
+            sd.team_name,
+            sd.team_colour,
+            MAX(t.speed) AS max_speed,
+            ROUND(AVG(t.speed)::numeric, 1) AS avg_speed,
+            ROUND(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY t.speed)::numeric, 1) AS p95_speed,
+            COUNT(*) AS data_points
+        FROM telemetry t
+        LEFT JOIN session_drivers sd
+            ON sd.session_id = t.session_id AND sd.driver_number = t.driver_number
+        WHERE t.session_id = :sid
+          AND t.speed > 0
+        GROUP BY t.driver_number, sd.full_name, sd.name_acronym, sd.team_name, sd.team_colour
+        ORDER BY max_speed DESC
+    """)
+    result = await db.execute(query, {"sid": session_id})
+    rows = result.fetchall()
+
+    if not rows:
+        return {"session_id": session_id, "drivers": []}
+
+    drivers = []
+    for r in rows:
+        drivers.append({
+            "driver_number": r[0],
+            "full_name": r[1] or "",
+            "acronym": r[2] or f"#{r[0]}",
+            "team_name": r[3] or "",
+            "team_colour": r[4] or "",
+            "max_speed": float(r[5]) if r[5] else 0,
+            "avg_speed": float(r[6]) if r[6] else 0,
+            "p95_speed": float(r[7]) if r[7] else 0,
+            "data_points": r[8] or 0,
+        })
+
+    return {
+        "session_id": session_id,
+        "total_drivers": len(drivers),
+        "drivers": drivers,
+    }
+
+
 @router.get("/tyre-strategy")
 async def tyre_strategy_summary(
     meeting_id: int,
