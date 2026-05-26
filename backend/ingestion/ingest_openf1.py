@@ -520,7 +520,7 @@ def main():
 
     elif args.all:
         meetings = api_get("meetings", {"year": args.year})
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         # Filter out testing, sort by date
         races = sorted(

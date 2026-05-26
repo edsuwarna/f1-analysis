@@ -6,6 +6,7 @@ Main application entry point.
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from backend.core.database import init_db
 from backend.api import meetings, sessions, analytics
@@ -38,11 +39,8 @@ app.include_router(meetings.router, prefix="/api", tags=["Meetings"])
 app.include_router(sessions.router, prefix="/api", tags=["Sessions"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 
-
-@app.get("/")
-async def root():
-    return {
-        "service": "F1 Analysis API",
-        "version": "0.1.0",
-        "docs": "/docs",
-    }
+# Serve frontend static files
+import os
+frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")

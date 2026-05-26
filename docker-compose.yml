@@ -27,6 +27,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app/backend
+      - ./frontend:/app/frontend
     environment:
       DATABASE_URL: postgresql+asyncpg://f1_user:f1_pass_secret@postgres:5432/f1_analysis
       CACHE_DIR: /app/cache
