@@ -344,6 +344,7 @@
       <div class="flex flex-wrap gap-1.5 items-center">
         <button onclick="loadRaces()" class="nav-link active" id="nav-races" style="padding:6px 10px;font-size:12px">🏁 Races</button>
         <button onclick="loadChampionship()" class="nav-link" id="nav-standings" style="padding:6px 10px;font-size:12px">🏆 Standings</button>
+        <button onclick="loadTeamMateBattle()" class="nav-link" id="nav-teammate" style="padding:6px 10px;font-size:12px">🤜 Team Battle</button>
         <button onclick="showGuide()" class="nav-link" id="nav-guide" style="padding:6px 10px;font-size:12px">📖 Guide</button>
         <button onclick="showAbout()" class="nav-link" id="nav-about" style="padding:6px 10px;font-size:12px">ℹ️ About</button>
         <button onclick="toggleTheme()" class="theme-btn" id="theme-btn" title="Toggle theme" style="padding:4px 8px;font-size:14px">🌙</button>
@@ -1113,6 +1114,24 @@
             <button onclick="compareDrivers(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">Compare</button>
           </div>
           <div id="comp-result" class="mt-4"></div>
+          <!-- Lap Time Delta (telemetry overlay) -->
+          <div class="mt-4 pt-4 border-t" style="border-color:var(--border-color)">
+            <h4 class="text-xs font-semibold mb-2" style="color:var(--text-primary)">🔬 Lap Time Delta — Telemetry Overlay</h4>
+            <p class="text-xs mb-2" style="color:var(--text-muted)">Pick specific laps to compare telemetry side by side.</p>
+            <div class="flex flex-wrap gap-3 items-center">
+              <select id="delta-drv1-lap" style="min-width:80px" class="text-xs p-1.5 rounded" disabled>
+                <option value="">Select driver first</option>
+              </select>
+              <span style="color:var(--text-secondary)">vs</span>
+              <select id="delta-drv2-lap" style="min-width:80px" class="text-xs p-1.5 rounded" disabled>
+                <option value="">Select driver first</option>
+              </select>
+              <button onclick="loadLapDelta(${sessionId})" class="bg-f1-red text-white px-3 py-1.5 rounded text-xs font-medium hover:opacity-90 transition" id="delta-btn" disabled>📊 Compare Laps</button>
+            </div>
+            <div id="delta-result" class="mt-3">
+              <div class="text-xs py-4 text-center" style="color:var(--text-muted)">Run a driver comparison first, then pick specific laps to overlay telemetry.</div>
+            </div>
+          </div>
         </div></div>
 
       <!-- Gap Timeline -->
@@ -1192,6 +1211,27 @@
           <div id="deg-chart-area"></div>
         </div>
       </div>
+
+      <!-- Track Position Map (Race/Sprint only) -->
+      ${(sessionType === 'Race' || sessionName === 'Sprint' || sessionName === 'Race') ? `
+      <div class="card p-5 mt-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm">🏎️ Track Position Map
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Circuit visualization with driver positions per lap</span>
+          </h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body closed">
+          <div class="text-xs mb-2" style="color:var(--text-muted)">Shows each driver's position on the circuit map. Use the slider to scrub through laps.</div>
+          <div class="flex items-center gap-3 mb-3 flex-wrap">
+            <button onclick="loadTrackMap(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">🗺️ Load Track Map</button>
+          </div>
+          <div id="trackmap-area">
+            <div class="text-center py-8" style="color:var(--text-muted)">Click "Load Track Map" to visualize positions on the circuit.</div>
+          </div>
+        </div>
+      </div>
+      ` : ''}
       `;
 
       el.innerHTML = html;
@@ -2716,6 +2756,17 @@
       html += `</tbody></table></div>`;
       el.innerHTML = html;
 
+      // Populate delta lap selectors
+      const dl1 = document.getElementById('delta-drv1-lap');
+      const dl2 = document.getElementById('delta-drv2-lap');
+      if (dl1 && dl2 && lapsA.length > 0 && lapsB.length > 0) {
+        dl1.innerHTML = lapsA.map(l => `<option value="${l.lap_number}">Lap ${l.lap_number}${l.compound ? ' (' + l.compound + ')' : ''}${l.lap_duration ? ' ' + l.lap_duration.toFixed(3) + 's' : ''}</option>`).join('');
+        dl2.innerHTML = lapsB.map(l => `<option value="${l.lap_number}">Lap ${l.lap_number}${l.compound ? ' (' + l.compound + ')' : ''}${l.lap_duration ? ' ' + l.lap_duration.toFixed(3) + 's' : ''}</option>`).join('');
+        dl1.disabled = false;
+        dl2.disabled = false;
+        document.getElementById('delta-btn').disabled = false;
+      }
+
       // Initialize chart after DOM is ready
       setTimeout(() => {
         const canvas = document.getElementById('lap-chart-canvas');
@@ -2794,6 +2845,320 @@
     } catch(e) {
       el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
     }
+  }
+
+  // ── Lap Time Delta (Telemetry Overlay) ──
+  let deltaChartInstance = null;
+
+  async function loadLapDelta(sessionId) {
+    const d1el = document.getElementById('comp-drv1');
+    const d2el = document.getElementById('comp-drv2');
+    const l1el = document.getElementById('delta-drv1-lap');
+    const l2el = document.getElementById('delta-drv2-lap');
+    const d1 = d1el.value;
+    const d2 = d2el.value;
+    const l1 = parseInt(l1el.value);
+    const l2 = parseInt(l2el.value);
+    const el = document.getElementById('delta-result');
+
+    if (!d1 || !d2 || !l1 || !l2) {
+      el.innerHTML = '<div class="text-xs py-4 text-center" style="color:var(--text-muted)">Select both drivers and laps first.</div>';
+      return;
+    }
+
+    el.innerHTML = '<div class="text-center py-4" style="color:var(--text-muted)">⏳ Loading telemetry...</div>';
+
+    if (deltaChartInstance) { deltaChartInstance.destroy(); deltaChartInstance = null; }
+
+    try {
+      const [telA, telB] = await Promise.all([
+        api(`/sessions/${sessionId}/telemetry/${d1}?lap=${l1}`),
+        api(`/sessions/${sessionId}/telemetry/${d2}?lap=${l2}`),
+      ]);
+
+      if (!telA || telA.length === 0 || !telB || telB.length === 0) {
+        el.innerHTML = '<div class="text-xs py-4 text-center" style="color:var(--text-muted)">No telemetry data for selected laps.</div>';
+        return;
+      }
+
+      // Normalize distance (use index % to align speed traces)
+      const maxLen = Math.max(telA.length, telB.length);
+      const labels = telA.map((_, i) => i);
+
+      // Speed trace
+      let html = `
+        <div class="text-xs mb-2" style="color:var(--text-secondary)">Driver 1 Lap ${l1} vs Driver 2 Lap ${l2} — Telemetry Overlay</div>
+        <div class="relative" style="height:200px;margin-bottom:8px">
+          <canvas id="delta-speed-canvas"></canvas>
+        </div>
+        <div class="relative" style="height:160px;margin-bottom:8px">
+          <canvas id="delta-throttle-canvas"></canvas>
+        </div>
+        <div class="grid grid-cols-2 gap-3 text-xs" style="color:var(--text-secondary)">
+          <div class="card p-3">
+            <div class="font-semibold mb-1">⏱️ ${d1el.options[d1el.selectedIndex].text.match(/\((\w+)\)/)?.[1] || '#'+d1} (Lap ${l1})</div>
+            <div>Top Speed: ${Math.max(...telA.filter(t => t.speed != null).map(t => t.speed)).toFixed(0)} km/h</div>
+            <div>Avg RPM: ${(telA.filter(t => t.rpm != null).reduce((s, t) => s + t.rpm, 0) / telA.filter(t => t.rpm != null).length).toFixed(0)}</div>
+          </div>
+          <div class="card p-3">
+            <div class="font-semibold mb-1">⏱️ ${d2el.options[d2el.selectedIndex].text.match(/\((\w+)\)/)?.[1] || '#'+d2} (Lap ${l2})</div>
+            <div>Top Speed: ${Math.max(...telB.filter(t => t.speed != null).map(t => t.speed)).toFixed(0)} km/h</div>
+            <div>Avg RPM: ${(telB.filter(t => t.rpm != null).reduce((s, t) => s + t.rpm, 0) / telB.filter(t => t.rpm != null).length).toFixed(0)}</div>
+          </div>
+        </div>
+      `;
+
+      el.innerHTML = html;
+
+      setTimeout(() => {
+        const isLight = document.documentElement.classList.contains('light');
+        const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+        const textColor = isLight ? '#64748b' : '#8b949e';
+
+        const d1acr = d1el.options[d1el.selectedIndex].text.match(/\((\w+)\)/)?.[1] || '#'+d1;
+        const d2acr = d2el.options[d2el.selectedIndex].text.match(/\((\w+)\)/)?.[1] || '#'+d2;
+
+        // Speed chart
+        const speedCanvas = document.getElementById('delta-speed-canvas');
+        if (speedCanvas) {
+          const speedCtx = speedCanvas.getContext('2d');
+          new Chart(speedCtx, {
+            type: 'line',
+            data: {
+              labels: labels,
+              datasets: [
+                { label: d1acr + ' Speed', data: telA.map(t => t.speed), borderColor: '#e10600', backgroundColor: 'rgba(225,6,0,0.05)', borderWidth: 1.5, pointRadius: 0, tension: 0.1, fill: true },
+                { label: d2acr + ' Speed', data: telB.map(t => t.speed), borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,0.05)', borderWidth: 1.5, pointRadius: 0, tension: 0.1, fill: true },
+              ]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              animation: { duration: 300 },
+              plugins: { legend: { position: 'top', labels: { color: textColor, font: { size: 10 }, boxWidth: 12 } }, title: { display: true, text: 'Speed (km/h)', color: textColor, font: { size: 11 } } },
+              scales: { x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 9 }, maxTicksLimit: 10 } }, y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 9 } } } }
+            }
+          });
+        }
+
+        // Throttle/Brake chart
+        const thrCanvas = document.getElementById('delta-throttle-canvas');
+        if (thrCanvas) {
+          const thrCtx = thrCanvas.getContext('2d');
+          new Chart(thrCtx, {
+            type: 'line',
+            data: {
+              labels: labels,
+              datasets: [
+                { label: d1acr + ' Throttle', data: telA.map(t => t.throttle != null ? t.throttle * 100 : null), borderColor: '#e10600', borderWidth: 1, pointRadius: 0, tension: 0.1, fill: false },
+                { label: d2acr + ' Throttle', data: telB.map(t => t.throttle != null ? t.throttle * 100 : null), borderColor: '#16a34a', borderWidth: 1, pointRadius: 0, tension: 0.1, fill: false },
+                { label: d1acr + ' Brake', data: telA.map(t => t.brake != null ? (t.brake ? 100 : 0) : null), borderColor: '#e10600', borderWidth: 1, pointRadius: 0, borderDash: [3,3], tension: 0 },
+                { label: d2acr + ' Brake', data: telB.map(t => t.brake != null ? (t.brake ? 100 : 0) : null), borderColor: '#16a34a', borderWidth: 1, pointRadius: 0, borderDash: [3,3], tension: 0 },
+              ]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              animation: { duration: 300 },
+              plugins: { legend: { position: 'top', labels: { color: textColor, font: { size: 10 }, boxWidth: 12 } }, title: { display: true, text: 'Throttle (%) / Brake', color: textColor, font: { size: 11 } } },
+              scales: { x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 9 }, maxTicksLimit: 10 } }, y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 9 }, max: 110 } } }
+            }
+          });
+        }
+      }, 50);
+    } catch(e) {
+      el.innerHTML = `<div class="text-xs py-4 text-center" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
+  }
+
+  // ── Track Position Map ──
+  let trackMapInterval = null;
+  let trackMapData = null;
+  let currentTrackLap = 1;
+
+  async function loadTrackMap(sessionId) {
+    const el = document.getElementById('trackmap-area');
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">⏳ Loading track map...</div>';
+
+    try {
+      const data = await api(`/sessions/${sessionId}/track-map`);
+      if (!data.circuit || data.circuit.length < 5) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No track map data available for this session</div>';
+        return;
+      }
+
+      trackMapData = data;
+      currentTrackLap = 1;
+      renderTrackMap();
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
+  }
+
+  function renderTrackMap() {
+    if (!trackMapData) return;
+    const el = document.getElementById('trackmap-area');
+    const data = trackMapData;
+    const maxLap = data.max_lap || 1;
+
+    // Get positions for current lap
+    let lapStr = String(currentTrackLap);
+    let positions = [];
+    if (data.lap_positions && data.lap_positions[lapStr]) {
+      positions = data.lap_positions[lapStr];
+    } else if (data.lap_positions) {
+      // Try number key
+      for (const [k, v] of Object.entries(data.lap_positions)) {
+        if (parseInt(k) === currentTrackLap) {
+          positions = v;
+          break;
+        }
+      }
+    }
+
+    // Canvas dimensions
+    const W = 600, H = 400;
+
+    // Normalize circuit coordinates to fit canvas with padding
+    const coords = data.circuit;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of coords) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const rangeX = maxX - minX || 1;
+    const rangeY = maxY - minY || 1;
+    const pad = 40;
+    const scaleX = (W - 2 * pad) / rangeX;
+    const scaleY = (H - 2 * pad) / rangeY;
+    const scale = Math.min(scaleX, scaleY);
+    const cx = (W - rangeX * scale) / 2;
+    const cy = (H - rangeY * scale) / 2;
+
+    function normX(x) { return cx + (x - minX) * scale; }
+    function normY(y) { return cy + (y - minY) * scale; }
+
+    const isLight = document.documentElement.classList.contains('light');
+    const bgColor = isLight ? '#f5f6f8' : '#0f1115';
+    const trackColor = isLight ? '#d1d5db' : '#2d3139';
+    const textColor = isLight ? '#1e293b' : '#e1e1e6';
+
+    let html = `
+      <div class="text-xs mb-2" style="color:var(--text-secondary);text-align:center">
+        Lap <strong>${currentTrackLap}</strong> / ${maxLap}
+      </div>
+      <div style="text-align:center">
+        <canvas id="trackmap-canvas" width="${W}" height="${H}" style="max-width:100%;height:auto;border-radius:8px;background:${bgColor}"></canvas>
+      </div>
+      <div class="flex items-center gap-3 mt-3 flex-wrap justify-center">
+        <button onclick="trackMapPrevLap()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--text-primary);border:1px solid var(--border-color);cursor:pointer">◀ Prev</button>
+        <input type="range" id="trackmap-slider" min="1" max="${maxLap}" value="${currentTrackLap}" oninput="trackMapSeek(this.value)" style="flex:1;max-width:300px">
+        <button onclick="trackMapNextLap()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--text-primary);border:1px solid var(--border-color);cursor:pointer">Next ▶</button>
+        <button onclick="trackMapPlay()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--text-primary);border:1px solid var(--border-color);cursor:pointer" id="trackmap-playbtn">▶ Play</button>
+      </div>
+      <div class="flex flex-wrap gap-2 mt-2 justify-center" id="trackmap-legend"></div>
+    `;
+
+    el.innerHTML = html;
+
+    // Draw circuit + dots on canvas
+    const canvas = document.getElementById('trackmap-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Circuit path
+    ctx.beginPath();
+    ctx.strokeStyle = trackColor;
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    for (let i = 0; i < coords.length; i++) {
+      const x = normX(coords[i].x);
+      const y = normY(coords[i].y);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+
+    // Draw driver dots
+    if (positions.length > 0) {
+      const numPositions = positions.length;
+      const totalPoints = coords.length;
+
+      positions.forEach((p, idx) => {
+        // Map position to a point along the circuit
+        // P1 is near the end (finish line area), others spread behind
+        const posRatio = 1.0 - (p.position - 1) / Math.max(numPositions, 1);
+        const ptIndex = Math.floor(posRatio * totalPoints * 0.8);
+        const pt = coords[Math.min(ptIndex, totalPoints - 1)];
+        const dotX = normX(pt.x);
+        const dotY = normY(pt.y);
+        const color = p.team_colour || '#888';
+
+        // Draw dot
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 8, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = isLight ? '#fff' : '#000';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Label
+        ctx.fillStyle = textColor;
+        ctx.font = 'bold 10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(p.acronym || `#${p.driver_number}`, dotX, dotY - 14);
+      });
+    }
+
+    // Legend
+    const legend = document.getElementById('trackmap-legend');
+    if (legend) {
+      legend.innerHTML = positions.map(p => {
+        const color = p.team_colour || '#888';
+        return `<span class="flex items-center gap-1 text-xs" style="color:${textColor}"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color}"></span> P${p.position} ${p.acronym}</span>`;
+      }).join('');
+    }
+  }
+
+  function trackMapSeek(lap) {
+    currentTrackLap = parseInt(lap);
+    renderTrackMap();
+  }
+
+  function trackMapPrevLap() {
+    if (trackMapData && currentTrackLap > 1) {
+      currentTrackLap--;
+      document.getElementById('trackmap-slider').value = currentTrackLap;
+      renderTrackMap();
+    }
+  }
+
+  function trackMapNextLap() {
+    if (trackMapData && currentTrackLap < trackMapData.max_lap) {
+      currentTrackLap++;
+      document.getElementById('trackmap-slider').value = currentTrackLap;
+      renderTrackMap();
+    }
+  }
+
+  function trackMapPlay() {
+    if (trackMapInterval) {
+      clearInterval(trackMapInterval);
+      trackMapInterval = null;
+      document.getElementById('trackmap-playbtn').textContent = '▶ Play';
+      return;
+    }
+    trackMapInterval = setInterval(() => {
+      if (currentTrackLap >= trackMapData.max_lap) {
+        currentTrackLap = 1;
+      } else {
+        currentTrackLap++;
+      }
+      document.getElementById('trackmap-slider').value = currentTrackLap;
+      renderTrackMap();
+    }, 400);
+    document.getElementById('trackmap-playbtn').textContent = '⏸ Pause';
   }
 
   // ── Collapse Toggle ──
@@ -2893,6 +3258,56 @@
         </div>
       </div>
     `;
+  }
+
+  // ── Team Mate Battle ──
+  async function loadTeamMateBattle() {
+    currentView = 'teammate';
+    saveState('teammate');
+    setNavActive('nav-teammate');
+    const el = document.getElementById('content');
+    el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">⏳ Loading teammate battles...</div>';
+    try {
+      const data = await api('/analytics/teammate-battle?year=2026');
+      const battles = data.battles || [];
+      if (battles.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No teammate data available</div>';
+        return;
+      }
+      let html = '<h2 class="text-xl font-bold mb-4">🤜 Team Mate Battle 2026</h2>';
+      html += '<p class="text-sm mb-6" style="color:var(--text-secondary)">Head-to-head comparison of teammates across all race weekends.</p>';
+      for (const team of battles) {
+        const tc = team.team_colour || '#666';
+        const dList = team.drivers.join(' vs ');
+        const qw = team.qual_wins || {};
+        const rw = team.race_wins || {};
+        const qStr = Object.entries(qw).map(([d, w]) => `${d}: ${w}`).join(', ');
+        const rStr = Object.entries(rw).map(([d, w]) => `${d}: ${w}`).join(', ');
+
+        html += `
+          <div class="card p-5 mb-4">
+            <div class="flex items-center gap-3 mb-3">
+              <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${tc}"></span>
+              <h3 class="font-semibold">${team.team_name || 'Unknown'}</h3>
+              <span class="text-xs" style="color:var(--text-secondary)">${dList}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div class="card p-3 text-center">
+                <div class="text-xs" style="color:var(--text-muted)">⏱️ Qualifying Wins</div>
+                <div class="mt-1">${qStr || '<span style="color:var(--text-muted)">No data</span>'}</div>
+              </div>
+              <div class="card p-3 text-center">
+                <div class="text-xs" style="color:var(--text-muted)">🏁 Race Pace Wins</div>
+                <div class="mt-1">${rStr || '<span style="color:var(--text-muted)">No data</span>'}</div>
+              </div>
+            </div>
+          </div>`;
+      }
+      html += `<div class="text-xs mt-4" style="color:var(--text-muted);text-align:center">${data.total_teams || 0} teams · Based on fastest qualifying & race lap per weekend</div>`;
+      el.innerHTML = html;
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-20" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
   }
 
   // ── Guide (How to Read Each Section) ──
@@ -3165,6 +3580,8 @@
     showGuide();
   } else if (savedView === 'standings') {
     loadChampionship();
+  } else if (savedView === 'teammate') {
+    loadTeamMateBattle();
   } else if (savedView === 'sessions' && savedState) {
     try {
       const s = JSON.parse(savedState);

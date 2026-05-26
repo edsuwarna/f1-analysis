@@ -610,3 +610,94 @@ async def compare_drivers(
         "driver_a": data.get(driver_a, []),
         "driver_b": data.get(driver_b, []),
     }
+
+
+@router.get("/sessions/{session_id}/track-map")
+async def get_track_map(
+    session_id: int,
+    lap: int | None = Query(None, description="Specific lap to show positions for"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Track position map — circuit layout + driver positions per lap.
+
+    Returns the circuit path (x,y from any driver's telemetry) and
+    each driver's position on track for every lap (or a specific lap).
+    """
+    # 1. Get circuit path from first driver's telemetry (any driver, first lap)
+    drv_result = await db.execute(
+        select(SessionDriver).where(SessionDriver.session_id == session_id).limit(1)
+    )
+    first_driver = drv_result.scalar_one_or_none()
+    if not first_driver:
+        return {"circuit": [], "positions": [], "max_lap": 0}
+
+    dn = first_driver.driver_number
+    telemetry_query = select(Telemetry).where(
+        Telemetry.session_id == session_id,
+        Telemetry.driver_number == dn,
+        Telemetry.lap_number == 1,
+    ).order_by(Telemetry.timestamp).limit(5000)
+    t_result = await db.execute(telemetry_query)
+    circuit_coords = [
+        {"x": t.x, "y": t.y}
+        for t in t_result.scalars().all()
+        if t.x is not None and t.y is not None
+    ]
+
+    # 2. Get position data (lap number, position, driver info)
+    pos_result = await db.execute(
+        select(Lap).where(
+            Lap.session_id == session_id,
+            Lap.position.isnot(None),
+            Lap.position > 0,
+        ).order_by(Lap.lap_number, Lap.position)
+    )
+    laps = pos_result.scalars().all()
+
+    # Fetch driver info
+    drv_all = await db.execute(
+        select(SessionDriver).where(SessionDriver.session_id == session_id)
+    )
+    driver_info = {}
+    for d in drv_all.scalars().all():
+        driver_info[d.driver_number] = {
+            "acronym": d.name_acronym,
+            "full_name": d.full_name,
+            "team_name": d.team_name,
+            "team_colour": d.team_colour,
+        }
+
+    # Build per-lap position lists
+    from collections import defaultdict
+    lap_positions = defaultdict(list)
+    all_laps = set()
+    for l in laps:
+        info = driver_info.get(l.driver_number, {})
+        lap_positions[l.lap_number].append({
+            "driver_number": l.driver_number,
+            "position": l.position,
+            "acronym": info.get("acronym", f"#{l.driver_number}"),
+            "team_colour": info.get("team_colour", ""),
+        })
+        all_laps.add(l.lap_number)
+
+    max_lap = max(all_laps) if all_laps else 0
+    sorted_laps = sorted(all_laps)
+
+    # If a specific lap is requested, return only that lap
+    if lap is not None:
+        return {
+            "circuit": circuit_coords,
+            "positions": lap_positions.get(lap, []),
+            "lap": lap,
+            "max_lap": max_lap,
+            "total_laps": len(sorted_laps),
+        }
+
+    return {
+        "circuit": circuit_coords,
+        "all_laps": sorted_laps,
+        "lap_positions": dict(lap_positions),
+        "max_lap": max_lap,
+        "total_laps": len(sorted_laps),
+    }

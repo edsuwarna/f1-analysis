@@ -706,3 +706,162 @@ async def qualifying_summary(
         "q2_drivers": q2_drivers,
         "q3_drivers": q3_drivers,
     }
+
+
+@router.get("/teammate-battle")
+async def teammate_battle(
+    year: int = Query(2026),
+    db: AsyncSession = Depends(get_db),
+):
+    """Compare teammates across all sessions in a season.
+
+    Groups drivers by team, pairs them, and returns head-to-head stats
+    for each teammate pair across all race weekends.
+    """
+    query = text("""
+        WITH driver_teams AS (
+            SELECT DISTINCT ON (sd.driver_number, m.id)
+                sd.driver_number,
+                sd.full_name,
+                sd.name_acronym,
+                sd.team_name,
+                sd.team_colour,
+                m.id AS meeting_id,
+                m.name AS race_name,
+                m.date_start
+            FROM session_drivers sd
+            JOIN sessions s ON s.id = sd.session_id
+            JOIN meetings m ON m.id = s.meeting_id
+            WHERE m.year = :year
+            ORDER BY sd.driver_number, m.id, s.date_start
+        ),
+        qual_best AS (
+            SELECT DISTINCT ON (l.session_id, l.driver_number)
+                l.session_id,
+                l.driver_number,
+                l.session_id AS sess_id,
+                MIN(l.lap_duration) FILTER (WHERE l.lap_duration > 0) AS best_qual_lap
+            FROM laps l
+            JOIN sessions s ON s.id = l.session_id
+            WHERE s.session_type = 'Qualifying'
+              AND l.lap_duration > 0
+            GROUP BY l.session_id, l.driver_number
+        ),
+        race_best AS (
+            SELECT
+                l.session_id,
+                l.driver_number,
+                MIN(l.lap_duration) FILTER (WHERE l.lap_duration > 0) AS best_race_lap,
+                MIN(l.duration_sector_1) FILTER (WHERE l.duration_sector_1 > 0) AS best_s1,
+                MIN(l.duration_sector_2) FILTER (WHERE l.duration_sector_2 > 0) AS best_s2,
+                MIN(l.duration_sector_3) FILTER (WHERE l.duration_sector_3 > 0) AS best_s3,
+                COUNT(*) FILTER (WHERE l.lap_duration > 0) AS race_laps
+            FROM laps l
+            JOIN sessions s ON s.id = l.session_id
+            WHERE s.session_type = 'Race'
+              AND l.lap_duration > 0
+            GROUP BY l.session_id, l.driver_number
+        ),
+        meeting_races AS (
+            SELECT DISTINCT s.meeting_id, s.id AS session_id
+            FROM sessions s
+            WHERE s.session_type = 'Race'
+        )
+        SELECT
+            dt.team_name,
+            dt.team_colour,
+            dt.meeting_id,
+            dt.race_name,
+            dt.date_start,
+            dt.driver_number,
+            dt.full_name,
+            dt.name_acronym,
+            qb.best_qual_lap,
+            rb.best_race_lap,
+            rb.best_s1,
+            rb.best_s2,
+            rb.best_s3,
+            rb.race_laps
+        FROM driver_teams dt
+        LEFT JOIN qual_best qb ON qb.driver_number = dt.driver_number
+            AND qb.session_id IN (
+                SELECT s.id FROM sessions s
+                WHERE s.meeting_id = dt.meeting_id AND s.session_type = 'Qualifying'
+            )
+        LEFT JOIN race_best rb ON rb.driver_number = dt.driver_number
+            AND rb.session_id IN (
+                SELECT s.id FROM sessions s
+                WHERE s.meeting_id = dt.meeting_id AND s.session_type = 'Race'
+            )
+        ORDER BY dt.date_start, dt.team_name, dt.driver_number
+    """)
+    result = await db.execute(query, {"year": year})
+    rows = result.fetchall()
+
+    from collections import defaultdict
+
+    # Group by team + meeting
+    teams = defaultdict(lambda: defaultdict(list))
+    seen_meetings = set()
+    for r in rows:
+        team = r.team_name or "Unknown"
+        meeting = (r.meeting_id, r.race_name, str(r.date_start) if r.date_start else "")
+        teams[team][meeting].append({
+            "driver_number": r.driver_number,
+            "full_name": r.full_name or f"#{r.driver_number}",
+            "acronym": r.name_acronym or f"#{r.driver_number}",
+            "best_qual_lap": r.best_qual_lap,
+            "best_race_lap": r.best_race_lap,
+            "best_s1": r.best_s1,
+            "best_s2": r.best_s2,
+            "best_s3": r.best_s3,
+            "race_laps": r.race_laps,
+        })
+        seen_meetings.add(meeting)
+
+    # Build team-mate battle output
+    battle = []
+    for team, meetings in sorted(teams.items()):
+        # Find the team colour from any entry
+        team_colour = ""
+        for m_data in meetings.values():
+            for d in m_data:
+                if d.get("team_colour"):
+                    team_colour = d["team_colour"]
+                    break
+
+        race_wins = defaultdict(int)
+        qual_wins = defaultdict(int)
+        points = defaultdict(int)
+        total_drivers = set()
+
+        for meeting_key, drivers in sorted(meetings.items()):
+            if len(drivers) >= 2:
+                # Sort drivers by this meeting's best qual lap for comparison
+                d_sorted = sorted(drivers, key=lambda d: d["best_qual_lap"] if d["best_qual_lap"] else float("inf"))
+                if len(d_sorted) >= 2:
+                    winner = d_sorted[0]["acronym"]
+                    qual_wins[winner] += 1
+
+                d_race = sorted(drivers, key=lambda d: d["best_race_lap"] if d["best_race_lap"] else float("inf"))
+                if len(d_race) >= 2:
+                    winner = d_race[0]["acronym"]
+                    race_wins[winner] += 1
+
+            for d in drivers:
+                total_drivers.add(d["acronym"])
+
+        driver_list = sorted(total_drivers)
+        battle.append({
+            "team_name": team,
+            "team_colour": team_colour,
+            "drivers": driver_list,
+            "race_wins": dict(race_wins),
+            "qual_wins": dict(qual_wins),
+        })
+
+    return {
+        "year": year,
+        "battles": battle,
+        "total_teams": len(battle),
+    }
