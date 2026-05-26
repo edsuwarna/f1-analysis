@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>F1 Analysis 2026</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://cdn.tailwindcss.com">
   {
     darkMode: 'class'
@@ -547,6 +548,8 @@
     }
   }
 
+  let lapChartInstance = null;
+
   async function compareDrivers(sessionId) {
     const d1el = document.getElementById('comp-drv1');
     const d2el = document.getElementById('comp-drv2');
@@ -555,7 +558,10 @@
     const d1name = d1el.options[d1el.selectedIndex].text.match(/\((\w+)\)/)?.[1] || d1;
     const d2name = d2el.options[d2el.selectedIndex].text.match(/\((\w+)\)/)?.[1] || d2;
     const el = document.getElementById('comp-result');
-    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Comparing...</div>';
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading comparison...</div>';
+
+    // Destroy previous chart
+    if (lapChartInstance) { lapChartInstance.destroy(); lapChartInstance = null; }
 
     try {
       const data = await api(`/sessions/${sessionId}/compare/${d1}/${d2}`);
@@ -563,8 +569,63 @@
       const lapsB = data.driver_b;
       const maxLaps = Math.max(lapsA.length, lapsB.length);
 
-      let html = `
-        <div class="overflow-x-auto mt-4">
+      // Build lap arrays
+      const labels = [];
+      const timesA = [];
+      const timesB = [];
+      const gapCumulative = [];
+      let cumGap = 0;
+      for (let i = 0; i < maxLaps; i++) {
+        const a = lapsA[i] || {};
+        const b = lapsB[i] || {};
+        labels.push(i + 1);
+        timesA.push(a.lap_duration || null);
+        timesB.push(b.lap_duration || null);
+        const delta = a.lap_duration && b.lap_duration ? (a.lap_duration - b.lap_duration) : 0;
+        cumGap += delta;
+        gapCumulative.push(+(cumGap.toFixed(3)));
+      }
+
+      // Chart canvas + table
+      let html = ``;
+
+      // Chart container
+      html += `<div class="relative" style="height:300px;margin-bottom:16px">
+        <canvas id="lap-chart-canvas"></canvas>
+      </div>`;
+
+      // Stats summary
+      const avgA = timesA.filter(t => t).reduce((s, t) => s + t, 0) / timesA.filter(t => t).length || 0;
+      const avgB = timesB.filter(t => t).reduce((s, t) => s + t, 0) / timesB.filter(t => t).length || 0;
+      const bestA = Math.min(...timesA.filter(t => t));
+      const bestB = Math.min(...timesB.filter(t => t));
+      html += `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:${d1name ? '#e10600' : ''}">${d1name}</div>
+            <div>Avg: ${avgA.toFixed(3)}s</div>
+            <div>Best: ${bestA.toFixed(3)}s</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold">📊 Stats</div>
+            <div>Δ avg: ${(avgA - avgB) > 0 ? '+' : ''}${(avgA - avgB).toFixed(3)}s</div>
+            <div>Total gap: ${gapCumulative[gapCumulative.length-1] > 0 ? '+' : ''}${gapCumulative[gapCumulative.length-1].toFixed(1)}s</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:#16a34a">${d2name}</div>
+            <div>Avg: ${avgB.toFixed(3)}s</div>
+            <div>Best: ${bestB.toFixed(3)}s</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold">🏁 Laps</div>
+            <div>${d1name}: ${lapsA.length}</div>
+            <div>${d2name}: ${lapsB.length}</div>
+          </div>
+        </div>`;
+
+      // Comparison table (existing)
+      html += `
+        <div class="overflow-x-auto">
           <table>
             <thead>
               <tr>
@@ -605,6 +666,82 @@
       }
       html += `</tbody></table></div>`;
       el.innerHTML = html;
+
+      // Initialize chart after DOM is ready
+      setTimeout(() => {
+        const canvas = document.getElementById('lap-chart-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const isLight = document.documentElement.classList.contains('light');
+        const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+        const textColor = isLight ? '#64748b' : '#8b949e';
+
+        lapChartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: d1name,
+                data: timesA,
+                borderColor: '#e10600',
+                backgroundColor: 'rgba(225,6,0,0.1)',
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                tension: 0.1,
+                fill: true,
+                spanGaps: false,
+              },
+              {
+                label: d2name,
+                data: timesB,
+                borderColor: '#16a34a',
+                backgroundColor: 'rgba(22,163,74,0.1)',
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                tension: 0.1,
+                fill: false,
+                spanGaps: false,
+              },
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 400 },
+            interaction: {
+              mode: 'index',
+              intersect: false,
+            },
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: { color: textColor, font: { size: 11 } }
+              },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(3)}s`
+                }
+              }
+            },
+            scales: {
+              x: {
+                title: { display: true, text: 'Lap', color: textColor, font: { size: 11 } },
+                grid: { color: gridColor },
+                ticks: { color: textColor, font: { size: 10 } }
+              },
+              y: {
+                title: { display: true, text: 'Lap Time (s)', color: textColor, font: { size: 11 } },
+                grid: { color: gridColor },
+                ticks: { color: textColor, font: { size: 10 } },
+                reverse: true,
+              }
+            }
+          }
+        });
+      }, 50);
     } catch(e) {
       el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
     }
