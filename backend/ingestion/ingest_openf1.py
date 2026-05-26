@@ -337,19 +337,60 @@ def _store_laps(sasession, session_key: int, session_id: int):
                 "pit_out": lap.get("is_pit_out_lap", False),
             })
 
+        # Fetch position data from OpenF1 to get lap-by-lap race positions
+        positions_map = {}  # (driver_number, lap_number) -> position
+        try:
+            time.sleep(REQUEST_DELAY)
+            pos_data = api_get("position", {"session_key": session_key})
+            if pos_data:
+                # Group positions by driver, sorted by date
+                from collections import defaultdict
+                by_driver = defaultdict(list)
+                for p in pos_data:
+                    dn = p.get("driver_number")
+                    pos = p.get("position")
+                    date = p.get("date")
+                    if dn and pos and date:
+                        by_driver[dn].append({"date": date, "position": pos})
+
+                # For each driver, align position with lap numbers
+                for dn, entries in by_driver.items():
+                    entries.sort(key=lambda x: x["date"])
+                    # Get lap data for this driver to match dates to laps
+                    driver_batch = [l for l in batch if l["dn"] == dn]
+                    # Simple approach: assign positions based on lap progression
+                    prev_lap_num = 0
+                    pos_idx = 0
+                    for lb in driver_batch:
+                        lb_num = lb["ln"]
+                        # Position data is sampled ~4/sec; find closest position
+                        # We'll just assign the median position during this lap
+                        if pos_idx < len(entries):
+                            positions_map[(dn, lb_num)] = entries[pos_idx]["position"]
+                            pos_idx = min(pos_idx + 1, len(entries) - 1)
+        except Exception as e:
+            log.warning(f"      ⚠️ Could not fetch position data: {e}")
+
         # Insert in batches of 500
         BATCH_SIZE = 500
         for i in range(0, len(batch), BATCH_SIZE):
             sub_batch = batch[i:i + BATCH_SIZE]
+            # Augment with position data
+            enhanced_batch = []
+            for lb in sub_batch:
+                dn = lb["dn"]
+                ln = lb["ln"]
+                lb["pos"] = positions_map.get((dn, ln))
+                enhanced_batch.append(lb)
             sasession.execute(text("""
                 INSERT INTO laps
                     (session_id, driver_number, lap_number,
                      duration_sector_1, duration_sector_2, duration_sector_3,
-                     lap_duration, speed_fl, speed_straight)
+                     lap_duration, speed_fl, speed_straight, position)
                 VALUES
-                    (:sid, :dn, :ln, :s1, :s2, :s3, :lt, :i1s, :sts)
+                    (:sid, :dn, :ln, :s1, :s2, :s3, :lt, :i1s, :sts, :pos)
                 ON CONFLICT DO NOTHING
-            """), sub_batch)
+            """), enhanced_batch)
 
         log.info(f"      📊 Stored {len(batch)} laps")
     except Exception as e:

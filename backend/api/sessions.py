@@ -373,6 +373,64 @@ async def get_session_gaps(
     }
 
 
+@router.get("/sessions/{session_id}/positions")
+async def get_session_positions(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Position history — each driver's race position lap by lap.
+
+    Returns a timeline of position per driver per lap, sorted by
+    lap_number then position. Great for a position-evolution chart.
+    """
+    result = await db.execute(
+        select(Lap)
+        .where(
+            Lap.session_id == session_id,
+            Lap.position.isnot(None),
+            Lap.position > 0,
+        )
+        .order_by(Lap.lap_number, Lap.position)
+    )
+    laps = result.scalars().all()
+
+    if not laps:
+        return {"max_lap": 0, "timeline": []}
+
+    max_lap = max(l.lap_number for l in laps)
+
+    # Fetch driver info once
+    drv_result = await db.execute(
+        select(SessionDriver).where(SessionDriver.session_id == session_id)
+    )
+    driver_info = {}
+    for d in drv_result.scalars().all():
+        driver_info[d.driver_number] = {
+            "acronym": d.name_acronym,
+            "full_name": d.full_name,
+            "team_name": d.team_name,
+            "team_colour": d.team_colour,
+        }
+
+    timeline = []
+    for l in laps:
+        info = driver_info.get(l.driver_number, {})
+        timeline.append({
+            "lap": l.lap_number,
+            "driver_number": l.driver_number,
+            "acronym": info.get("acronym", f"#{l.driver_number}"),
+            "full_name": info.get("full_name", ""),
+            "team_name": info.get("team_name", ""),
+            "team_colour": info.get("team_colour", ""),
+            "position": l.position,
+        })
+
+    return {
+        "max_lap": max_lap,
+        "timeline": timeline,
+    }
+
+
 @router.get("/sessions/{session_id}/compare/{driver_a}/{driver_b}")
 async def compare_drivers(
     session_id: int,

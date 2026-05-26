@@ -604,6 +604,25 @@
       }
       html += `</tbody></table></div></div></div>`;
 
+      // ── Position History (Race only) ──
+      html += `
+      <div class="card p-5 mb-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm">🏁 Position History
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Race position lap-by-lap</span>
+          </h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body closed">
+          <div id="pos-chart-area">
+            <div class="text-center py-8" style="color:var(--text-muted)">
+              <button onclick="loadPositionHistory(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">📊 Load Position Chart</button>
+              <div class="mt-2 text-xs">Click to load — may be heavy for long races (20+ drivers × many laps)</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
       // ── Tyre Strategy Timeline ──
       if (stints.length > 0) {
         // Build stint-by-driver for the table (keeping the detail)
@@ -889,6 +908,7 @@
 
   let degChartInstance = null;
   let gapChartInstance = null;
+  let posChartInstance = null;
 
   // ── Tyre Degradation ──
   async function loadDegradation(sessionId) {
@@ -1250,6 +1270,215 @@
     }
   }
 
+  // ── Position History ──
+  async function loadPositionHistory(sessionId) {
+    const el = document.getElementById('pos-chart-area');
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading position data...</div>';
+
+    if (posChartInstance) { posChartInstance.destroy(); posChartInstance = null; }
+
+    try {
+      const data = await api(`/sessions/${sessionId}/positions`);
+      const timeline = data.timeline;
+      const maxLap = data.max_lap;
+
+      if (!timeline || timeline.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No position data available</div>';
+        return;
+      }
+
+      // Group by lap
+      const lapPositions = {};
+      const driverMap = {};
+      for (const entry of timeline) {
+        if (!lapPositions[entry.lap]) lapPositions[entry.lap] = [];
+        lapPositions[entry.lap].push(entry);
+        driverMap[entry.driver_number] = {
+          acronym: entry.acronym,
+          full_name: entry.full_name,
+          team_name: entry.team_name,
+          team_colour: entry.team_colour,
+        };
+      }
+
+      const allDrivers = Object.keys(driverMap).map(Number);
+      const allLaps = Object.keys(lapPositions).map(Number).sort((a, b) => a - b);
+
+      // Build per-driver position series
+      const labels = [];
+      for (let i = 1; i <= maxLap; i++) labels.push(i);
+
+      // Driver colors
+      const DRIVER_COLORS = [
+        '#e10600', '#16a34a', '#3b82f6', '#f59e0b', '#8b5cf6',
+        '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16',
+        '#dc2626', '#6366f1', '#d946ef', '#22c55e', '#eab308',
+        '#64748b', '#0ea5e9', '#a855f7', '#10b981', '#9ca3af',
+      ];
+
+      let colorIdx = 0;
+      const datasets = [];
+      const sortedDrivers = [...allDrivers].sort((a, b) => {
+        // Sort by final position (lower is better)
+        const aLast = lapPositions[allLaps[allLaps.length - 1]]?.find(e => e.driver_number === a);
+        const bLast = lapPositions[allLaps[allLaps.length - 1]]?.find(e => e.driver_number === b);
+        return (aLast?.position || 99) - (bLast?.position || 99);
+      });
+
+      for (const dn of sortedDrivers) {
+        const info = driverMap[dn];
+        const color = info.team_colour
+          ? `#${info.team_colour.replace('#', '')}`
+          : DRIVER_COLORS[colorIdx % DRIVER_COLORS.length];
+        colorIdx++;
+
+        const data = [];
+        for (let i = 1; i <= maxLap; i++) {
+          const entry = lapPositions[i]?.find(e => e.driver_number === dn);
+          data.push(entry?.position || null);
+        }
+
+        datasets.push({
+          label: info.acronym || `#${dn}`,
+          data: data,
+          borderColor: color,
+          backgroundColor: color,
+          borderWidth: 2,
+          pointRadius: 1.5,
+          pointHoverRadius: 5,
+          tension: 0,
+          spanGaps: true,
+          fill: false,
+          stepped: 'before',  // step-line: position only changes at lap boundaries
+        });
+      }
+
+      // Summary stats: how many position changes, avg overtakes per lap
+      const changes = {};
+      for (const dn of allDrivers) {
+        let prevPos = null;
+        let chg = 0;
+        for (let i = 1; i <= maxLap; i++) {
+          const entry = lapPositions[i]?.find(e => e.driver_number === dn);
+          if (entry && entry.position) {
+            if (prevPos !== null && entry.position !== prevPos) chg++;
+            prevPos = entry.position;
+          }
+        }
+        changes[dn] = chg;
+      }
+      const totalChanges = Object.values(changes).reduce((s, c) => s + c, 0);
+
+      // Count distinct positions
+      const maxPos = Math.max(...timeline.map(e => e.position));
+      const posRange = maxPos;
+
+      el.innerHTML = `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">${maxLap}</div>
+            <div>Total Laps</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">${allDrivers.length}</div>
+            <div>Drivers</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">${totalChanges}</div>
+            <div>Position Changes</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">P1 - P${posRange}</div>
+            <div>Position Range</div>
+          </div>
+        </div>
+        <div class="text-xs mb-2" style="color:var(--text-muted);text-align:center">
+          Chart shows each driver's position lap by lap. Hover to see details. 
+          <strong>P1 on top</strong> — lines stepping right show position holds, 
+          crossing lines show overtakes. Enable/disable drivers via legend.
+        </div>
+        <div class="relative" style="height:450px">
+          <canvas id="pos-chart-canvas"></canvas>
+        </div>
+      `;
+
+      // Render chart
+      setTimeout(() => {
+        const canvas = document.getElementById('pos-chart-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const isLight = document.documentElement.classList.contains('light');
+        const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+        const textColor = isLight ? '#64748b' : '#8b949e';
+
+        posChartInstance = new Chart(ctx, {
+          type: 'line',
+          data: { datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 300 },
+            interaction: {
+              mode: 'index',
+              intersect: false,
+            },
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: {
+                  color: textColor,
+                  font: { size: 9 },
+                  boxWidth: 12,
+                  padding: 6,
+                  usePointStyle: true,
+                  pointStyle: 'line',
+                },
+              },
+              tooltip: {
+                callbacks: {
+                  title: (items) => `Lap ${items[0].label}`,
+                  label: (ctx) => {
+                    const val = ctx.parsed.y;
+                    if (val === null) return null;
+                    return `${ctx.dataset.label}: P${val}${val === 1 ? ' 🏆' : ''}`;
+                  },
+                },
+              },
+            },
+            scales: {
+              x: {
+                title: { display: true, text: 'Lap', color: textColor, font: { size: 11 } },
+                grid: { color: gridColor },
+                ticks: { color: textColor, font: { size: 10 } },
+                min: 1,
+              },
+              y: {
+                title: { display: true, text: 'Race Position', color: textColor, font: { size: 11 } },
+                grid: { color: gridColor },
+                ticks: {
+                  color: textColor,
+                  font: { size: 10 },
+                  stepSize: 1,
+                  callback: (v) => `P${v}`,
+                },
+                min: 1,
+                max: posRange + 0.5,
+                reverse: true,
+              },
+            },
+            elements: {
+              line: {
+                stepped: 'before',
+              },
+            },
+          },
+        });
+      }, 50);
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
+  }
+
   async function compareDrivers(sessionId) {
     const d1el = document.getElementById('comp-drv1');
     const d2el = document.getElementById('comp-drv2');
@@ -1472,7 +1701,7 @@
           <p><strong>Data Source:</strong> OpenF1 API + FastAPI Backend</p>
           <p><strong>Database:</strong> PostgreSQL 18</p>
           <p><strong>Season:</strong> 2026</p>
-          <p><strong>Features:</strong> Sector times · Tyre strategy timeline · Pit stop analysis · Weather impact · Driver comparison · Gap Timeline · Tyre degradation</p>
+          <p><strong>Features:</strong> Sector times · Position History · Tyre strategy timeline · Pit stop analysis · Weather impact · Driver comparison · Gap Timeline · Tyre degradation</p>
           <p class="mt-4"><strong>GitHub:</strong> <a href="https://github.com/edsuwarna/f1-analysis" target="_blank" style="color:var(--text-primary);text-decoration:underline">github.com/edsuwarna/f1-analysis</a></p>
         </div>
         <div class="mt-6 text-xs" style="color:var(--text-muted)">
