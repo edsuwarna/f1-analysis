@@ -824,11 +824,166 @@
           </div>
           <div id="comp-result" class="mt-4"></div>
         </div></div>
+
+      <!-- Tyre Degradation -->
+      <div class="card p-5 mt-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm">🛞 Tyre Degradation</h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body closed">
+          <div class="flex flex-wrap gap-3 items-center mb-3">
+            <select id="deg-drv1">
+              ${drivers.map(d => `<option value="${d.driver_number}"${d.driver_number === 3 ? ' selected' : ''}>${d.full_name} (${d.name_acronym})</option>`).join('')}
+            </select>
+            <span style="color:var(--text-secondary)">vs</span>
+            <select id="deg-drv2">
+              ${drivers.map(d => `<option value="${d.driver_number}"${d.driver_number === 44 ? ' selected' : ''}>${d.full_name} (${d.name_acronym})</option>`).join('')}
+            </select>
+            <button onclick="loadDegradation(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">Plot</button>
+          </div>
+          <div class="text-xs mb-3" style="color:var(--text-muted)">Lap time vs tyre age — garis solid = Driver 1, garis putus = Driver 2</div>
+          <div id="deg-chart-area"></div>
+        </div>
+      </div>
       `;
 
       el.innerHTML = html;
     } catch(e) {
       el.innerHTML = `<div class="text-center py-20" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
+  }
+
+  let degChartInstance = null;
+
+  // ── Tyre Degradation ──
+  async function loadDegradation(sessionId) {
+    const d1el = document.getElementById('deg-drv1');
+    const d2el = document.getElementById('deg-drv2');
+    const d1 = d1el.value;
+    const d2 = d2el.value;
+    if (d1 === d2) { return; }
+    const d1name = d1el.options[d1el.selectedIndex].text.match(/\((\w+)\)/)?.[1] || d1;
+    const d2name = d2el.options[d2el.selectedIndex].text.match(/\((\w+)\)/)?.[1] || d2;
+    const el = document.getElementById('deg-chart-area');
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading degradation data...</div>';
+
+    if (degChartInstance) { degChartInstance.destroy(); degChartInstance = null; }
+
+    try {
+      const [laps1, laps2] = await Promise.all([
+        api(`/sessions/${sessionId}/laps?driver=${d1}`),
+        api(`/sessions/${sessionId}/laps?driver=${d2}`),
+      ]);
+
+      const filterValid = laps => laps.filter(l => l.lap_duration && l.lap_duration > 10 && l.lap_duration < 600 && l.tyre_age != null && l.compound);
+      const f1 = filterValid(laps1);
+      const f2 = filterValid(laps2);
+
+      if (f1.length === 0 && f2.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No tyre degradation data available</div>';
+        return;
+      }
+
+      const compoundColors = {
+        'SOFT': '#e10600', 'MEDIUM': '#d97706', 'HARD': '#6b7280',
+        'INTERMEDIATE': '#2d7d46', 'WET': '#1a5c7a'
+      };
+      const compoundLabels = { 'SOFT': 'Soft', 'MEDIUM': 'Medium', 'HARD': 'Hard', 'INTERMEDIATE': 'Intermediate', 'WET': 'Wet' };
+
+      const datasets = [];
+      // Driver 1
+      for (const compound of [...new Set(f1.map(l => l.compound))]) {
+        const pts = f1.filter(l => l.compound === compound);
+        datasets.push({
+          label: `${d1name} ${compoundLabels[compound] || compound}`,
+          data: pts.map(l => ({ x: l.tyre_age, y: l.lap_duration })),
+          borderColor: compoundColors[compound] || '#666',
+          backgroundColor: compoundColors[compound] || '#666',
+          borderWidth: 2,
+          pointRadius: 3,
+          tension: 0.3,
+        });
+      }
+      // Driver 2
+      for (const compound of [...new Set(f2.map(l => l.compound))]) {
+        const pts = f2.filter(l => l.compound === compound);
+        datasets.push({
+          label: `${d2name} ${compoundLabels[compound] || compound}`,
+          data: pts.map(l => ({ x: l.tyre_age, y: l.lap_duration })),
+          borderColor: compoundColors[compound] || '#666',
+          borderDash: [5, 5],
+          borderWidth: 2,
+          pointRadius: 3,
+          pointStyle: 'rectRot',
+          tension: 0.3,
+        });
+      }
+
+      // Avg lap times
+      const avg1 = (f1.reduce((s, l) => s + l.lap_duration, 0) / f1.length).toFixed(3);
+      const avg2 = (f2.reduce((s, l) => s + l.lap_duration, 0) / f2.length).toFixed(3);
+
+      el.innerHTML = `
+        <div class="grid grid-cols-2 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:#e10600">${d1name}</div>
+            <div>Avg: ${avg1}s · Laps: ${f1.length}</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:#16a34a">${d2name}</div>
+            <div>Avg: ${avg2}s · Laps: ${f2.length}</div>
+          </div>
+        </div>
+        <div class="relative" style="height:350px">
+          <canvas id="deg-chart-canvas"></canvas>
+        </div>
+      `;
+
+      setTimeout(() => {
+        const canvas = document.getElementById('deg-chart-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const isLight = document.documentElement.classList.contains('light');
+        const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+        const textColor = isLight ? '#64748b' : '#8b949e';
+
+        degChartInstance = new Chart(ctx, {
+          type: 'scatter',
+          data: { datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 400 },
+            plugins: {
+              legend: { position: 'top', labels: { color: textColor, font: { size: 10 } } },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    const d = ctx.parsed;
+                    return `${ctx.dataset.label}: L${ctx.rawDataIndex+1} · ${d.y.toFixed(3)}s (age: ${d.x})`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                title: { display: true, text: 'Tyre Age (laps)', color: textColor, font: { size: 11 } },
+                grid: { color: gridColor },
+                ticks: { color: textColor, font: { size: 10 }, stepSize: 1 }
+              },
+              y: {
+                title: { display: true, text: 'Lap Time (s)', color: textColor, font: { size: 11 } },
+                grid: { color: gridColor },
+                ticks: { color: textColor, font: { size: 10 } },
+                reverse: true,
+              }
+            }
+          }
+        });
+      }, 50);
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
     }
   }
 

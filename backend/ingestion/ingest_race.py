@@ -213,7 +213,9 @@ def _store_session(engine, fastf1_session, meeting_id: int):
         ).fetchone()
 
         if existing:
-            log.info(f"    Session already exists (ID: {existing[0]}), skipping...")
+            log.info(f"    Session already exists (ID: {existing[0]}), storing telemetry only...")
+            _store_telemetry(db_session, fastf1_session, existing[0])
+            db_session.commit()
             return existing[0]
 
         # Get session name
@@ -250,6 +252,9 @@ def _store_session(engine, fastf1_session, meeting_id: int):
 
         # Store laps
         _store_laps(db_session, fastf1_session, session_id)
+
+        # Store telemetry
+        _store_telemetry(db_session, fastf1_session, session_id)
 
         # Store stints (tyre data)
         _store_stints(db_session, fastf1_session, session_id)
@@ -348,6 +353,80 @@ def _store_laps(sasession, f1session, session_id: int):
 
     except Exception as e:
         log.warning(f"      ⚠️ Laps store error: {e}")
+
+
+def _store_telemetry(sasession, f1session, session_id: int):
+    """Store high-frequency telemetry data (speed, throttle, brake, RPM)."""
+    import math
+    try:
+        total = 0
+        for drv in f1session.drivers:
+            try:
+                laps = f1session.laps.pick_driver(drv)
+                if laps is None or laps.empty:
+                    continue
+
+                car_data = laps.get_car_data()
+                if car_data is None or car_data.empty:
+                    continue
+
+                # Add distance for better alignment
+                car_data = car_data.add_distance()
+
+                batch = []
+                for _, row in car_data.iterrows():
+                    ts = row.get("Time", 0)
+                    if hasattr(ts, "total_seconds"):
+                        ts = ts.total_seconds()
+                    lap_num = int(row.get("LapNumber", 0)) if pd.notna(row.get("LapNumber")) else None
+                    speed = float(row.get("Speed", 0)) if pd.notna(row.get("Speed")) else None
+                    rpm = int(row.get("RPM", 0)) if pd.notna(row.get("RPM")) else None
+                    gear = int(row.get("Gear", 0)) if pd.notna(row.get("Gear")) else None
+                    throttle = float(row.get("Throttle", 0)) if pd.notna(row.get("Throttle")) else None
+                    brake = bool(row.get("Brake", False)) if pd.notna(row.get("Brake")) else None
+                    drs = bool(row.get("DRS", False)) if pd.notna(row.get("DRS")) else None
+                    x = float(row.get("X", 0)) if pd.notna(row.get("X")) else None
+                    y = float(row.get("Y", 0)) if pd.notna(row.get("Y")) else None
+
+                    if lap_num is None or speed is None:
+                        continue
+
+                    batch.append({
+                        "sid": session_id,
+                        "dn": int(drv),
+                        "ln": lap_num,
+                        "ts": float(ts) if ts else 0,
+                        "speed": speed,
+                        "rpm": rpm,
+                        "gear": gear,
+                        "throttle": throttle,
+                        "brake": 1.0 if brake else 0.0,
+                        "drs": drs if drs else False,
+                        "x": x if x and not math.isnan(x) else None,
+                        "y": y if y and not math.isnan(y) else None,
+                    })
+
+                if batch:
+                    chunk_size = 500
+                    for i in range(0, len(batch), chunk_size):
+                        chunk = batch[i:i + chunk_size]
+                        sasession.execute(text("""
+                            INSERT INTO telemetry (session_id, driver_number, lap_number,
+                                timestamp, speed, rpm, gear, throttle, brake, drs, x, y)
+                            VALUES (:sid, :dn, :ln, :ts, :speed, :rpm, :gear,
+                                :throttle, :brake, :drs, :x, :y)
+                            ON CONFLICT DO NOTHING
+                        """), chunk)
+                    total += len(batch)
+                    log.info(f"      📈 Stored {len(batch)} telemetry points for driver #{drv}")
+
+            except Exception as e:
+                log.warning(f"      ⚠️ Telemetry driver #{drv} error: {e}")
+
+        log.info(f"      📊 Total telemetry: {total} points")
+
+    except Exception as e:
+        log.warning(f"      ⚠️ Telemetry store error: {e}")
 
 
 def _store_stints(sasession, f1session, session_id: int):
