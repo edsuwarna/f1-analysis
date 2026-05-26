@@ -431,6 +431,132 @@ async def get_session_positions(
     }
 
 
+@router.get("/sessions/{session_id}/qualifying-evolution")
+async def get_qualifying_evolution(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Qualifying evolution — each driver's lap progression with improvement deltas.
+
+    Groups laps by driver, sorted by lap_number, with sector deltas pre-computed.
+    Best for Qualifying sessions (has is_personal_best flags).
+    """
+    result = await db.execute(
+        select(Lap)
+        .where(
+            Lap.session_id == session_id,
+            Lap.lap_duration.isnot(None),
+            Lap.lap_duration > 0,
+        )
+        .order_by(Lap.driver_number, Lap.lap_number)
+    )
+    laps = result.scalars().all()
+
+    if not laps:
+        return {"evolution": [], "best_lap_times": []}
+
+    # Fetch driver info
+    drv_result = await db.execute(
+        select(SessionDriver).where(SessionDriver.session_id == session_id)
+    )
+    driver_info = {}
+    for d in drv_result.scalars().all():
+        driver_info[d.driver_number] = {
+            "acronym": d.name_acronym,
+            "full_name": d.full_name,
+            "team_name": d.team_name,
+            "team_colour": d.team_colour,
+        }
+
+    from collections import defaultdict
+    by_driver = defaultdict(list)
+    for l in laps:
+        by_driver[l.driver_number].append(l)
+
+    evolution = []
+    all_best = []
+
+    for dn, driver_laps in by_driver.items():
+        driver_laps.sort(key=lambda l: l.lap_number)
+        info = driver_info.get(dn, {})
+        prev_lap = None
+        prev_s1 = None
+        prev_s2 = None
+        prev_s3 = None
+        personal_best_time = None
+        runs = []
+
+        for l in driver_laps:
+            lap_time = l.lap_duration
+            s1 = l.duration_sector_1
+            s2 = l.duration_sector_2
+            s3 = l.duration_sector_3
+
+            # Delta from previous lap
+            delta = (lap_time - prev_lap) if (prev_lap is not None and lap_time and prev_lap) else None
+            delta_s1 = (s1 - prev_s1) if (s1 and prev_s1) else None
+            delta_s2 = (s2 - prev_s2) if (s2 and prev_s2) else None
+            delta_s3 = (s3 - prev_s3) if (s3 and prev_s3) else None
+
+            # Is this a personal best?
+            is_pb = False
+            if lap_time and lap_time > 0:
+                if personal_best_time is None or lap_time < personal_best_time:
+                    personal_best_time = lap_time
+                    is_pb = True
+
+            runs.append({
+                "lap_number": l.lap_number,
+                "lap_duration": lap_time,
+                "sector_1": s1,
+                "sector_2": s2,
+                "sector_3": s3,
+                "compound": l.compound,
+                "is_personal_best": is_pb,
+                "delta": round(delta, 3) if delta is not None else None,
+                "delta_s1": round(delta_s1, 3) if delta_s1 is not None else None,
+                "delta_s2": round(delta_s2, 3) if delta_s2 is not None else None,
+                "delta_s3": round(delta_s3, 3) if delta_s3 is not None else None,
+            })
+
+            prev_lap = lap_time
+            prev_s1 = s1
+            prev_s2 = s2
+            prev_s3 = s3
+
+        evolution.append({
+            "driver_number": dn,
+            "acronym": info.get("acronym", f"#{dn}"),
+            "full_name": info.get("full_name", ""),
+            "team_name": info.get("team_name", ""),
+            "team_colour": info.get("team_colour", ""),
+            "runs": runs,
+            "best_lap_time": personal_best_time,
+            "total_runs": len(runs),
+        })
+
+        # For the best-lap comparison table
+        if personal_best_time and personal_best_time > 0:
+            all_best.append({
+                "driver_number": dn,
+                "acronym": info.get("acronym", f"#{dn}"),
+                "full_name": info.get("full_name", ""),
+                "team_name": info.get("team_name", ""),
+                "team_colour": info.get("team_colour", ""),
+                "best_lap_time": personal_best_time,
+            })
+
+    # Sort evolution by best lap time
+    evolution.sort(key=lambda x: x["best_lap_time"] if x["best_lap_time"] else float('inf'))
+    # Sort best times
+    all_best.sort(key=lambda x: x["best_lap_time"])
+
+    return {
+        "evolution": evolution,
+        "best_lap_times": all_best,
+    }
+
+
 @router.get("/sessions/{session_id}/compare/{driver_a}/{driver_b}")
 async def compare_drivers(
     session_id: int,

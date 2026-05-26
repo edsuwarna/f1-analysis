@@ -77,6 +77,7 @@ make reset-db       # Wipe and recreate database
 | `GET /api/sessions/{id}/pit-stops` | Pit stop events |
 | `GET /api/sessions/{id}/gaps` | Gap timeline (cumulative gap to leader) |
 | `GET /api/sessions/{id}/positions` | Position history (lap-by-lap race position) |
+| `GET /api/sessions/{id}/qualifying-evolution` | Qualifying lap progression (deltas, personal bests) |
 | `GET /api/sessions/{id}/telemetry/{driver}` | Car telemetry data |
 | `GET /api/sessions/{id}/compare/{d1}/{d2}` | Head-to-head comparison |
 | `GET /api/sessions/{id}/weather` | Weather timeline |
