@@ -11,6 +11,33 @@ from backend.models.models import SessionDriver
 
 router = APIRouter()
 
+# ── Race Engineers (per driver_number, based on DB data) ──
+# Known as of 2026 season. PRs welcome for corrections & updates.
+RACE_ENGINEERS = {
+    1: "Will Joseph",              # Norris (McLaren)
+    3: "Gianpiero Lambiase",       # Verstappen (Red Bull)
+    5: None,                       # Bortoleto (Audi) — rookie
+    6: None,                       # Hadjar (Red Bull) — rookie
+    10: "Karel Loos",              # Gasly (Alpine)
+    11: None,                      # Perez (Cadillac)
+    12: None,                      # Antonelli (Mercedes) — rookie
+    14: "Chris Cronin",            # Alonso (Aston Martin)
+    16: "Bryan Bozzi",             # Leclerc (Ferrari)
+    18: "Henry Howe",              # Stroll (Aston Martin)
+    23: "James Gough",             # Albon (Williams)
+    27: None,                      # Hulkenberg (Audi)
+    30: None,                      # Lawson (Racing Bulls)
+    31: None,                      # Ocon (Haas)
+    41: None,                      # Lindblad (Racing Bulls)
+    43: None,                      # Colapinto (Alpine)
+    44: "Riccardo Adami",          # Hamilton (Ferrari)
+    55: None,                      # Sainz (Williams)
+    63: "Marcus Dudley",           # Russell (Mercedes)
+    77: None,                      # Bottas (Cadillac)
+    81: "Tom Stallard",            # Piastri (McLaren)
+    87: None,                      # Bearman (Haas)
+}
+
 # ── Team reference data ──
 # Hardcoded but easy to update via PRs
 TEAM_INFO = {
@@ -222,6 +249,7 @@ async def get_teams(
             "acronym": d.name_acronym,
             "team_colour": d.team_colour or "",
             "headshot_url": d.headshot_url or "",
+            "race_engineer": RACE_ENGINEERS.get(d.driver_number, None),
         })
 
     # Get pit stop ranking

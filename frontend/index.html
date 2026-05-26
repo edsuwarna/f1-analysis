@@ -3494,9 +3494,12 @@
             <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:${d.team_colour || '#666'};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff">
               ${d.headshot_url ? `<img src="${d.headshot_url}" alt="${d.acronym}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.parentElement.textContent='${d.acronym}'">` : d.acronym}
             </div>
-            <div class="min-w-0">
+            <div class="min-w-0 flex-1">
               <div class="text-sm font-semibold" style="color:var(--text-primary)">${d.full_name}</div>
-              <div class="text-xs" style="color:${d.team_colour || '#666'};font-weight:600">${d.acronym}</div>
+              <div class="flex items-center gap-3 text-xs" style="color:${d.team_colour || '#666'};font-weight:600">
+                <span>${d.acronym}</span>
+                ${d.race_engineer && d.race_engineer !== 'TBC' ? `<span style="color:var(--text-muted);font-weight:400">🔧 ${d.race_engineer}</span>` : ''}
+              </div>
             </div>
           </div>
         `).join('');
