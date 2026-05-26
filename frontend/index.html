@@ -3492,7 +3492,7 @@
         let driverCards = drivers.map(d => `
           <div class="flex items-center gap-3 p-2.5 rounded" style="background:var(--bg-primary);border:1px solid var(--border-color)">
             <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:${d.team_colour || '#666'};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff">
-              ${d.headshot_url ? `<img src="${d.headshot_url}" alt="${d.acronym}" style="width:100%;height:100%;object-fit:cover;object-position:50% 10%" onerror="this.style.display='none';this.parentElement.textContent='${d.acronym}'">` : d.acronym}
+              ${d.headshot_url ? `<img src="${d.headshot_url}" alt="${d.acronym}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.parentElement.textContent='${d.acronym}'">` : d.acronym}
             </div>
             <div class="min-w-0 flex-1">
               <div class="text-sm font-semibold" style="color:var(--text-primary)">${d.full_name}</div>
