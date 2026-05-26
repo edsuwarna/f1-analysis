@@ -3444,77 +3444,134 @@
     document.getElementById('content').innerHTML = `
       <div class="card p-6 max-w-3xl mx-auto">
         <h2 class="text-xl font-bold mb-5">📖 How to Read the Analysis</h2>
+        <p class="text-sm mb-6" style="color:var(--text-muted)">Features grouped by tab. All charts are interactive — hover for details, click legend items to toggle series.</p>
 
-        <div class="mb-6">
-          <h3 class="font-semibold text-sm mb-2">🏆 Best Sector Times</h3>
-          <p class="text-sm mb-1" style="color:var(--text-secondary)">Shows each driver's fastest time in Sector 1 (S1), Sector 2 (S2), and Sector 3 (S3), plus their theoretical best lap. Each cell is colour-coded: green = top 3, darker = faster. Hover for exact time.</p>
-          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> A driver topping all 3 sectors is on for pole. A driver with a big S3 advantage is strong on straights.</p>
+        <h3 class="font-semibold text-sm mb-3 mt-6" style="color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">🏁 Race Session Page</h3>
+
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">🏆 Best Sector Times</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Shows each driver's fastest time in Sector 1 (S1), Sector 2 (S2), and Sector 3 (S3), plus their theoretical best lap. Colour-coded: green = top 3, darker = faster. Hover for exact time.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Driver topping all 3 sectors = on for pole. Big S3 advantage = strong on straights.</p>
         </div>
 
-        <div class="mb-6">
-          <h3 class="font-semibold text-sm mb-2">⏱️ Qualifying Evolution</h3>
-          <p class="text-sm mb-1" style="color:var(--text-secondary)">Tracks lap time progression per driver across all qualifying runs. The chart shows each driver's improvement or decline; the table below shows each run's time, compound, and position change.</p>
-          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> Steep downward slopes = big improvements. Drivers who plateau early may not have more pace left.</p>
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">⏱️ Qualifying Evolution</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Lap time progression per driver across all qualifying runs. Chart shows improvement/decline; table below shows each run's time, compound, and position change.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Steep downward slopes = big improvements. Early plateau = may not have more pace left.</p>
         </div>
 
-        <div class="mb-6">
-          <h3 class="font-semibold text-sm mb-2">📈 Lap Distribution</h3>
-          <p class="text-sm mb-1" style="color:var(--text-secondary)">Distribution of all lap times per driver as a box plot or scatter. Shows median, consistency (spread), and outliers. Each driver card shows avg pace and interval to the fastest average.</p>
-          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> Tight clusters = consistent pace. Wide spread = inconsistent. Outliers above could mean traffic or mistakes.</p>
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">📈 Lap Distribution</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Distribution of all lap times per driver. Shows median, consistency (spread), and outliers. Each card shows avg pace and interval to the fastest.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Tight clusters = consistent. Wide spread = inconsistent. Outliers = traffic or mistakes.</p>
         </div>
 
-        <div class="mb-6">
-          <h3 class="font-semibold text-sm mb-2">🏁 Position History</h3>
-          <p class="text-sm mb-1" style="color:var(--text-secondary)">Lap-by-lap race position for every driver. P1 is at the top. Each step right shows the driver held position for that lap. Use the checkboxes + <strong>Plot Chart</strong> button to focus on specific battles.</p>
-          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> Crossing lines = overtakes. A flat line at the top = dominant win. Late-race climbs = strong recovery drive.</p>
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">🏁 Position History</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Lap-by-lap race position. P1 at top. Checkboxes + <strong>Plot Chart</strong> button to focus specific battles.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Crossing lines = overtakes. Flat line at top = dominant win. Late climb = recovery drive.</p>
         </div>
 
-        <div class="mb-6">
-          <h3 class="font-semibold text-sm mb-2">⛽ Pit Strategy Battle</h3>
-          <p class="text-sm mb-1" style="color:var(--text-secondary)">Race position over time with undercut/overlay analysis. The table lists every pit stop (lap, driver, tyre, time lost). The chart shows how pit windows affect track position.</p>
-          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> A driver pitting earlier (undercut) can leapfrog ahead by having fresh tyres. Compare out-lap times to spot undercut attempts.</p>
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">📍 Track Position Map</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Real-time position on the circuit layout. Each dot = a driver, coloured by team. Use <strong>▶ Play</strong> to replay the race, or scrub through laps with the slider.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Closing gaps = battle forming. Dots spreading out after pit stops = undercut effect.</p>
         </div>
 
-        <div class="mb-6">
-          <h3 class="font-semibold text-sm mb-2">🛞 Tyre Strategy Timeline</h3>
-          <p class="text-sm mb-1" style="color:var(--text-secondary)">Visual timeline of every driver's tyre stints. Coloured bars show compound (Soft/Medium/Hard/Intermediate/Wet), and the legend at the bottom shows the colour codes.</p>
-          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> Splitting strategies between drivers at the same team. A long middle stint on Hards = one-stop gamble. Multiple short stints = aggressive.</p>
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">⛽ Pit Strategy Battle</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Race position over time with undercut/overlay analysis. Table lists every pit stop (lap, driver, tyre, time lost).</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Early pitter with fresh tyres can leapfrog ahead. Compare out-lap times to spot undercut attempts.</p>
         </div>
 
-        <div class="mb-6">
-          <h3 class="font-semibold text-sm mb-2">⛽ Pit Stop Analysis</h3>
-          <p class="text-sm mb-1" style="color:var(--text-secondary)">Details every pit stop: lap number, driver, from/to compound, and time lost. The chart plots pit stop times per lap with colour-coded compound transitions.</p>
-          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> Consistent sub-2.5s pit stops = strong crew. Slow stops (&gt;3.5s) cost track position. Double-stacks can bunch lap times.</p>
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">🛞 Tyre Strategy Timeline</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Visual timeline of every driver's tyre stints. Coloured bars: Soft/Medium/Hard/Intermediate/Wet.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Splitting strategies between teammates. Long middle stint on Hards = one-stop gamble. Short stints = aggressive.</p>
         </div>
 
-        <div class="mb-6">
-          <h3 class="font-semibold text-sm mb-2">📊 Gap Timeline</h3>
-          <p class="text-sm mb-1" style="color:var(--text-secondary)">Cumulative gap to the race leader per lap for each driver. The line at 0 is the leader. Check/uncheck drivers and click <strong>Plot Gaps</strong> to focus on specific battles. Use the dropdown to pick a reference driver instead of leader.</p>
-          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> A rising line = losing time to leader. A flat/falling line = matching or gaining on the leader. Diverging lines after a pit stop show undercut success.</p>
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">⛽ Pit Stop Analysis</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Every pit stop: lap number, driver, compound change, time lost. Chart plots pit stop times per lap.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Consistent sub-2.5s = strong crew. Slow stops (&gt;3.5s) cost track position.</p>
         </div>
 
-        <div class="mb-6">
-          <h3 class="font-semibold text-sm mb-2">🔄 Overtake Analysis</h3>
-          <p class="text-sm mb-1" style="color:var(--text-secondary)">Tracks every position change lap by lap. Green bars = positions gained, red = positions lost. The table ranks drivers by net overtakes (gained minus lost).</p>
-          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> High gain + low loss = clean aggressive driving. High loss = either car issues or being vulnerable on straights.</p>
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">📊 Gap Timeline</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Cumulative gap to the leader per lap. Check/uncheck drivers + <strong>Plot Gaps</strong>. Use dropdown to pick a different reference driver.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Rising line = losing time. Flat/falling = matching or gaining. Diverging after pit = undercut success.</p>
         </div>
 
-        <div class="mb-6">
-          <h3 class="font-semibold text-sm mb-2">🛞 Tyre Degradation</h3>
-          <p class="text-sm mb-1" style="color:var(--text-secondary)">Scatter plot of lap time vs tyre age for two selected drivers. Each compound is a different series. Solid lines = Driver 1, dashed = Driver 2. The steeper the upward trend, the faster the tyres are degrading.</p>
-          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> A shallow slope on old tyres = good deg management. A sudden spike = performance cliff when tyres are completely gone.</p>
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">🔄 Overtake Analysis</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Position changes lap by lap. Green = gained, red = lost. Table ranks drivers by net overtakes.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> High gain + low loss = clean aggressive driving. High loss = car issues or vulnerable on straights.</p>
         </div>
 
-        <div class="mb-6">
-          <h3 class="font-semibold text-sm mb-2">🔬 Driver Comparison</h3>
-          <p class="text-sm mb-1" style="color:var(--text-secondary)">Head-to-head for any two drivers across the session: fastest lap, avg pace, sector times, top speed. Ideal for comparing teammates or title rivals.</p>
-          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> Teammate gaps in qualifying reveal who has the edge. In races, compare stint lengths and deg to see who manages tyres better.</p>
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">🛞 Tyre Degradation</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Scatter plot: lap time vs tyre age for two drivers. Each compound = different series. Solid = Driver 1, dashed = Driver 2.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Shallow slope on old tyres = good deg management. Sudden spike = performance cliff.</p>
         </div>
 
-        <div class="mb-6">
-          <h3 class="font-semibold text-sm mb-2">🏆 Championship Standings</h3>
-          <p class="text-sm mb-1" style="color:var(--text-secondary)">Season-long driver and constructor points. Includes a points-progression chart to visualise momentum swings across rounds and a race-by-race results table.</p>
-          <p class="text-xs" style="color:var(--text-muted)"><strong>What to look for:</strong> Steep climb = dominant run. Flat mid-season = development battle. Late surge = team found pace.</p>
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">🔬 Driver Comparison</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Head-to-head for any two drivers: fastest lap, avg pace, sector times, top speed. Lap-by-lap delta chart + table with sector breakdown.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Teammate gaps in quali = who has the edge. In races, compare stint lengths and deg management.</p>
+        </div>
+
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">👥 Team Mate Battle</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Within-team comparison for the session. Shows qualifying and race pace head-to-head with progress bars. Both drivers use team colours.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Quali specialist vs race-craft master. Who's closer on race pace vs one-lap pace.</p>
+        </div>
+
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">📥 Data Export (CSV)</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Download raw data: Laps, Telemetry, Stints, Pit Stops, or Weather as CSV files — one click per data type in the session toolbar.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Use for:</strong> External analysis in Excel, Python, or your own tools.</p>
+        </div>
+
+        <h3 class="font-semibold text-sm mb-3 mt-6" style="color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">🏆 Standings Tab</h3>
+
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">🏆 Championship Standings</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Driver &amp; constructor points for the season. Progress bars, medal icons, and race-by-race results table per GP.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Steep climb = dominant run. Flat mid-season = development battle. Late surge = found pace.</p>
+        </div>
+
+        <h3 class="font-semibold text-sm mb-3 mt-6" style="color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">📊 Season Tab</h3>
+
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">📈 Points Progression</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Cumulative points per driver plotted across every round. Checkboxes to select drivers (default top 10). Click <strong>Plot</strong> to update.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> The gap between championship contenders widening or shrinking each weekend.</p>
+        </div>
+
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">🔥 Driver Form Tracker</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Finishing position trend per round. P1 at top (Y-axis inverted). Check up to 22 drivers, click <strong>Plot Form</strong>. Team colour lines show each driver's momentum.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Sustained top-3 line = championship form. Volatile lines = inconsistent. Rising line (toward P1) = hot streak.</p>
+        </div>
+
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">🤜🤛 Driver Head-to-Head</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Compare any two drivers across the entire season. Shows qualifying wins, race wins, and percentage splits. Results computed from every shared round.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Quali beast vs race master. Teammate H2H reveals who truly leads the team.</p>
+        </div>
+
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">⛽ Pit Stop Championship</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Team ranking by average pit stop speed and consistency. Includes fastest/slowest stops per team, total stops, and consistency %.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Fastest average = best crew. High consistency = reliable stops under pressure.</p>
+        </div>
+
+        <h3 class="font-semibold text-sm mb-3 mt-6" style="color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">🤜 Team Battle Tab</h3>
+
+        <div class="mb-4">
+          <h4 class="font-semibold text-sm mb-1">🤜 Team Mate Battle (Season)</h4>
+          <p class="text-xs mb-1" style="color:var(--text-secondary)">Cross-season teammate comparison. For each team, shows qualifying and race head-to-head tallies with dual progress bars. Drivers sorted by who appeared in more race weekends.</p>
+          <p class="text-xs" style="color:var(--text-muted)"><strong>Look for:</strong> Which driver dominates within each team. Big mismatches = potential driver change incoming.</p>
         </div>
       </div>
     `;
