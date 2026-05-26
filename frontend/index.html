@@ -502,7 +502,7 @@
       for (const s of sessions) {
         const icon = s.session_type === 'Race' ? '🏁' : s.session_type === 'Qualifying' ? '⏱️' : '🔧';
         html += `
-          <div class="card p-5 cursor-pointer hover:border-gray-500 transition" onclick="loadSession(${s.id}, ${meetingId}, '${meetingName.replace(/'/g, "\\'")}', '${s.session_name.replace(/'/g, "\\'")}')">
+          <div class="card p-5 cursor-pointer hover:border-gray-500 transition" onclick="loadSession(${s.id}, ${meetingId}, '${meetingName.replace(/'/g, "\\'")}', '${s.session_name.replace(/'/g, "\\'")}', '${s.session_type}')">
             <div class="flex items-center gap-3">
               <span class="text-2xl">${icon}</span>
               <div>
@@ -520,7 +520,7 @@
     }
   }
 
-  async function loadSession(sessionId, meetingId, meetingName, sessionName) {
+  async function loadSession(sessionId, meetingId, meetingName, sessionName, sessionType) {
     const el = document.getElementById('content');
     el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">Loading session data...</div>';
 
@@ -548,7 +548,7 @@
           <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
             <h3 class="font-semibold text-sm">🏆 Best Sector Times
               <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">
-                🟣 Tercepat · 🟢 Top 3 · 🟡 Di luar Top 3
+                🟣 Fastest · 🟢 Top 3 · 🟡 Outside Top 3
               </span>
             </h3>
             <span class="collapse-icon">▼</span>
@@ -643,8 +643,8 @@
         </div>
       </div>`;
 
-      // ── Position History (Race only) ──
-      html += `
+      // ── Position History (Race/Sprint only) ──
+      ${(sessionType === 'Race' || sessionName === 'Sprint' || sessionName === 'Race') ? `
       <div class="card p-5 mb-6">
         <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
           <h3 class="font-semibold text-sm">🏁 Position History
@@ -656,11 +656,19 @@
           <div id="pos-chart-area">
             <div class="text-center py-8" style="color:var(--text-muted)">
               <button onclick="loadPositionHistory(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">📊 Load Position Chart</button>
-              <div class="mt-2 text-xs">Click to load — may be heavy for long races (20+ drivers × many laps)</div>
+              <div class="mt-2 text-xs">Shows how positions changed lap by lap — P1 at top. Click legend to toggle drivers.</div>
             </div>
           </div>
         </div>
-      </div>`;
+      </div>` : `
+      <div class="card p-5 mb-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm" style="color:var(--text-muted)">🏁 Position History
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Only available for Race/Sprint sessions</span>
+          </h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+      </div>`}
 
       // ── Tyre Strategy Timeline ──
       if (stints.length > 0) {
@@ -911,10 +919,29 @@
             </select>
             <button onclick="loadGaps(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">📈 Plot Gaps</button>
           </div>
-          <div class="text-xs mb-3" style="color:var(--text-muted)">Cumulative gap to leader per lap — garis di 0 = leader. Pilih driver buat dibandingin.</div>
+          <div class="text-xs mb-3" style="color:var(--text-muted)">Cumulative gap to leader per lap — line at 0 = leader. Shows who gained/lost time throughout the session.</div>
           <div id="gap-chart-area"></div>
         </div>
       </div>
+
+      <!-- Overtake Analysis (Race/Sprint only) -->
+      ${(sessionType === 'Race' || sessionName === 'Sprint' || sessionName === 'Race') ? `
+      <div class="card p-5 mt-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm">🏁 Overtake Analysis
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Position changes per lap</span>
+          </h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body closed">
+          <div id="overtake-chart-area">
+            <div class="text-center py-8" style="color:var(--text-muted)">
+              <button onclick="loadOvertakeAnalysis(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">🏁 Load Overtake Analysis</button>
+              <div class="mt-2 text-xs">Shows overtakes gained/lost per lap by each driver. Positive = gained positions.</div>
+            </div>
+          </div>
+        </div>
+      </div>` : ''}
 
       <!-- Tyre Degradation -->
       <div class="card p-5 mt-6">
@@ -925,15 +952,15 @@
         <div class="collapse-body closed">
           <div class="flex flex-wrap gap-3 items-center mb-3">
             <select id="deg-drv1">
-              ${drivers.map(d => `<option value="${d.driver_number}"${d.driver_number === 3 ? ' selected' : ''}>${d.full_name} (${d.name_acronym})</option>`).join('')}
+              ${drivers.map(d => `<option value="${d.driver_number}"${d.driver_number === 1 ? ' selected' : ''}>${d.full_name} (${d.name_acronym})</option>`).join('')}
             </select>
             <span style="color:var(--text-secondary)">vs</span>
             <select id="deg-drv2">
-              ${drivers.map(d => `<option value="${d.driver_number}"${d.driver_number === 44 ? ' selected' : ''}>${d.full_name} (${d.name_acronym})</option>`).join('')}
+              ${drivers.map(d => `<option value="${d.driver_number}"${d.driver_number === 16 ? ' selected' : ''}>${d.full_name} (${d.name_acronym})</option>`).join('')}
             </select>
             <button onclick="loadDegradation(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">Plot</button>
           </div>
-          <div class="text-xs mb-3" style="color:var(--text-muted)">Lap time vs tyre age — garis solid = Driver 1, garis putus = Driver 2</div>
+          <div class="text-xs mb-3" style="color:var(--text-muted)">Lap time vs tyre age — solid line = Driver 1, dashed = Driver 2. Different colors show compounds.</div>
           <div id="deg-chart-area"></div>
         </div>
       </div>
@@ -950,6 +977,7 @@
   let posChartInstance = null;
   let qevoChartInstance = null;
   let lapdistChartInstance = null;
+  let overtakeChartInstance = null;
 
   // ── Tyre Degradation ──
   async function loadDegradation(sessionId) {
@@ -1649,6 +1677,220 @@
     }
   }
 
+  // ── Overtake Analysis ──
+  async function loadOvertakeAnalysis(sessionId) {
+    const el = document.getElementById('overtake-chart-area');
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading overtake data...</div>';
+
+    if (overtakeChartInstance) { overtakeChartInstance.destroy(); overtakeChartInstance = null; }
+
+    try {
+      const data = await api(`/sessions/${sessionId}/positions`);
+      const timeline = data.timeline;
+      const maxLap = data.max_lap;
+
+      if (!timeline || timeline.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No overtake data available</div>';
+        return;
+      }
+
+      // Group by driver, track position changes
+      const byDriver = {};
+      const driverMeta = {};
+      for (const entry of timeline) {
+        const dn = entry.driver_number;
+        if (!byDriver[dn]) {
+          byDriver[dn] = [];
+          driverMeta[dn] = { acronym: entry.acronym, team_colour: entry.team_colour };
+        }
+        byDriver[dn].push(entry);
+      }
+
+      // For each driver, compute net position change per lap
+      const labels = Array.from({ length: maxLap }, (_, i) => i + 1);
+      const driverChanges = {};
+      const totalOvertakes = {};
+
+      for (const [dn, entries] of Object.entries(byDriver)) {
+        const sorted = entries.sort((a, b) => a.lap - b.lap);
+        const changes = [];
+        let prevPos = null;
+        let totalGained = 0;
+        let totalLost = 0;
+        for (let lap = 1; lap <= maxLap; lap++) {
+          const entry = sorted.find(e => e.lap === lap);
+          if (entry && entry.position) {
+            if (prevPos !== null && entry.position !== prevPos) {
+              changes.push(prevPos - entry.position); // positive = gained positions
+              if (entry.position < prevPos) totalGained += (prevPos - entry.position);
+              else totalLost += (entry.position - prevPos);
+            } else {
+              changes.push(0);
+            }
+            prevPos = entry.position;
+          } else {
+            changes.push(null);
+          }
+        }
+        driverChanges[dn] = changes;
+        totalOvertakes[dn] = { gained: totalGained, lost: totalLost, net: totalGained - totalLost };
+      }
+
+      // Sort by net overtakes
+      const sortedDrivers = Object.entries(totalOvertakes)
+        .sort((a, b) => b[1].net - a[1].net);
+
+      // Summary stats
+      const totalGainedAll = Object.values(totalOvertakes).reduce((s, o) => s + o.gained, 0);
+      const totalLostAll = Object.values(totalOvertakes).reduce((s, o) => s + o.lost, 0);
+      const mostOvertakes = sortedDrivers[0];
+
+      // Top overtakers table
+      let html = `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">${totalGainedAll}</div>
+            <div>Total Positions Gained</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">${totalLostAll}</div>
+            <div>Total Positions Lost</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:#16a34a">+${mostOvertakes ? mostOvertakes[1].net : 0}</div>
+            <div>Best Net (${mostOvertakes ? (driverMeta[mostOvertakes[0]]?.acronym || mostOvertakes[0]) : '—'})</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">${Object.keys(byDriver).length}</div>
+            <div>Drivers</div>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto mb-4">
+          <table>
+            <thead>
+              <tr><th>#</th><th>Driver</th><th class="text-right">Gained</th><th class="text-right">Lost</th><th class="text-right">Net</th></tr>
+            </thead>
+            <tbody>
+      `;
+      sortedDrivers.forEach(([dn, stats], i) => {
+        const meta = driverMeta[dn] || {};
+        const color = meta.team_colour ? teamColor(meta.team_colour) : '#666';
+        const netClass = stats.net > 0 ? 'color:#16a34a;font-weight:700' : stats.net < 0 ? 'color:#dc2626' : '';
+        html += `
+          <tr>
+            <td style="color:var(--text-secondary)">${i + 1}</td>
+            <td class="font-medium" style="color:${color}">${meta.acronym || `#${dn}`}</td>
+            <td class="text-right font-mono" style="color:#16a34a">+${stats.gained}</td>
+            <td class="text-right font-mono" style="color:#dc2626">-${stats.lost}</td>
+            <td class="text-right font-mono font-bold" style="${netClass}">${stats.net > 0 ? '+' : ''}${stats.net}</td>
+          </tr>
+        `;
+      });
+      html += `</tbody></table></div>`;
+
+      // Chart: per-lap overtakes (bar chart: green=gained, red=lost)
+      html += `
+        <div class="text-xs mb-3" style="color:var(--text-muted)">
+          <strong>Overtakes Per Lap</strong> — 🟢 Green bars = positions gained, 🔴 Red = positions lost. Hover for details.
+        </div>
+        <div class="relative" style="height:300px;margin-bottom:16px">
+          <canvas id="overtake-chart-canvas-${sessionId}"></canvas>
+        </div>
+      `;
+
+      el.innerHTML = html;
+
+      // Render chart
+      setTimeout(() => {
+        const canvas = document.getElementById(`overtake-chart-canvas-${sessionId}`);
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const isLight = document.documentElement.classList.contains('light');
+        const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+        const textColor = isLight ? '#64748b' : '#8b949e';
+
+        // Top 5 most active drivers for chart
+        const chartDrivers = sortedDrivers.slice(0, 5);
+        const datasets = [];
+
+        chartDrivers.forEach(([dn], idx) => {
+          const meta = driverMeta[dn] || {};
+          const color = meta.team_colour ? teamColor(meta.team_colour) : ['#e10600','#16a34a','#3b82f6','#f59e0b','#8b5cf6'][idx];
+          const changes = driverChanges[dn];
+          const gainedData = changes.map(c => c !== null && c > 0 ? c : null);
+          const lostData = changes.map(c => c !== null && c < 0 ? Math.abs(c) : null);
+
+          // Gained (green segment)
+          datasets.push({
+            label: `${meta.acronym || dn} Gained`,
+            data: gainedData,
+            backgroundColor: 'rgba(22,163,74,0.6)',
+            borderColor: '#16a34a',
+            borderWidth: 1,
+            borderRadius: 2,
+            barPercentage: 0.6,
+            order: 1,
+          });
+          // Lost (red segment, negative)
+          datasets.push({
+            label: `${meta.acronym || dn} Lost`,
+            data: lostData,
+            backgroundColor: 'rgba(220,38,38,0.6)',
+            borderColor: '#dc2626',
+            borderWidth: 1,
+            borderRadius: 2,
+            barPercentage: 0.6,
+            order: 2,
+          });
+        });
+
+        overtakeChartInstance = new Chart(ctx, {
+          type: 'bar',
+          data: { labels, datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 300 },
+            interaction: { mode: 'item', intersect: true },
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: { color: textColor, font: { size: 9 }, boxWidth: 12, padding: 6 },
+              },
+              tooltip: {
+                callbacks: {
+                  title: (items) => `Lap ${items[0].label}`,
+                  label: (ctx) => {
+                    const val = ctx.parsed.y;
+                    if (val === null) return null;
+                    const label = ctx.dataset.label.replace(' Gained',' 🟢').replace(' Lost',' 🔴');
+                    return `${label}: ${val} position${val > 1 ? 's' : ''}`;
+                  },
+                },
+              },
+            },
+            scales: {
+              x: {
+                title: { display: true, text: 'Lap', color: textColor, font: { size: 11 } },
+                grid: { color: gridColor },
+                ticks: { color: textColor, font: { size: 9 } },
+              },
+              y: {
+                title: { display: true, text: 'Positions Changed', color: textColor, font: { size: 11 } },
+                grid: { color: gridColor },
+                ticks: { color: textColor, font: { size: 9 }, stepSize: 1 },
+                beginAtZero: true,
+              },
+            },
+          },
+        });
+      }, 100);
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
+  }
+
   // ── Position History ──
   async function loadPositionHistory(sessionId) {
     const el = document.getElementById('pos-chart-area');
@@ -1903,11 +2145,11 @@
       </div>`;
 
       // Stats summary
-      // Legend
+      // Stats summary (English)
       html += `
         <div class="flex flex-wrap gap-x-4 gap-y-1 justify-center mb-4 text-xs" style="color:var(--text-secondary)">
-          <span><strong style="color:#16a34a">🟢 Hijau</strong> = Pembalap ini lebih cepat di sektor itu</span>
-          <span><strong style="color:#eab308">🟡 Kuning</strong> = Pembalap ini lebih lambat (↓ delta)</span>
+          <span><strong style="color:#16a34a">🟢 Green</strong> = This driver is faster in that sector</span>
+          <span><strong style="color:#eab308">🟡 Yellow</strong> = This driver is slower (↓ delta)</span>
           <span>Δ ${d1name} - ${d2name} 🟢 = ${d1name} · 🔴 = ${d2name}</span>
         </div>`;
       const avgA = timesA.filter(t => t).reduce((s, t) => s + t, 0) / timesA.filter(t => t).length || 0;
@@ -2075,16 +2317,16 @@
     document.getElementById('content').innerHTML = `
       <div class="card p-8 max-w-2xl mx-auto text-center">
         <h2 class="text-xl font-bold mb-4">🏎️ F1 Analysis 2026</h2>
-        <p style="color:var(--text-secondary)" class="mb-6">Formula 1 sector times, tyre strategy, and driver comparison platform.</p>
+        <p style="color:var(--text-secondary)" class="mb-6">Formula 1 sector times, tyre strategy, driver comparison, and race analysis platform.</p>
         <div class="text-left text-sm" style="color:var(--text-secondary)">
           <p><strong>Data Source:</strong> OpenF1 API + FastAPI Backend</p>
           <p><strong>Database:</strong> PostgreSQL 18</p>
           <p><strong>Season:</strong> 2026</p>
-          <p><strong>Features:</strong> Sector times · Lap Distribution · Championship Standings · Qualifying Evolution · Position History · Tyre strategy timeline · Pit stop analysis · Weather impact · Driver comparison · Gap Timeline · Tyre degradation</p>
+          <p><strong>Features:</strong> Sector times · Lap Distribution · Championship Standings · Qualifying Evolution · Position History · Tyre strategy · Pit stops · Weather · Driver comparison · Gap Timeline · Tyre degradation · Overtake Analysis</p>
           <p class="mt-4"><strong>GitHub:</strong> <a href="https://github.com/edsuwarna/f1-analysis" target="_blank" style="color:var(--text-primary);text-decoration:underline">github.com/edsuwarna/f1-analysis</a></p>
         </div>
         <div class="mt-6 text-xs" style="color:var(--text-muted)">
-          F1 is a trademark of Formula One Licensing B.V. This is an unofficial project.
+          F1 is a trademark of Formula One Licensing B.V. This is an unofficial data analysis project.
         </div>
       </div>
     `;
