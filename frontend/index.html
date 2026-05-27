@@ -4573,6 +4573,7 @@
           { label: 'Power Unit', value: team.power_unit, icon: '⚡' },
           { label: 'Chassis', value: team.chassis, icon: '🏎️' },
           { label: 'Founded', value: team.founded, icon: '📅' },
+          { label: 'Reserve Driver(s)', value: team.reserve_driver, icon: '🔄' },
         ];
 
         if (team.constructors_titles > 0) {
@@ -4601,7 +4602,6 @@
               <div class="text-sm font-semibold" style="color:var(--text-primary)">${d.full_name}</div>
               <div class="flex items-center gap-3 text-xs" style="color:${d.team_colour || '#666'};font-weight:600">
                 <span>${d.acronym}</span>
-                ${d.race_engineer && d.race_engineer !== 'TBC' ? `<span style="color:var(--text-muted);font-weight:400">🔧 ${d.race_engineer}</span>` : ''}
               </div>
             </div>
           </div>
@@ -5089,7 +5089,7 @@
             </h3>
             <span class="collapse-icon">▼</span>
           </div>
-          <div class="collapse-body">
+          <div class="collapse-body closed">
             <div class="flex flex-wrap gap-2 mb-3" id="prog-drivers">
               ${progression.drivers.map((d, i) => `
                 <label class="flex items-center gap-1.5 text-xs cursor-pointer" style="color:var(--text-primary)">

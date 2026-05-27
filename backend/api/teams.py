@@ -66,6 +66,23 @@ HEADSHOT_2026 = {
     87: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/haasf1team/olibea01/2026haasf1teamolibea01right.webp",
 }
 
+# ── Reserve Drivers (2026 season) ──
+# Per team, usually 1-2 drivers shared across the garage.
+# "TBC" means not yet confirmed / changes mid-season.
+RESERVE_DRIVERS = {
+    "Alpine": "Mick Schumacher",
+    "Aston Martin": "Stoffel Vandoorne",
+    "Audi": "TBC",
+    "Cadillac": "TBC",
+    "Ferrari": "Antonio Giovinazzi / Zhou Guanyu",
+    "Haas F1 Team": "TBC",
+    "McLaren": "Pato O'Ward",
+    "Mercedes": "Frederik Vesti",
+    "Racing Bulls": "TBC",
+    "Red Bull Racing": "TBC",
+    "Williams": "TBC",
+}
+
 # ── Team reference data ──
 # Hardcoded but easy to update via PRs
 TEAM_INFO = {
@@ -331,6 +348,7 @@ async def get_teams(
             "pit_stop_rank": pit["position"],
             "pit_stop_avg": pit["avg_pit_duration"],
             "pit_stop_count": pit["total_stops"],
+            "reserve_driver": RESERVE_DRIVERS.get(team_name, "TBC"),
             "drivers": drivers,
             "driver_count": len(drivers),
         })
