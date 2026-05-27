@@ -5290,14 +5290,12 @@
               }).join('')}
             </div>
             <div class="flex gap-2 mb-3">
-              <button onclick="renderPointsPerWeekend()" class="bg-f1-red text-white px-3 py-1.5 rounded text-xs font-medium hover:opacity-90 transition">📊 Render Chart</button>
+              <button onclick="renderPointsPerWeekend()" class="bg-f1-red text-white px-3 py-1.5 rounded text-xs font-medium hover:opacity-90 transition">🔥 Heatmap</button>
               <button onclick="ppwSelectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">✅ Select All</button>
               <button onclick="ppwDeselectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">⬜ Clear</button>
             </div>
-            <div class="relative" style="height:400px">
-              <canvas id="ppw-chart-canvas"></canvas>
-            </div>
-            <div id="ppw-status" class="text-xs mt-2" style="color:var(--text-muted);text-align:center">Select drivers and click Render Chart</div>
+            <div id="ppw-heatmap-container" style="overflow-x:auto;overflow-y:auto;max-height:600px"></div>
+            <div id="ppw-status" class="text-xs mt-2" style="color:var(--text-muted);text-align:center">Select drivers and click Heatmap</div>
           </div>
         </div>`;
 
@@ -5312,7 +5310,6 @@
   }
 
   // ── Points Per Weekend ──
-  let ppwChartInstance = null;
 
   function ppwSelectAll() {
     document.querySelectorAll('.ppw-cb').forEach(cb => cb.checked = true);
@@ -5324,10 +5321,8 @@
   function renderPointsPerWeekend() {
     if (!window._ppwData) return;
     const { ppwRaces, ppwData, ppwDriverList, ppwColorMap, ppwRaceNames } = window._ppwData;
-    const el = document.getElementById('ppw-chart-canvas');
+    const el = document.getElementById('ppw-heatmap-container');
     if (!el) return;
-
-    if (ppwChartInstance) { ppwChartInstance.destroy(); ppwChartInstance = null; }
 
     // Get selected drivers
     const selected = [];
@@ -5339,82 +5334,95 @@
       return;
     }
 
-    // Build datasets per driver (stacked bar)
-    const datasets = showDrivers.map((dn, idx) => {
-      const d = ppwDriverList.includes(dn) ? null : null;
-      const color = ppwColorMap[dn] || ['#e10600','#16a34a','#3b82f6','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#dc2626','#6366f1','#d946ef','#22c55e','#eab308','#64748b','#0ea5e9','#a855f7','#10b981','#9ca3af'][idx % 20];
-      const data = ppwRaceNames.map(rn => ppwData[rn][dn] || 0);
-      const acronym = document.querySelector(`.ppw-cb[value="${dn}"]`)?.dataset?.acronym || `#${dn}`;
-      return {
-        label: acronym,
-        data: data,
-        backgroundColor: color,
-        borderColor: '#111',
-        borderWidth: 1,
-      };
-    });
-
-    const ctx = el.getContext('2d');
     const isLight = document.documentElement.classList.contains('light');
-    const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
     const textColor = isLight ? '#64748b' : '#8b949e';
+    const borderColor = isLight ? '#e2e8f0' : '#2d333b';
+    const bgColor = isLight ? '#f8fafc' : '#161b22';
+    const zeroColor = isLight ? '#f1f5f9' : '#0d1117';
 
-    ppwChartInstance = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: ppwRaceNames,
-        datasets: datasets,
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 400 },
-        plugins: {
-          title: {
-            display: true,
-            text: showDrivers.length + ' driver(s) · Each bar = total weekend points (Race + Sprint)',
-            color: textColor,
-            font: { size: 11 },
-            padding: { bottom: 8 },
-          },
-          legend: {
-            position: 'top',
-            labels: { color: textColor, font: { size: 9 }, boxWidth: 12, padding: 6 },
-          },
-          tooltip: {
-            mode: 'index',
-            intersect: false,
-            callbacks: {
-              title: (items) => items[0].label,
-              label: (ctx) => {
-                const val = ctx.parsed.y;
-                if (val === 0) return null;
-                return ctx.dataset.label + ': ' + val + ' pts';
-              },
-              footer: (items) => {
-                const total = items.reduce((s, i) => s + (i.parsed.y || 0), 0);
-                return 'Total: ' + total + ' pts';
-              },
-            },
-          },
-        },
-        scales: {
-          x: {
-            grid: { color: gridColor },
-            ticks: { color: textColor, font: { size: 9 }, maxRotation: 30 },
-          },
-          y: {
-            stacked: true,
-            title: { display: true, text: 'Points', color: textColor, font: { size: 11 } },
-            grid: { color: gridColor },
-            ticks: { color: textColor, font: { size: 9 }, stepSize: 5 },
-            beginAtZero: true,
-          },
-        },
-      },
-    });
+    // Find max points for normalization
+    let maxPts = 0;
+    for (const dn of showDrivers) {
+      for (const rn of ppwRaceNames) {
+        maxPts = Math.max(maxPts, ppwData[rn][dn] || 0);
+      }
+    }
+    maxPts = Math.max(maxPts, 1); // avoid div by zero
 
-    document.getElementById('ppw-status').textContent = 'Showing ' + showDrivers.length + ' drivers · ' + ppwRaceNames.length + ' rounds';
+    // Build team color map (dimmed)
+    const teamColors = {};
+    for (const cb of document.querySelectorAll('.ppw-cb')) {
+      const dn = parseInt(cb.value);
+      const base = ppwColorMap[dn] || '#666';
+      teamColors[dn] = base;
+    }
+
+    // Total points per driver
+    const driverTotals = {};
+    for (const dn of showDrivers) {
+      let total = 0;
+      for (const rn of ppwRaceNames) total += ppwData[rn][dn] || 0;
+      driverTotals[dn] = total;
+    }
+    // Sort by total descending
+    const sortedDrivers = [...showDrivers].sort((a, b) => driverTotals[b] - driverTotals[a]);
+
+    // Row height & cell width
+    const nCols = ppwRaceNames.length;
+    const cellW = Math.max(48, Math.min(72, 600 / nCols));
+    const cellH = 28;
+    const rowLabelW = 48;
+
+    let html = `<div style="min-width:${rowLabelW + nCols * cellW + 8}px">`;
+
+    // Header row (race names)
+    html += `<div style="display:flex;gap:2px;margin-bottom:4px;padding-left:${rowLabelW}px">`;
+    for (const rn of ppwRaceNames) {
+      const short = rn.replace(/ Grand Prix$/, '').replace(/^.*\s/, '').slice(0, 4);
+      html += `<div style="width:${cellW}px;text-align:center;font-size:9px;color:${textColor};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${rn}">${short}</div>`;
+    }
+    html += `<div style="width:36px;text-align:center;font-size:9px;color:${textColor};font-weight:bold">Tot</div>`;
+    html += '</div>';
+
+    // Data rows (one per driver)
+    for (const dn of sortedDrivers) {
+      const acronym = document.querySelector(`.ppw-cb[value="${dn}"]`)?.dataset?.acronym || `#${dn}`;
+      const baseColor = teamColors[dn] || '#666';
+      // Create tinted version for background (low opacity)
+      const rgb = baseColor.replace('#', '');
+      const r = parseInt(rgb.slice(0,2), 16);
+      const g = parseInt(rgb.slice(2,4), 16);
+      const b = parseInt(rgb.slice(4,6), 16);
+
+      html += `<div style="display:flex;align-items:center;gap:2px;margin-bottom:1px">`;
+      // Driver label
+      html += `<div style="width:${rowLabelW}px;text-align:right;padding-right:6px;font-size:9px;font-weight:600;color:${baseColor};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${acronym}</div>`;
+
+      // Cells
+      let rowTotal = 0;
+      for (const rn of ppwRaceNames) {
+        const pts = ppwData[rn][dn] || 0;
+        rowTotal += pts;
+        if (pts === 0) {
+          html += `<div style="width:${cellW}px;height:${cellH}px;background:${zeroColor};border-radius:3px;font-size:9px;display:flex;align-items:center;justify-content:center;color:${textColor};opacity:0.3">0</div>`;
+        } else {
+          const intensity = Math.min(1, pts / maxPts);
+          // Scale from dim (0.2) to full color (1.0)
+          const alpha = 0.15 + intensity * 0.85;
+          const cellBg = `rgba(${r},${g},${b},${alpha})`;
+          const textBrightness = (r*0.299 + g*0.587 + b*0.114) * alpha;
+          const cellTextColor = textBrightness > 80 ? '#000' : '#fff';
+          html += `<div style="width:${cellW}px;height:${cellH}px;background:${cellBg};border-radius:3px;font-size:10px;font-weight:bold;display:flex;align-items:center;justify-content:center;color:${cellTextColor}" title="${acronym} - ${rn}: ${pts} pts">${pts}</div>`;
+        }
+      }
+      // Row total
+      html += `<div style="width:36px;text-align:center;font-size:9px;font-weight:bold;color:${textColor}">${rowTotal}</div>`;
+      html += '</div>';
+    }
+
+    html += '</div>';
+    el.innerHTML = html;
+    document.getElementById('ppw-status').textContent = showDrivers.length + ' drivers &times; ' + ppwRaceNames.length + ' rounds &mdash; darker = more points';
   }
 
   // ── Season Analysis ──

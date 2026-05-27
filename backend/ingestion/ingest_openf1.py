@@ -285,6 +285,10 @@ def _store_session(engine, meeting_id: int, session_key: int,
         time.sleep(REQUEST_DELAY)
         _store_weather(session, session_key, session_id)
 
+        # Store race control messages
+        time.sleep(REQUEST_DELAY)
+        _store_race_control(session, session_key, session_id)
+
         # Commit session data first so telemetry (separate connection) can FK reference it
         session.commit()
 
@@ -624,6 +628,43 @@ def _store_weather(sasession, session_key: int, session_id: int):
     except Exception as e:
         sasession.rollback()
         log.warning(f"      ⚠️ Weather error: {e}")
+
+
+def _store_race_control(sasession, session_key: int, session_id: int):
+    """Store race control messages (flags, SC, VSC, penalties, incidents)."""
+    try:
+        rc_data = api_get("race_control", {"session_key": session_key})
+        if not rc_data:
+            log.info("      🚩 No race control data")
+            return
+
+        batch = []
+        for rc in rc_data:
+            ts_str = rc.get("date")
+            ts = _parse_dt(ts_str) if ts_str else None
+            batch.append({
+                "sid": session_id,
+                "ln": rc.get("lap_number"),
+                "cat": rc.get("category"),
+                "flag": rc.get("flag"),
+                "scope": rc.get("scope"),
+                "sector": rc.get("sector"),
+                "dn": rc.get("driver_number"),
+                "msg": (rc.get("message") or "")[:500],
+                "ts": ts,
+            })
+
+        if batch:
+            sasession.execute(text("""
+                INSERT INTO race_control_messages
+                    (session_id, lap_number, category, flag, scope, sector, driver_number, message, timestamp)
+                VALUES (:sid, :ln, :cat, :flag, :scope, :sector, :dn, :msg, :ts)
+                ON CONFLICT DO NOTHING
+            """), batch)
+            log.info(f"      🚩 Stored {len(batch)} race control messages")
+    except Exception as e:
+        sasession.rollback()
+        log.warning(f"      ⚠️ Race control error: {e}")
 
 
 def _parse_dt(val):
