@@ -135,7 +135,8 @@ async def championship_standings(
             sd.full_name,
             sd.name_acronym,
             sd.team_name,
-            sd.team_colour
+            sd.team_colour,
+            sd.country_code AS driver_country_code
         FROM meetings m
         JOIN sessions s ON s.meeting_id = m.id
         JOIN laps l ON l.session_id = s.id
@@ -191,6 +192,7 @@ async def championship_standings(
                 "acronym": r.name_acronym or f"#{driver_num}",
                 "team_name": team,
                 "team_colour": team_colour,
+                "country_code": (r.driver_country_code or "").upper() or "XX",
             }
 
         race_results[(r.race_name, r.meeting_id)].append({
@@ -236,6 +238,7 @@ async def championship_standings(
             "acronym": info["acronym"],
             "team_name": info["team_name"],
             "team_colour": info["team_colour"],
+            "country_code": info.get("country_code", ""),
             "points": pts,
         }
         for i, (dn, pts) in enumerate(
@@ -246,9 +249,14 @@ async def championship_standings(
 
     # Constructor standings
     team_colours = {}
+    team_countries = {}
     for info in driver_details.values():
         if info["team_name"] and info["team_colour"]:
             team_colours[info["team_name"]] = info["team_colour"]
+        if info["team_name"] and info.get("country_code"):
+            # Use first driver's country as team country (fallback)
+            if info["team_name"] not in team_countries:
+                team_countries[info["team_name"]] = info["country_code"]
 
     constructor_standings = [
         {
@@ -256,6 +264,7 @@ async def championship_standings(
             "team_name": team,
             "points": pts,
             "team_colour": team_colours.get(team, ""),
+            "country_code": team_countries.get(team, ""),
         }
         for i, (team, pts) in enumerate(
             sorted(constructor_points.items(), key=lambda x: -x[1])

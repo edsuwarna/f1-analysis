@@ -133,8 +133,9 @@
   .standings-table tr:last-child td { border-bottom: none; }
   .standings-table .col-pos { width: 8%; }
   .standings-table .col-driver { width: 14%; }
+  .standings-table .col-country { width: 4%; min-width: 28px; text-align: center; }
   .standings-table .col-team { width: 14%; }
-  .standings-table .col-progress { width: 64%; }
+  .standings-table .col-progress { width: 60%; }
   .pos-medal { font-size: 16px; }
 
   /* ── Tyre Timeline ── */
@@ -5169,72 +5170,6 @@
       }
       html += `</tbody></table></div></div></div>`;
 
-      // Race results per round — collapsible cards, Race + Sprint separated
-      html += `
-        <div class="card p-5 mb-6">
-          <h3 class="font-semibold text-sm mb-4">📋 Race Results</h3>
-          <div class="space-y-3">
-      `;
-      for (const race of races) {
-        // Separate Race and Sprint results (ALL drivers, sorted by position)
-        const raceResults = race.results.filter(r => r.session_name === 'Race' || r.session_name === undefined).sort((a, b) => a.position - b.position);
-        const sprintResults = race.results.filter(r => r.session_name === 'Sprint').sort((a, b) => a.position - b.position);
-        const hasSprint = sprintResults.length > 0;
-        const sprintKeys = sprintResults.reduce((acc, r) => { acc[r.driver_number] = r; return acc; }, {});
-        const raceKeys = raceResults.reduce((acc, r) => { acc[r.driver_number] = r; return acc; }, {});
-        html += `
-          <div class="card" style="overflow:hidden">
-            <div class="collapse-header flex items-center justify-between p-4" onclick="toggleCollapse(this)">
-              <h4 class="text-sm font-semibold" style="color:var(--text-primary)">🏎️ ${race.race_name}${hasSprint ? ' <span style="color:var(--text-muted);font-weight:400;font-size:11px">· Sprint</span>' : ''}</h4>
-              <span class="collapse-icon">▼</span>
-            </div>
-            <div class="collapse-body closed">
-              <div style="padding:0 16px 16px">
-        `;
-        // Race results — ALL drivers in position order
-        if (raceResults.length > 0) {
-          html += `<div class="text-xs font-semibold mb-2" style="color:var(--text-muted)">🏁 Race</div>
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 mb-3">`;
-          for (const r of raceResults) {
-            const bg = r.team_colour ? teamColor(r.team_colour) : '#666';
-            const pos = r.position;
-            const pts = r.points;
-            const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : `P${pos}`;
-            const ptsBadge = pts > 0 ? `<span class="font-bold" style="color:#fff;background:${bg};border-radius:4px;padding:0 5px;font-size:10px">${pts}</span>` : '';
-            html += `<div class="flex items-center gap-1.5 text-xs" style="background:${bg}22;border:1px solid ${bg}44;border-radius:6px;padding:4px 8px">
-              <span style="font-weight:700;font-size:11px">${medal}</span>
-              <span style="font-weight:600">${r.acronym}</span>
-              <span style="margin-left:auto">${ptsBadge}</span>
-            </div>`;
-          }
-          html += `</div>`;
-        }
-        // Sprint results — ALL drivers in position order
-        if (hasSprint && sprintResults.length > 0) {
-          html += `<div class="text-xs font-semibold mb-2" style="color:var(--text-muted)">⚡ Sprint</div>
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5">`;
-          for (const r of sprintResults) {
-            const bg = r.team_colour ? teamColor(r.team_colour) : '#666';
-            const pts = r.points;
-            const pos = r.position;
-            const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : `P${pos}`;
-            const ptsBadge = pts > 0 ? `<span class="font-bold" style="color:#fff;background:${bg};border-radius:4px;padding:0 5px;font-size:10px">${pts}</span>` : '';
-            html += `<div class="flex items-center gap-1.5 text-xs" style="background:${bg}22;border:1px solid ${bg}44;border-radius:6px;padding:4px 8px">
-              <span style="font-weight:700;font-size:11px">${medal}</span>
-              <span style="font-weight:600">${r.acronym}</span>
-              <span style="margin-left:auto">${ptsBadge}</span>
-            </div>`;
-          }
-          html += `</div>`;
-        }
-        html += `
-              </div>
-            </div>
-          </div>
-        `;
-      }
-      html += `</div></div>`;
-
       // ── Points Per Weekend ──
       if (races.length > 0) {
         // Compute per-GP points per driver
@@ -5384,6 +5319,72 @@
         </div>`;
         window._ppwConData = { ppwRaces, ppwConData, ppwConList: sortedConList, ppwConColorMap, ppwRaceNames, ppwCountryCodes };
       }
+
+      // Race results per round — collapsible cards, Race + Sprint separated
+      html += `
+        <div class="card p-5 mb-6">
+          <h3 class="font-semibold text-sm mb-4">📋 Race Results</h3>
+          <div class="space-y-3">
+      `;
+      for (const race of races) {
+        // Separate Race and Sprint results (ALL drivers, sorted by position)
+        const raceResults = race.results.filter(r => r.session_name === 'Race' || r.session_name === undefined).sort((a, b) => a.position - b.position);
+        const sprintResults = race.results.filter(r => r.session_name === 'Sprint').sort((a, b) => a.position - b.position);
+        const hasSprint = sprintResults.length > 0;
+        const sprintKeys = sprintResults.reduce((acc, r) => { acc[r.driver_number] = r; return acc; }, {});
+        const raceKeys = raceResults.reduce((acc, r) => { acc[r.driver_number] = r; return acc; }, {});
+        html += `
+          <div class="card" style="overflow:hidden">
+            <div class="collapse-header flex items-center justify-between p-4" onclick="toggleCollapse(this)">
+              <h4 class="text-sm font-semibold" style="color:var(--text-primary)">🏎️ ${race.race_name}${hasSprint ? ' <span style="color:var(--text-muted);font-weight:400;font-size:11px">· Sprint</span>' : ''}</h4>
+              <span class="collapse-icon">▼</span>
+            </div>
+            <div class="collapse-body closed">
+              <div style="padding:0 16px 16px">
+        `;
+        // Race results — ALL drivers in position order
+        if (raceResults.length > 0) {
+          html += `<div class="text-xs font-semibold mb-2" style="color:var(--text-muted)">🏁 Race</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 mb-3">`;
+          for (const r of raceResults) {
+            const bg = r.team_colour ? teamColor(r.team_colour) : '#666';
+            const pos = r.position;
+            const pts = r.points;
+            const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : `P${pos}`;
+            const ptsBadge = pts > 0 ? `<span class="font-bold" style="color:#fff;background:${bg};border-radius:4px;padding:0 5px;font-size:10px">${pts}</span>` : '';
+            html += `<div class="flex items-center gap-1.5 text-xs" style="background:${bg}22;border:1px solid ${bg}44;border-radius:6px;padding:4px 8px">
+              <span style="font-weight:700;font-size:11px">${medal}</span>
+              <span style="font-weight:600">${r.acronym}</span>
+              <span style="margin-left:auto">${ptsBadge}</span>
+            </div>`;
+          }
+          html += `</div>`;
+        }
+        // Sprint results — ALL drivers in position order
+        if (hasSprint && sprintResults.length > 0) {
+          html += `<div class="text-xs font-semibold mb-2" style="color:var(--text-muted)">⚡ Sprint</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5">`;
+          for (const r of sprintResults) {
+            const bg = r.team_colour ? teamColor(r.team_colour) : '#666';
+            const pts = r.points;
+            const pos = r.position;
+            const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : `P${pos}`;
+            const ptsBadge = pts > 0 ? `<span class="font-bold" style="color:#fff;background:${bg};border-radius:4px;padding:0 5px;font-size:10px">${pts}</span>` : '';
+            html += `<div class="flex items-center gap-1.5 text-xs" style="background:${bg}22;border:1px solid ${bg}44;border-radius:6px;padding:4px 8px">
+              <span style="font-weight:700;font-size:11px">${medal}</span>
+              <span style="font-weight:600">${r.acronym}</span>
+              <span style="margin-left:auto">${ptsBadge}</span>
+            </div>`;
+          }
+          html += `</div>`;
+        }
+        html += `
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      html += `</div></div>`;
 
       el.innerHTML = html;
     } catch(e) {
