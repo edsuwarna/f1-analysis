@@ -46,6 +46,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ── Health check ──
+@app.get("/health")
+async def health():
+    """Simple health check for container healthcheck + tunnel readiness."""
+    return {"status": "ok"}
+
+
 # Register routers
 app.include_router(meetings.router, prefix="/api", tags=["Meetings"])
 app.include_router(sessions.router, prefix="/api", tags=["Sessions"])

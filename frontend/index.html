@@ -3847,6 +3847,7 @@
           ]
         },
         options: {
+          indexAxis: 'y',
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
@@ -3966,6 +3967,7 @@
           ]
         },
         options: {
+          indexAxis: 'y',
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
@@ -4055,9 +4057,17 @@
     const dn = parseInt(sel.value);
     const drivers = window._gearAnalysisData || [];
     const d = drivers.find(d => d.driver_number === dn);
-    if (!d || !d.gear_distribution) return;
     const el = document.getElementById('gear-distribution-detail');
     if (el._gearChart) { el._gearChart.destroy(); }
+
+    // No gear data available from API — show RPM stats instead
+    if (!d || !d.gear_distribution || Object.keys(d.gear_distribution).length === 0) {
+      el.innerHTML = `<div class="text-xs" style="color:var(--text-muted)">
+        <p>📡 Gear data not available for this session (OpenF1 doesn't provide gear telemetry for 2026).</p>
+        <p class="mt-1">RPM data available: Avg ${d?.avg_rpm || '—'} RPM | Max ${d?.max_rpm || '—'} RPM | ${d?.high_rpm_percentage || '—'}% high RPM</p>
+      </div>`;
+      return;
+    }
 
     const gears = Object.keys(d.gear_distribution).sort((a,b) => parseInt(a) - parseInt(b));
     const labels = gears.map(g => `G${g}`);

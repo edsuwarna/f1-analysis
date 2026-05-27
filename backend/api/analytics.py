@@ -8,6 +8,7 @@ from sqlalchemy import select, text
 
 from backend.core.database import get_db
 from backend.models.models import Session, SessionDriver, Lap, PitStop, Telemetry
+from backend.core.cache import get_cached, set_cache
 
 router = APIRouter()
 
@@ -1510,6 +1511,11 @@ async def get_overtake_mode_analysis(
     Analyzes when Overtake Mode (electrical boost) is used relative to
     the gap to the car ahead. Shows effectiveness, frequency, and speed gains.
     """
+    # Check cache first
+    cached = get_cached("overtake-mode", session_id)
+    if cached:
+        return cached
+
     # Get all telemetry for this session
     result = await db.execute(
         select(Telemetry).where(
@@ -1562,26 +1568,38 @@ async def get_overtake_mode_analysis(
         if len(tele) < 5:
             continue
 
-        # Count overtake mode activations (drs == True / 10 / 12 / 14)
-        om_active = [t for t in tele if t.drs is True or (isinstance(t.drs, int) and t.drs in (10, 12, 14))]
+        # 2026 regs: Overtake Mode (electrical boost) replaces DRS.
+        # Since OpenF1 doesn't provide a dedicated OM field, detect via
+        # full-throttle high-speed sections: throttle > 90%, speed > 200, no brake.
+        # This proxies when a driver is deploying max power on straights.
+        def _is_om(t):
+            if t.throttle is None or t.throttle <= 90:
+                return False
+            if t.speed is None or t.speed <= 200:
+                return False
+            if t.brake is not None and t.brake > 0:
+                return False
+            return True
+
+        om_active = [t for t in tele if _is_om(t)]
         om_count = len(om_active)
         total_count = len(tele)
         om_pct = round((om_count / total_count) * 100, 1) if total_count else 0
 
         # Speed analysis: avg speed with OM on vs off
         speeds_om = [t.speed for t in om_active if t.speed and t.speed > 0]
-        speeds_regular = [t.speed for t in tele if (t.drs is False or t.drs == 0) and t.speed and t.speed > 0]
+        speeds_regular = [t.speed for t in tele if not _is_om(t) and t.speed and t.speed > 0]
 
         avg_speed_om = round(sum(speeds_om) / len(speeds_om), 1) if speeds_om else 0
         avg_speed_regular = round(sum(speeds_regular) / len(speeds_regular), 1) if speeds_regular else 0
         speed_gain = round(avg_speed_om - avg_speed_regular, 1)
 
-        # Detect individual Overtake Mode activation events (consecutive drs=on sequences)
+        # Detect individual activation events (consecutive OM-active sequences)
         events = []
         in_om = False
         event_start = None
         for t in tele:
-            is_om = t.drs is True or (isinstance(t.drs, int) and t.drs in (10, 12, 14))
+            is_om = _is_om(t)
             if is_om and not in_om:
                 in_om = True
                 event_start = t
@@ -1620,13 +1638,15 @@ async def get_overtake_mode_analysis(
 
     drivers_data.sort(key=lambda x: x["om_percentage"], reverse=True)
 
-    return {
+    result = {
         "session_id": session_id,
         "overtake_mode": True,
-        "note": "Overtake Mode replaces DRS in 2026 regs — electrical boost when within 1s of car ahead",
+        "note": "Overtake Mode (ERS electrical boost, replaces DRS in 2026). Detected from full-throttle high-speed sections (>200 km/h, throttle >90%, no brake). Higher % = more time at max power on straights.",
         "total_drivers_analyzed": len(drivers_data),
         "drivers": drivers_data,
     }
+    set_cache("overtake-mode", session_id, result)
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1642,6 +1662,10 @@ async def get_braking_analysis(
     Analyzes telemetry brake data to identify braking events, measure
     brake pressure patterns, and calculate a late-braking aggressiveness score.
     """
+    cached = get_cached("braking", session_id)
+    if cached:
+        return cached
+
     result = await db.execute(
         select(Telemetry).where(
             Telemetry.session_id == session_id,
@@ -1753,11 +1777,13 @@ async def get_braking_analysis(
 
     drivers_data.sort(key=lambda x: x["late_braking_index"], reverse=True)
 
-    return {
+    result = {
         "session_id": session_id,
         "total_drivers_analyzed": len(drivers_data),
         "drivers": drivers_data,
     }
+    set_cache("braking", session_id, result)
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1774,6 +1800,10 @@ async def get_corner_analysis(
     min corner speed, exit speed, and compares across drivers.
     Works with 2026 active aero data — high-downforce mode in corners.
     """
+    cached = get_cached("corner-analysis", session_id)
+    if cached:
+        return cached
+
     result = await db.execute(
         select(Telemetry).where(
             Telemetry.session_id == session_id,
@@ -1865,12 +1895,14 @@ async def get_corner_analysis(
 
     drivers_data.sort(key=lambda x: x["avg_min_corner_speed"], reverse=True)
 
-    return {
+    result = {
         "session_id": session_id,
         "note": "Corner detection: braking + speed reduction + acceleration. 2026 active aero = high-downforce mode in corners.",
         "total_drivers_analyzed": len(drivers_data),
         "drivers": drivers_data,
     }
+    set_cache("corner-analysis", session_id, result)
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1886,6 +1918,10 @@ async def get_gear_analysis(
     Analyzes telemetry gear and RPM data to show each driver's gear usage,
     average RPM per gear, and shift point preferences.
     """
+    cached = get_cached("gear-analysis", session_id)
+    if cached:
+        return cached
+
     result = await db.execute(
         select(Telemetry).where(
             Telemetry.session_id == session_id,
@@ -1921,6 +1957,10 @@ async def get_gear_analysis(
         has_gear_data = any(t.gear is not None for t in tele)
 
         if has_gear_data:
+            gear_counts = defaultdict(int)
+            gear_rpm = defaultdict(list)
+            gear_speed = defaultdict(list)
+            gear_distribution = {}
             for t in tele:
                 if t.gear and t.gear > 0 and t.gear <= 8:
                     gear_counts[t.gear] += 1
@@ -1995,8 +2035,10 @@ async def get_gear_analysis(
 
     drivers_data.sort(key=lambda x: x["avg_shift_up_rpm"], reverse=True)
 
-    return {
+    result = {
         "session_id": session_id,
         "total_drivers_analyzed": len(drivers_data),
         "drivers": drivers_data,
     }
+    set_cache("gear-analysis", session_id, result)
+    return result

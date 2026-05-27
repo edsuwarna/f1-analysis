@@ -28,6 +28,7 @@ services:
     volumes:
       - ./backend:/app/backend
       - ./frontend:/app/frontend
+      - f1_cache:/app/cache
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-f1_user}:${POSTGRES_PASSWORD:-f1_pass_secret}@postgres:5432/${POSTGRES_DB:-f1_analysis}
       CACHE_DIR: /app/cache
@@ -37,6 +38,12 @@ services:
         condition: service_healthy
     restart: unless-stopped
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   ingestion:
     build:
