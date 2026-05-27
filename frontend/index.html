@@ -1444,12 +1444,9 @@
       }
 
       const compoundLabels = { 'SOFT': 'Soft', 'MEDIUM': 'Medium', 'HARD': 'Hard', 'INTERMEDIATE': 'Intermediate', 'WET': 'Wet' };
+      const tyreColors = { 'SOFT': '#FFD700', 'MEDIUM': '#A0A0A0', 'HARD': '#E10600', 'INTERMEDIATE': '#00A651', 'WET': '#005DB9' };
       const lineDashMap = { 'SOFT': [], 'MEDIUM': [6, 4], 'HARD': [3, 6], 'INTERMEDIATE': [10, 4, 4, 4], 'WET': [4, 4, 8, 4] };
-
-      // Driver 1 team color
-      const d1color = f1.length > 0 && f1[0].team_colour ? `#${f1[0].team_colour.replace('#', '')}` : '#e10600';
-      // Driver 2 team color
-      const d2color = f2.length > 0 && f2[0].team_colour ? `#${f2[0].team_colour.replace('#', '')}` : '#16a34a';
+      const compoundOrder = ['SOFT', 'MEDIUM', 'HARD', 'INTERMEDIATE', 'WET'];
 
       const datasets = [];
 
@@ -1472,14 +1469,19 @@
         return `rgb(${r},${g},${b})`;
       }
 
-      // Driver 1 — team color, bold circle points
-      for (const compound of [...new Set(f1.map(l => l.compound))]) {
+      // Sort compounds by predefined order for consistent legend
+      const sortedCompounds1 = [...new Set(f1.map(l => l.compound))].sort((a,b) => compoundOrder.indexOf(a) - compoundOrder.indexOf(b));
+      const sortedCompounds2 = [...new Set(f2.map(l => l.compound))].sort((a,b) => compoundOrder.indexOf(a) - compoundOrder.indexOf(b));
+
+      // Driver 1 — tyre compound color, bold line, circle points
+      for (const compound of sortedCompounds1) {
         const pts = f1.filter(l => l.compound === compound);
+        const tyreColor = tyreColors[compound] || '#888';
         datasets.push({
           label: `${d1name} ${compoundLabels[compound] || compound}`,
           data: pts.map(l => ({ x: l.tyre_age, y: l.lap_duration })),
-          borderColor: d1color,
-          backgroundColor: d1color,
+          borderColor: tyreColor,
+          backgroundColor: tyreColor,
           borderWidth: 2.5,
           borderDash: lineDashMap[compound] || [],
           pointRadius: 5,
@@ -1489,15 +1491,15 @@
           tension: 0.3,
         });
       }
-      // Driver 2 — lightened team color (mix with white), diamond points
-      const d2colorLight = driverColor(d2color, -0.35);
-      for (const compound of [...new Set(f2.map(l => l.compound))]) {
+      // Driver 2 — tyre compound color lightened 35%, triangle points
+      for (const compound of sortedCompounds2) {
         const pts = f2.filter(l => l.compound === compound);
+        const tyreColor = driverColor(tyreColors[compound] || '#888', -0.35);
         datasets.push({
           label: `${d2name} ${compoundLabels[compound] || compound}`,
           data: pts.map(l => ({ x: l.tyre_age, y: l.lap_duration })),
-          borderColor: d2colorLight,
-          backgroundColor: d2colorLight,
+          borderColor: tyreColor,
+          backgroundColor: tyreColor,
           borderWidth: 2,
           borderDash: lineDashMap[compound] || [],
           pointRadius: 6,
@@ -1527,9 +1529,9 @@
           </div>
         </div>
         <div class="text-xs mb-2 flex flex-wrap gap-3 justify-center" style="color:var(--text-muted)">
-          <span>● <strong style="color:${drv1Meta}">${d1name}</strong> (circle · full team color)</span>
-          <span>▲ <strong style="color:${drv2Meta}">${d2name}</strong> (triangle · lightened 35%)</span>
-          <span>— Solid = Soft · — — = Medium · · · = Hard</span>
+          <span>● <strong style="color:${drv1Meta}">${d1name}</strong> (circle)</span>
+          <span>▲ <strong style="color:${drv2Meta}">${d2name}</strong> (triangle)</span>
+          <span>🟡 Soft — ⬜ Medium — 🔴 Hard — 🟢 Inter — 🔵 Wet</span>
         </div>
         <div class="relative" style="height:350px">
           <canvas id="deg-chart-canvas"></canvas>
