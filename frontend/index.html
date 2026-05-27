@@ -51,7 +51,7 @@
   .sector-badge { font-variant-numeric: tabular-nums; }
   .team-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
   .team-badge { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; line-height: 1.4; }
-  .team-logo { display: inline-block; height: 24px; width: auto; vertical-align: middle; object-fit: contain; }
+  .team-logo { display: inline-block; width: 52px; height: 22px; vertical-align: middle; object-fit: contain; }
   .nav-link { color: var(--text-secondary); cursor: pointer; padding: 8px 16px; border-radius: 6px; transition: all .15s; }
   .nav-link:hover { color: var(--text-primary); background: var(--hover-bg); }
   .nav-link.active { color: #fff; background: #e10600; }
@@ -495,10 +495,10 @@
   function teamBadge(teamName, colour) {
     const c = teamColor(colour);
     if (teamName && TEAM_LOGO_MAP[teamName]) {
-      return `<span style="display:flex;align-items:center;justify-content:center;width:100%"><img class="team-logo" src="logos/${TEAM_LOGO_MAP[teamName]}" alt="${teamName}" title="${teamName}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block'" onload="this.style.display='inline-block';this.nextElementSibling.style.display='none'"><span class="team-badge" style="background:${c};color:#fff;border:1px solid rgba(255,255,255,0.1);display:none">${teamName.replace(/ F1 Team$/, '').replace(/ Team$/, '').substring(0, 8)}</span></span>`;
+      return `<span style="display:flex;align-items:center;gap:6px"><img class="team-logo" src="logos/${TEAM_LOGO_MAP[teamName]}" alt="${teamName}" title="${teamName}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block'" onload="this.style.display='inline-block';this.nextElementSibling.style.display='none'"><span class="team-badge" style="background:${c};color:#fff;border:1px solid rgba(255,255,255,0.1);display:none">${teamName.replace(/ F1 Team$/, '').replace(/ Team$/, '').substring(0, 8)}</span></span>`;
     }
     const acronym = (teamName || '').replace(/ F1 Team$/, '').replace(/ Team$/, '').substring(0, 10);
-    return `<span style="display:flex;align-items:center;justify-content:center;width:100%"><span class="team-badge" style="background:${c};color:#fff;border:1px solid rgba(255,255,255,0.1)">${acronym}</span></span>`;
+    return `<span style="display:flex;align-items:center;gap:6px"><span class="team-badge" style="background:${c};color:#fff;border:1px solid rgba(255,255,255,0.1)">${acronym}</span></span>`;
   }
 
   // ── Driver Cell (colored acronym + team dot, properly aligned) ──
@@ -4940,8 +4940,11 @@
               <table>
                 <thead>
                   <tr>
-                    <th>Pos</th><th>Driver</th><th>Team</th>
-                    <th class="text-right">Points</th><th>Progress</th>
+                    <th style="width:50px">Pos</th>
+                    <th style="width:110px">Driver</th>
+                    <th style="min-width:130px">Team</th>
+                    <th class="text-right" style="width:70px">Points</th>
+                    <th style="width:140px">Progress</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4981,7 +4984,12 @@
             <div class="overflow-x-auto">
               <table>
                 <thead>
-                  <tr><th>Pos</th><th>Team</th><th class="text-right">Points</th><th>Progress</th></tr>
+                  <tr>
+                    <th style="width:50px">Pos</th>
+                    <th style="min-width:130px">Team</th>
+                    <th class="text-right" style="width:70px">Points</th>
+                    <th style="width:140px">Progress</th>
+                  </tr>
                 </thead>
                 <tbody>
       `;
