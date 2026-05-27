@@ -121,6 +121,29 @@ async def championship_standings(
                    6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
     SPRINT_POINTS = {1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1}
 
+    # Fallback country codes for 2026 grid (OpenF1 API doesn't provide them)
+    DRIVER_COUNTRIES = {
+        1: "GBR", 3: "NED", 5: "BRA", 6: "FRA",
+        10: "FRA", 11: "MEX", 12: "ITA", 14: "ESP",
+        16: "MON", 18: "CAN", 23: "THA", 27: "GER",
+        30: "NZL", 31: "FRA", 34: "USA", 41: "SWE",
+        43: "ARG", 44: "GBR", 55: "ESP", 63: "GBR",
+        77: "FIN", 81: "AUS", 87: "GBR",
+    }
+    TEAM_COUNTRIES = {
+        "Mercedes": "GER",
+        "Ferrari": "ITA",
+        "McLaren": "GBR",
+        "Red Bull Racing": "AUT",
+        "Alpine": "FRA",
+        "Racing Bulls": "ITA",
+        "Haas F1 Team": "USA",
+        "Williams": "GBR",
+        "Audi": "GER",
+        "Cadillac": "USA",
+        "Aston Martin": "GBR",
+    }
+
     query = text("""
         SELECT
             m.id AS meeting_id,
@@ -192,7 +215,8 @@ async def championship_standings(
                 "acronym": r.name_acronym or f"#{driver_num}",
                 "team_name": team,
                 "team_colour": team_colour,
-                "country_code": (r.driver_country_code or "").upper() or "XX",
+                "country_code": ((r.driver_country_code or "").upper()
+                                 or DRIVER_COUNTRIES.get(driver_num, "XX")),
             }
 
         race_results[(r.race_name, r.meeting_id)].append({
@@ -253,10 +277,13 @@ async def championship_standings(
     for info in driver_details.values():
         if info["team_name"] and info["team_colour"]:
             team_colours[info["team_name"]] = info["team_colour"]
-        if info["team_name"] and info.get("country_code"):
-            # Use first driver's country as team country (fallback)
+        if info["team_name"]:
+            # Prefer team's official nationality, fallback to first driver
             if info["team_name"] not in team_countries:
-                team_countries[info["team_name"]] = info["country_code"]
+                team_countries[info["team_name"]] = (
+                    TEAM_COUNTRIES.get(info["team_name"])
+                    or info.get("country_code", "")
+                )
 
     constructor_standings = [
         {
