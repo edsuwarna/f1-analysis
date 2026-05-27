@@ -358,6 +358,7 @@
         <button onclick="loadSeasonAnalysis()" class="nav-link" id="nav-season" style="padding:6px 10px;font-size:12px">📊 Season</button>
         <button onclick="loadTeamMateBattle()" class="nav-link" id="nav-teammate" style="padding:6px 10px;font-size:12px">🤜 Team Battle</button>
         <button onclick="loadTeams()" class="nav-link" id="nav-teams" style="padding:6px 10px;font-size:12px">🏢 Teams</button>
+        <button onclick="loadNews()" class="nav-link" id="nav-news" style="padding:6px 10px;font-size:12px">📰 News</button>
         <button onclick="showGuide()" class="nav-link" id="nav-guide" style="padding:6px 10px;font-size:12px">📖 Guide</button>
         <button onclick="loadGlossary()" class="nav-link" id="nav-glossary" style="padding:6px 10px;font-size:12px">📚 Glossary</button>
         <button onclick="showAbout()" class="nav-link" id="nav-about" style="padding:6px 10px;font-size:12px">ℹ️ About</button>
@@ -4251,6 +4252,53 @@
     if (icon) icon.classList.toggle('open');
   }
 
+  async function loadNews() {
+    currentView = 'news';
+    saveState('news');
+    setNavActive('nav-news');
+    const el = document.getElementById('content');
+    el.innerHTML = '<div class="text-center py-20" style="color:var(--text-muted)">⏳ Loading F1 news...</div>';
+
+    try {
+      const data = await api('/news');
+      const articles = data.articles || [];
+
+      if (articles.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No news available</div>';
+        return;
+      }
+
+      let html = '<div class="card p-6">';
+      html += '<h2 class="text-xl font-bold mb-1">📰 F1 News</h2>';
+      html += '<p class="text-xs mb-4" style="color:var(--text-muted)">Latest from Motorsport, The Guardian, RaceFans & F1i</p>';
+      html += '<div class="space-y-3">';
+
+      for (const a of articles) {
+        const pubDate = a.pub_date ? new Date(a.pub_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+        html += '<div class="card p-4 hover:opacity-90 transition-opacity" style="border-left:4px solid var(--text-muted)">';
+        html += '<a href="' + a.link + '" target="_blank" rel="noopener noreferrer" style="color:var(--text-primary);text-decoration:none">';
+        html += '<div class="flex items-start gap-3">';
+        if (a.thumbnail) {
+          html += '<img src="' + a.thumbnail + '" alt="" class="rounded hidden sm:block" style="width:100px;height:70px;object-fit:cover;flex-shrink:0" loading="lazy" onerror="this.style.display=\'none\'">';
+        }
+        html += '<div class="flex-1 min-w-0">';
+        html += '<div class="font-semibold text-sm leading-snug mb-1">' + a.title + '</div>';
+        if (a.description) {
+          html += '<div class="text-xs mb-1.5" style="color:var(--text-secondary)">' + a.description.slice(0, 200) + '</div>';
+        }
+        html += '<div class="flex items-center gap-2 text-xs" style="color:var(--text-muted)">';
+        html += '<span class="px-2 py-0.5 rounded text-xs font-medium" style="background:var(--accent);color:#fff">' + a.source_icon + ' ' + a.source + '</span>';
+        if (pubDate) html += '<span>' + pubDate + '</span>';
+        html += '</div></div></div></a></div>';
+      }
+
+      html += '</div></div>';
+      el.innerHTML = html;
+    } catch(e) {
+      el.innerHTML = '<div class="text-center py-8" style="color:#dc2626">Error loading news: ' + e.message + '</div>';
+    }
+  }
+
   async function showAbout() {
     currentView = 'about';
     saveState('about');
@@ -5466,6 +5514,8 @@
     loadTeamMateBattle();
   } else if (savedView === 'teams') {
     loadTeams();
+  } else if (savedView === 'news') {
+    loadNews();
   } else if (savedView === 'session' && savedState) {
     try {
       const s = JSON.parse(savedState);

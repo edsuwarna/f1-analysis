@@ -13,7 +13,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from backend.core.database import init_db
 from backend.core.limiter import limiter
-from backend.api import meetings, sessions, analytics, teams
+from backend.api import meetings, sessions, analytics, teams, news
 
 
 @asynccontextmanager
@@ -59,6 +59,7 @@ app.include_router(meetings.router, prefix="/api", tags=["Meetings"])
 app.include_router(sessions.router, prefix="/api", tags=["Sessions"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(teams.router, prefix="/api/teams", tags=["Teams"])
+app.include_router(news.router, prefix="/api", tags=["News"])
 
 # Serve frontend static files
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
