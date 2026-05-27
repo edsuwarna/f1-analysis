@@ -70,17 +70,17 @@ HEADSHOT_2026 = {
 # Per team, usually 1-2 drivers shared across the garage.
 # "TBC" means not yet confirmed / changes mid-season.
 RESERVE_DRIVERS = {
-    "Alpine": "Mick Schumacher",
-    "Aston Martin": "Stoffel Vandoorne",
-    "Audi": "TBC",
-    "Cadillac": "TBC",
-    "Ferrari": "Antonio Giovinazzi / Zhou Guanyu",
-    "Haas F1 Team": "TBC",
-    "McLaren": "Pato O'Ward",
-    "Mercedes": "Frederik Vesti",
+    "Alpine": "TBC",
+    "Aston Martin": "Jak Crawford (Third Driver)",
+    "Audi": "Ralph Boschung (Development)",
+    "Cadillac": "Zhou Guanyu (Reserve) · Colton Herta (Test)",
+    "Ferrari": "TBC",
+    "Haas F1 Team": "Jack Doohan (Reserve) · Ryo Hirakawa (Reserve)",
+    "McLaren": "Leonardo Fornaroli (Reserve/Test/Development)",
+    "Mercedes": "Frederik Vesti (Third Driver)",
     "Racing Bulls": "TBC",
-    "Red Bull Racing": "TBC",
-    "Williams": "TBC",
+    "Red Bull Racing": "Yuki Tsunoda (Test & Reserve)",
+    "Williams": "Luke Browning (Reserve) · Victor Martins (Test/Development)",
 }
 
 # ── Team reference data ──
