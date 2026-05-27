@@ -95,6 +95,14 @@ RESERVE_HEADSHOTS = {
     "Jack Doohan": "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/common/f1/2025/alpine/jacdoo01/2025alpinejacdoo01right.webp",
 }
 
+# ── Helper: split reserve driver string into array ──
+def _split_reserve(raw: str) -> list:
+    """Split 'Jack Doohan (Reserve) · Ryo Hirakawa (Reserve)' → ['Jack Doohan (Reserve)', 'Ryo Hirakawa (Reserve)']"""
+    if not raw or raw == "TBC":
+        return []
+    parts = [p.strip() for p in raw.split("·")]
+    return [p for p in parts if p]
+
 # ── Team reference data ──
 # Hardcoded but easy to update via PRs
 TEAM_INFO = {
@@ -360,7 +368,7 @@ async def get_teams(
             "pit_stop_rank": pit["position"],
             "pit_stop_avg": pit["avg_pit_duration"],
             "pit_stop_count": pit["total_stops"],
-            "reserve_driver": RESERVE_DRIVERS.get(team_name, "TBC"),
+            "reserve_drivers": _split_reserve(RESERVE_DRIVERS.get(team_name, "TBC")),
             "drivers": drivers,
             "driver_count": len(drivers),
         })
