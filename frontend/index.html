@@ -3676,7 +3676,7 @@
       // Categorize messages
       const categories = {};
       const FLAG_ICONS = { 'YELLOW': '🟡', 'RED': '🔴', 'GREEN': '🟢', 'CHEQUERED': '🏁', 'BLUE': '🔵', 'DOUBLE YELLOW': '🟡🟡', 'WHITE': '⚪', 'BLACK': '⚫', 'BLACK AND WHITE': '🏳️', 'CLEAR': '🟢' };
-      const CAT_ICONS = { 'Flag': '🚩', 'SafetyCar': '🚗', 'Penalty': '⏱️', 'Incident': '⚠️', 'TrackLimit': '📏', 'Other': 'ℹ️' };
+      const CAT_ICONS = { 'Flag': '🎌', 'SafetyCar': '🚗', 'Penalty': '⏱️', 'Incident': '⚠️', 'TrackLimit': '📏', 'Other': 'ℹ️' };
 
       let totalSC = 0, totalVSC = 0, totalPenalties = 0, totalFlags = 0;
 
@@ -3724,37 +3724,43 @@
       for (const cat of categoryOrder) {
         if (!categories[cat] || categories[cat].length === 0) continue;
         const icon = CAT_ICONS[cat] || 'ℹ️';
+        const startOpen = cat === 'SafetyCar' || cat === 'Penalty' || cat === 'Incident';
         html += `
-          <div class="mb-4">
-            <div class="text-xs font-semibold mb-2" style="color:var(--text-muted)">${icon} ${cat} (${categories[cat].length})</div>
-            <div class="overflow-x-auto" style="max-height:300px;overflow-y:auto">
-              <table>
-                <thead>
-                  <tr>
-                    <th class="text-right">Lap</th>
-                    <th>Flag</th>
-                    <th>Scope</th>
-                    <th>Driver</th>
-                    <th>Message</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${categories[cat].map(m => {
-                    const flagIcon = FLAG_ICONS[m.flag] || '';
-                    const driverLabel = m.driver_number ? `#${m.driver_number}` : '—';
-                    const lapLabel = m.lap_number ? `L${m.lap_number}` : '—';
-                    const scopeLabel = m.scope || (m.sector != null ? `S${m.sector}` : '—');
-                    return `
+          <div class="mb-3 card" style="overflow:hidden">
+            <div class="collapse-header flex items-center justify-between p-3" onclick="toggleCollapse(this)">
+              <div class="text-xs font-semibold" style="color:var(--text-muted)">${icon} ${cat} <span class="font-normal" style="color:var(--text-secondary)">(${categories[cat].length})</span></div>
+              <span class="collapse-icon ${startOpen ? 'open' : ''}">${startOpen ? '▲' : '▼'}</span>
+            </div>
+            <div class="collapse-body ${startOpen ? '' : 'closed'}">
+              <div class="overflow-x-auto" style="max-height:320px;overflow-y:auto">
+                <table>
+                  <thead>
                     <tr>
-                      <td class="text-right font-mono" style="color:var(--text-secondary)">${lapLabel}</td>
-                      <td><span class="font-bold">${flagIcon} ${m.flag || '—'}</span></td>
-                      <td style="color:var(--text-secondary)">${scopeLabel}</td>
-                      <td style="color:var(--text-secondary)">${driverLabel}</td>
-                      <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${m.message || '—'}</td>
-                    </tr>`;
-                  }).join('')}
-                </tbody>
-              </table>
+                      <th class="text-right">Lap</th>
+                      <th>Flag</th>
+                      <th>Scope</th>
+                      <th>Driver</th>
+                      <th>Message</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${categories[cat].map(m => {
+                      const flagIcon = FLAG_ICONS[m.flag] || '';
+                      const driverLabel = m.driver_number ? `#${m.driver_number}` : '—';
+                      const lapLabel = m.lap_number ? `L${m.lap_number}` : '—';
+                      const scopeLabel = m.scope || (m.sector != null ? `S${m.sector}` : '—');
+                      return `
+                      <tr>
+                        <td class="text-right font-mono" style="color:var(--text-secondary)">${lapLabel}</td>
+                        <td><span class="font-bold">${flagIcon} ${m.flag || '—'}</span></td>
+                        <td style="color:var(--text-secondary)">${scopeLabel}</td>
+                        <td style="color:var(--text-secondary)">${driverLabel}</td>
+                        <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${m.message || '—'}</td>
+                      </tr>`;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         `;
@@ -5083,9 +5089,9 @@
             <h3 class="font-semibold text-sm">👨‍👩‍👧‍👦 Driver Standings
               <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">${drivers.length} drivers · season points</span>
             </h3>
-            <span class="collapse-icon open">▼</span>
+            <span class="collapse-icon">▼</span>
           </div>
-          <div class="collapse-body">
+          <div class="collapse-body closed">
             <div class="overflow-x-auto">
               <table class="standings-table">
                 <thead>
@@ -5129,9 +5135,9 @@
             <h3 class="font-semibold text-sm">🏭 Constructor Standings
               <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">${constructors.length} teams · season points</span>
             </h3>
-            <span class="collapse-icon open">▼</span>
+            <span class="collapse-icon">▼</span>
           </div>
-          <div class="collapse-body">
+          <div class="collapse-body closed">
             <div class="overflow-x-auto">
               <table class="standings-table">
                 <thead>
@@ -5241,12 +5247,17 @@
         for (const race of ppwRaces) {
           const raceName = race.race_name;
           ppwRaceNames.push(raceName);
-          // Group points by driver for this weekend (Race + Sprint)
+          // Per-driver points split by Race vs Sprint
           const driverPts = {};
           for (const r of race.results) {
             const dn = r.driver_number;
             allPpwDrivers.add(dn);
-            driverPts[dn] = (driverPts[dn] || 0) + (r.points || 0);
+            if (!driverPts[dn]) driverPts[dn] = { race: 0, sprint: 0 };
+            if (r.session_name === 'Sprint') {
+              driverPts[dn].sprint += r.points || 0;
+            } else {
+              driverPts[dn].race += r.points || 0;
+            }
           }
           ppwData[raceName] = driverPts;
         }
@@ -5340,11 +5351,13 @@
     const bgColor = isLight ? '#f8fafc' : '#161b22';
     const zeroColor = isLight ? '#f1f5f9' : '#0d1117';
 
-    // Find max points for normalization
+    // Find max race points for normalization (sprint is secondary)
     let maxPts = 0;
     for (const dn of showDrivers) {
       for (const rn of ppwRaceNames) {
-        maxPts = Math.max(maxPts, ppwData[rn][dn] || 0);
+        const p = ppwData[rn][dn];
+        const racePts = p ? p.race || 0 : 0;
+        maxPts = Math.max(maxPts, racePts);
       }
     }
     maxPts = Math.max(maxPts, 1); // avoid div by zero
@@ -5357,20 +5370,23 @@
       teamColors[dn] = base;
     }
 
-    // Total points per driver
+    // Total points per driver (race + sprint)
     const driverTotals = {};
     for (const dn of showDrivers) {
       let total = 0;
-      for (const rn of ppwRaceNames) total += ppwData[rn][dn] || 0;
+      for (const rn of ppwRaceNames) {
+        const p = ppwData[rn][dn];
+        total += p ? (p.race || 0) + (p.sprint || 0) : 0;
+      }
       driverTotals[dn] = total;
     }
     // Sort by total descending
     const sortedDrivers = [...showDrivers].sort((a, b) => driverTotals[b] - driverTotals[a]);
 
-    // Row height & cell width
+    // Row height & cell width — taller cells for race+sprint info
     const nCols = ppwRaceNames.length;
     const cellW = Math.max(48, Math.min(72, 600 / nCols));
-    const cellH = 28;
+    const cellH = 34; // taller for split view
     const rowLabelW = 48;
 
     let html = `<div style="min-width:${rowLabelW + nCols * cellW + 8}px">`;
@@ -5401,18 +5417,28 @@
       // Cells
       let rowTotal = 0;
       for (const rn of ppwRaceNames) {
-        const pts = ppwData[rn][dn] || 0;
+        const p = ppwData[rn][dn];
+        const racePts = p ? p.race || 0 : 0;
+        const sprintPts = p ? p.sprint || 0 : 0;
+        const pts = racePts + sprintPts;
         rowTotal += pts;
         if (pts === 0) {
           html += `<div style="width:${cellW}px;height:${cellH}px;background:${zeroColor};border-radius:3px;font-size:9px;display:flex;align-items:center;justify-content:center;color:${textColor};opacity:0.3">0</div>`;
         } else {
-          const intensity = Math.min(1, pts / maxPts);
-          // Scale from dim (0.2) to full color (1.0)
+          const intensity = Math.min(1, racePts / maxPts);
           const alpha = 0.15 + intensity * 0.85;
           const cellBg = `rgba(${r},${g},${b},${alpha})`;
           const textBrightness = (r*0.299 + g*0.587 + b*0.114) * alpha;
           const cellTextColor = textBrightness > 80 ? '#000' : '#fff';
-          html += `<div style="width:${cellW}px;height:${cellH}px;background:${cellBg};border-radius:3px;font-size:10px;font-weight:bold;display:flex;align-items:center;justify-content:center;color:${cellTextColor}" title="${acronym} - ${rn}: ${pts} pts">${pts}</div>`;
+          // Split display: race pts big, sprint +N small below
+          if (sprintPts > 0) {
+            html += `<div style="width:${cellW}px;height:${cellH}px;background:${cellBg};border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:${cellTextColor};line-height:1.2" title="${acronym} - ${rn}: Race ${racePts} + Sprint ${sprintPts} = ${pts} pts">
+              <span style="font-size:10px;font-weight:bold">${racePts}</span>
+              <span style="font-size:7px;opacity:0.85">+${sprintPts}</span>
+            </div>`;
+          } else {
+            html += `<div style="width:${cellW}px;height:${cellH}px;background:${cellBg};border-radius:3px;font-size:10px;font-weight:bold;display:flex;align-items:center;justify-content:center;color:${cellTextColor}" title="${acronym} - ${rn}: ${racePts} pts">${racePts}</div>`;
+          }
         }
       }
       // Row total
@@ -5422,7 +5448,7 @@
 
     html += '</div>';
     el.innerHTML = html;
-    document.getElementById('ppw-status').textContent = showDrivers.length + ' drivers &times; ' + ppwRaceNames.length + ' rounds &mdash; darker = more points';
+    document.getElementById('ppw-status').textContent = showDrivers.length + ' drivers &times; ' + ppwRaceNames.length + ' rounds &mdash; race pts (main) + sprint (small)';
   }
 
   // ── Season Analysis ──
