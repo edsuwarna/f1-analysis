@@ -339,6 +339,9 @@
     .top-bar.session-bar { padding: 10px 24px 8px; }
   }
   .top-bar-spacer { height: 0; }
+
+  /* Scroll offset for sticky top bar */
+  .card.p-5 { scroll-margin-top: 130px; }
 </style>
 </head>
 <body>
@@ -456,7 +459,11 @@
             const icon = body.previousElementSibling?.querySelector('.collapse-icon');
             if (icon) icon.classList.add('open');
           }
-          card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // Scroll with offset for sticky top bar
+          const topBar = document.querySelector('.top-bar');
+          const offset = topBar ? topBar.offsetHeight + 12 : 0;
+          const top = card.getBoundingClientRect().top + window.scrollY - offset;
+          window.scrollTo({ top, behavior: 'smooth' });
         };
         list.appendChild(item);
       });
