@@ -528,6 +528,13 @@
     return `<span style="display:flex;align-items:center;gap:6px"><span class="team-badge" style="background:${c};color:#fff;border:1px solid rgba(255,255,255,0.1)">${acronym}</span></span>`;
   }
 
+  // ── Country Flag Emoji ──
+  function flagEmoji(cc) {
+    if (!cc || cc === 'XX') return '';
+    const base = 0x1F1E6;
+    return String.fromCodePoint(base + (cc.charCodeAt(0) - 65), base + (cc.charCodeAt(1) - 65));
+  }
+
   // ── Driver Cell (colored acronym + team dot, properly aligned) ──
   function driverCell(acronym, colour) {
     const c = teamColor(colour);
@@ -5099,6 +5106,7 @@
                   <tr>
                     <th class="col-pos">Pos</th>
                     <th class="col-driver">Driver</th>
+                    <th class="col-country"></th>
                     <th class="col-team">Team</th>
                     <th class="col-progress">Points</th>
                   </tr>
@@ -5114,6 +5122,7 @@
           <tr>
             <td class="col-pos">${medal}</td>
             <td class="col-driver">${driverCell(d.acronym, d.team_colour)}</td>
+            <td class="col-country">${flagEmoji(d.country_code)}</td>
             <td class="col-team">${teamBadge(d.team_name, d.team_colour)}</td>
             <td class="col-progress">
               <div class="flex items-center gap-2">
@@ -5144,6 +5153,7 @@
                 <thead>
                   <tr>
                     <th class="col-pos">Pos</th>
+                    <th class="col-country"></th>
                     <th class="col-team">Team</th>
                     <th class="col-progress">Points</th>
                   </tr>
@@ -5156,6 +5166,7 @@
         html += `
           <tr>
             <td class="col-pos"><span class="pos-medal" style="color:${c.position <= 3 ? ['#ffd700','#c0c0c0','#cd7f32'][c.position-1] : 'var(--text-secondary)'}">${c.position}</span></td>
+            <td class="col-country">${flagEmoji(c.country_code)}</td>
             <td class="col-team">${teamBadge(c.team_name, c.team_colour)}</td>
             <td class="col-progress">
               <div class="flex items-center gap-2">
@@ -5220,7 +5231,7 @@
         html += `
         <div class="card p-5 mb-6">
           <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
-            <h3 class="font-semibold text-sm">📊 Points Per Weekend
+            <h3 class="font-semibold text-sm">📊 Driver Points Per Weekend
               <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Points distribution across rounds</span>
             </h3>
             <span class="collapse-icon">▼</span>
