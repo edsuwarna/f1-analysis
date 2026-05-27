@@ -441,8 +441,7 @@
       cards.forEach(card => {
         const header = card.querySelector('.collapse-header h3');
         if (!header) return;
-        // Skip disabled/hidden sections
-        if (header.closest('.collapse-body') && header.closest('.collapse-body').classList.contains('closed')) return;
+        // Skip if section content is empty / unavailable
         const text = header.textContent.replace(/[▼▲]\s*$/, '').trim();
         if (!text || text.includes('Only available')) return;
         const item = document.createElement('div');
@@ -450,6 +449,13 @@
         item.textContent = text;
         item.onclick = () => {
           toggleToc();
+          // Auto-open if collapsed
+          const body = card.querySelector('.collapse-body.closed');
+          if (body) {
+            body.classList.remove('closed');
+            const icon = body.previousElementSibling?.querySelector('.collapse-icon');
+            if (icon) icon.classList.add('open');
+          }
           card.scrollIntoView({ behavior: 'smooth', block: 'start' });
         };
         list.appendChild(item);
@@ -841,7 +847,7 @@
           html += `
             <tr>
               <td style="color:var(--text-secondary)">${i + 1}</td>
-              <td class="font-medium">${d.acronym || '—'}</td>
+              <td class="font-medium">${d.team_colour ? driverCell(d.acronym, d.team_colour) : (d.acronym || '—')}</td>
               <td>${teamBadge(d.team, d.team_colour)}</td>
               <td class="text-right font-mono ${bestS1 ? 'font-bold' : ''}" style="${s1Color ? 'color:' + s1Color : ''}${s1Bold ? ';' + s1Bold : ''}">${formatTime(d.best_sector_1)}</td>
               <td class="text-right font-mono ${bestS2 ? 'font-bold' : ''}" style="${s2Color ? 'color:' + s2Color : ''}${s2Bold ? ';' + s2Bold : ''}">${formatTime(d.best_sector_2)}</td>
@@ -970,7 +976,7 @@
           ).join('');
           html += `
             <tr>
-              <td class="font-medium">${drv ? drv.name_acronym : dn}</td>
+              <td class="font-medium">${drv ? driverCell(drv.name_acronym, drv.team_colour) : dn}</td>
               <td>${teamBadge(drv?.team_name, drv?.team_colour)}</td>
               <td colspan="6">${stintCells}</td>
             </tr>
@@ -1074,7 +1080,7 @@
           const laps = stops.map(p => p.lap_number).sort((a,b) => a-b).join(', ');
           html += `
             <tr>
-              <td class="font-medium">${drv ? drv.name_acronym : dn}</td>
+              <td class="font-medium">${drv ? driverCell(drv.name_acronym, drv.team_colour) : dn}</td>
               <td>${teamBadge(drv?.team_name, drv?.team_colour)}</td>
               <td class="text-right">${stops.length}</td>
               <td class="text-right font-mono">${avgStop.toFixed(1)}s</td>
@@ -1740,7 +1746,7 @@
                 return `
                   <tr>
                     <td style="color:var(--text-secondary)">${i + 1}</td>
-                    <td class="font-medium">${s.acronym || `#${dn}`}</td>
+                    <td class="font-medium">${s.team_colour ? driverCell(s.acronym, s.team_colour) : (s.acronym || `#${dn}`)}</td>
                     <td>${s.team_name ? teamBadge(s.team_name, s.team_colour) : '—'}</td>
                     <td class="text-right font-mono ${isLeader ? 'font-bold' : ''}" style="${isLeader ? 'color:#16a34a' : ''}">${isLeader ? '0.000s (P1)' : '+' + finalGap.toFixed(3) + 's'}</td>
                     <td class="text-right font-mono" style="color:var(--text-secondary)">${maxGap > 0 ? '+' + maxGap.toFixed(1) + 's' : '—'}</td>
@@ -1957,10 +1963,9 @@
 
     for (let i = 0; i < drivers.length; i++) {
       const d = drivers[i];
-      const teamC = d.team_colour ? teamColor(d.team_colour) : '#666';
       html += `<tr>
         <td style="color:var(--text-secondary)">${i + 1}</td>
-        <td class="font-medium" style="color:${teamC}">${d.acronym}</td>
+        <td class="font-medium">${driverCell(d.acronym, d.team_colour)}</td>
         <td>${teamBadge(d.team_name, d.team_colour)}</td>`;
 
       for (const seg of segments) {
@@ -2149,7 +2154,6 @@
       `;
       for (let i = 0; i < drivers.length; i++) {
         const d = drivers[i];
-        const teamC = d.team_colour ? teamColor(d.team_colour) : '#666';
         html += `
           <tr>
             <td style="color:var(--text-secondary)">${i + 1}</td>
@@ -2340,7 +2344,6 @@
       allStops.sort((a, b) => (b.pit_duration || 99) - (a.pit_duration || 99));
 
       for (const stop of allStops) {
-        const color = stop.team_colour ? teamColor(stop.team_colour) : '#666';
         const isFast = stop.pit_duration && stop.pit_duration < 23;
         const isSlow = stop.pit_duration && stop.pit_duration > 30;
         const delta = stop.delta;
@@ -2348,7 +2351,7 @@
         const deltaIcon = delta !== null ? (delta < -0.5 ? ' 🟢' : delta > 0.5 ? ' 🔴' : '') : '';
         html += `
           <tr>
-            <td class="font-medium" style="color:${color}">${stop.acronym}</td>
+            <td class="font-medium">${driverCell(stop.acronym, stop.team_colour)}</td>
             <td style="color:var(--text-secondary)">L${stop.lap_number}</td>
             <td class="text-right font-mono ${isFast ? 'font-bold' : ''}" style="${isFast ? 'color:#16a34a' : isSlow ? 'color:#dc2626' : ''}">${stop.pit_duration ? stop.pit_duration.toFixed(1) + 's' : '—'}</td>
             <td class="text-right font-mono" style="color:var(--text-secondary)">${stop.in_lap_time ? stop.in_lap_time.toFixed(3) + 's' : '—'}</td>
@@ -2542,12 +2545,11 @@
       `;
       sortedDrivers.forEach(([dn, stats], i) => {
         const meta = driverMeta[dn] || {};
-        const color = meta.team_colour ? teamColor(meta.team_colour) : '#666';
         const netClass = stats.net > 0 ? 'color:#16a34a;font-weight:700' : stats.net < 0 ? 'color:#dc2626' : '';
         html += `
           <tr>
             <td style="color:var(--text-secondary)">${i + 1}</td>
-            <td class="font-medium" style="color:${color}">${meta.acronym || `#${dn}`}</td>
+            <td class="font-medium">${meta.team_colour ? driverCell(meta.acronym, meta.team_colour) : (meta.acronym || `#${dn}`)}</td>
             <td class="text-right font-mono" style="color:#16a34a">+${stats.gained}</td>
             <td class="text-right font-mono" style="color:#dc2626">-${stats.lost}</td>
             <td class="text-right font-mono font-bold" style="${netClass}">${stats.net > 0 ? '+' : ''}${stats.net}</td>
