@@ -225,6 +225,14 @@
     .stats-strip > span { font-size: 10px; }
     /* Section nav button inside cards */
     .section-nav-btn { display: none !important; }
+    /* ToC button: smaller & repositioned so it doesn't cover table content */
+    .toc-btn {
+      width: 40px !important;
+      height: 40px !important;
+      font-size: 16px !important;
+      bottom: 12px !important;
+      right: 12px !important;
+    }
   }
 
   /* ── Floating ToC Button ── */
@@ -4034,8 +4042,8 @@
                 <tr>
                   <td style="color:var(--text-muted)">${i + 1}</td>
                   <td><span style="background:#${d.team_colour || '666'};width:8px;height:8px;display:inline-block;border-radius:2px;margin-right:4px;vertical-align:middle"></span>${d.acronym}</td>
-                  <td style="text-align:right">${d.total_shifts}</td>
-                  <td style="text-align:right;font-weight:bold">${d.avg_shift_up_rpm}</td>
+                  <td style="text-align:right">${d.total_shifts > 0 ? d.total_shifts : '—'}</td>
+                  <td style="text-align:right;font-weight:bold">${d.avg_shift_up_rpm > 0 ? d.avg_shift_up_rpm : '—'}</td>
                   <td style="text-align:right">${d.max_rpm}</td>
                   <td style="text-align:right">${d.avg_rpm}</td>
                   <td style="text-align:right">${d.high_rpm_percentage}%</td>
@@ -4129,11 +4137,11 @@
           <div>Avg RPM</div>
         </div>
         <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
-          <div class="font-bold text-base" style="color:var(--text-primary)">${d.avg_shift_up_rpm.toLocaleString()}</div>
+          <div class="font-bold text-base" style="color:var(--text-primary)">${d.avg_shift_up_rpm > 0 ? d.avg_shift_up_rpm.toLocaleString() : '—'}</div>
           <div>Shift-Up RPM</div>
         </div>
         <div class="text-center p-2" style="background:var(--bg-primary);border-radius:6px">
-          <div class="font-bold text-base" style="color:var(--text-primary)">${d.total_shifts.toLocaleString()}</div>
+          <div class="font-bold text-base" style="color:var(--text-primary)">${d.total_shifts > 0 ? d.total_shifts.toLocaleString() : '—'}</div>
           <div>Total Shifts</div>
         </div>
       </div>
