@@ -83,6 +83,18 @@ RESERVE_DRIVERS = {
     "Williams": "Luke Browning (Reserve) · Victor Martins (Test/Development)",
 }
 
+# ── Reserve Driver Headshots ──
+# Only drivers with existing F1-media CDN headshots.
+# Others will show the 🔄 icon as fallback.
+RESERVE_HEADSHOTS = {
+    "Yuki Tsunoda": "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/common/f1/2026/racingbulls/yuktsu01/2026racingbullsyuktsu01right.webp",
+    "Frederik Vesti": "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/common/f1/2026/mercedes/freves01/2026mercedesfreves01right.webp",
+    "Jak Crawford": "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/common/f1/2026/astonmartin/jakcra01/2026astonmartinjakcra01right.webp",
+    "Luke Browning": "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/common/f1/2026/williams/lukbro01/2026williamslukbro01right.webp",
+    "Ryo Hirakawa": "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/common/f1/2026/haasf1team/ryohir01/2026haasf1teamryohir01right.webp",
+    "Jack Doohan": "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/common/f1/2025/alpine/jacdoo01/2025alpinejacdoo01right.webp",
+}
+
 # ── Team reference data ──
 # Hardcoded but easy to update via PRs
 TEAM_INFO = {
@@ -360,4 +372,5 @@ async def get_teams(
         "year": year,
         "total_teams": len(teams),
         "teams": teams,
+        "reserve_headshots": RESERVE_HEADSHOTS,
     }

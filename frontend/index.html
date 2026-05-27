@@ -4560,6 +4560,8 @@
         </div>
       `;
 
+      const reserveHS = teamsData.reserve_headshots || {};
+
       for (const team of teamsData.teams) {
         const tc = team.team_colour || '#666';
         const drivers = team.drivers || [];
@@ -4636,14 +4638,20 @@
                     ${driverCards}
                   </div>
                   ${team.reserve_driver && team.reserve_driver !== 'TBC' ? `
+                    ${(() => {
+                      const rn = Object.keys(reserveHS).find(n => team.reserve_driver.includes(n));
+                      const ru = rn ? reserveHS[rn] : null;
+                      return `
                     <h4 class="text-xs font-semibold mt-3 mb-2" style="color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">🔄 Reserve Driver</h4>
                     <div class="flex items-center gap-3 p-2.5 rounded" style="background:var(--bg-primary);border:1px dashed var(--border-color)">
-                      <div style="width:36px;height:36px;border-radius:50%;background:${tc}22;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px">🔄</div>
+                      <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:${tc}22;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--text-muted)">
+                        ${ru ? `<img src="${ru}" alt="" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.parentElement.textContent='🔄'">` : '🔄'}
+                      </div>
                       <div>
                         <div class="text-sm font-semibold" style="color:var(--text-primary)">${team.reserve_driver}</div>
                         <div class="text-xs" style="color:var(--text-muted)">Reserve Driver</div>
                       </div>
-                    </div>
+                    </div>`;})()}
                   ` : ''}
                 </div>
               </div>
