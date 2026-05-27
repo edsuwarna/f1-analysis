@@ -126,7 +126,7 @@ async def championship_standings(
         1: "GBR", 3: "NED", 5: "BRA", 6: "FRA",
         10: "FRA", 11: "MEX", 12: "ITA", 14: "ESP",
         16: "MON", 18: "CAN", 23: "THA", 27: "GER",
-        30: "NZL", 31: "FRA", 34: "USA", 41: "SWE",
+        30: "NZL", 31: "FRA", 34: "USA", 41: "GBR",
         43: "ARG", 44: "GBR", 55: "ESP", 63: "GBR",
         77: "FIN", 81: "AUS", 87: "GBR",
     }
