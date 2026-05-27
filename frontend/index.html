@@ -110,6 +110,29 @@
   .collapse-icon.open { transform: rotate(180deg); }
   .collapse-body { overflow: hidden; }
   .collapse-body.closed { display: none; }
+  .standings-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+  .standings-table th {
+    padding: 8px 6px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .standings-table td {
+    padding: 6px 6px;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 13px;
+  }
+  .standings-table tr:last-child td { border-bottom: none; }
+  .standings-table .col-pos { width: 8%; }
+  .standings-table .col-driver { width: 14%; }
+  .standings-table .col-team { width: 14%; }
+  .standings-table .col-progress { width: 64%; }
+  .pos-medal { font-size: 16px; }
 
   /* ── Tyre Timeline ── */
   .tyme-row {
@@ -4933,17 +4956,17 @@
             <h3 class="font-semibold text-sm">👨‍👩‍👧‍👦 Driver Standings
               <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">${drivers.length} drivers · season points</span>
             </h3>
-            <span class="collapse-icon">▼</span>
+            <span class="collapse-icon open">▼</span>
           </div>
-          <div class="collapse-body closed">
+          <div class="collapse-body">
             <div class="overflow-x-auto">
-              <table>
+              <table class="standings-table">
                 <thead>
                   <tr>
-                    <th style="width:50px">Pos</th>
-                    <th style="width:110px">Driver</th>
-                    <th style="min-width:80px">Team</th>
-                    <th style="width:340px">Progress</th>
+                    <th class="col-pos">Pos</th>
+                    <th class="col-driver">Driver</th>
+                    <th class="col-team">Team</th>
+                    <th class="col-progress">Points</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4952,16 +4975,16 @@
       for (const d of drivers) {
         const pct = (d.points / maxPts * 100).toFixed(0);
         const teamC = d.team_colour ? teamColor(d.team_colour) : '#666';
-        const medal = d.position === 1 ? '🥇' : d.position === 2 ? '🥈' : d.position === 3 ? '🥉' : d.position;
+        const medal = d.position === 1 ? '🥇' : d.position === 2 ? '🥈' : d.position === 3 ? '🥉' : `<span class="pos-medal" style="color:var(--text-secondary)">${d.position}</span>`;
         html += `
           <tr>
-            <td class="font-bold" style="color:${d.position <= 3 ? ['#ffd700','#c0c0c0','#cd7f32'][d.position-1] : 'var(--text-secondary)'}">${medal}</td>
-            <td>${driverCell(d.acronym, d.team_colour)}</td>
-            <td>${teamBadge(d.team_name, d.team_colour)}</td>
-            <td style="width:340px">
+            <td class="col-pos">${medal}</td>
+            <td class="col-driver">${driverCell(d.acronym, d.team_colour)}</td>
+            <td class="col-team">${teamBadge(d.team_name, d.team_colour)}</td>
+            <td class="col-progress">
               <div class="flex items-center gap-2">
-                <div style="flex:1;background:var(--bg-primary);border-radius:5px;height:14px;overflow:hidden">
-                  <div style="width:${pct}%;height:100%;background:${teamC};border-radius:5px;transition:width 0.5s"></div>
+                <div style="flex:1;background:var(--bg-primary);border-radius:6px;height:14px;overflow:hidden">
+                  <div style="width:${pct}%;height:100%;background:${teamC};border-radius:6px;transition:width 0.5s"></div>
                 </div>
                 <span class="font-mono text-xs font-bold" style="color:${teamC};min-width:32px;text-align:right">${d.points}</span>
               </div>
@@ -4979,16 +5002,16 @@
             <h3 class="font-semibold text-sm">🏭 Constructor Standings
               <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">${constructors.length} teams · season points</span>
             </h3>
-            <span class="collapse-icon">▼</span>
+            <span class="collapse-icon open">▼</span>
           </div>
-          <div class="collapse-body closed">
+          <div class="collapse-body">
             <div class="overflow-x-auto">
-              <table>
+              <table class="standings-table">
                 <thead>
                   <tr>
-                    <th style="width:50px">Pos</th>
-                    <th style="min-width:80px">Team</th>
-                    <th style="width:340px">Progress</th>
+                    <th class="col-pos">Pos</th>
+                    <th class="col-team">Team</th>
+                    <th class="col-progress">Points</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4998,12 +5021,12 @@
         const col = c.team_colour ? `#${c.team_colour.replace('#', '')}` : '#666';
         html += `
           <tr>
-            <td class="font-bold" style="color:${c.position <= 3 ? ['#ffd700','#c0c0c0','#cd7f32'][c.position-1] : 'var(--text-secondary)'}">${c.position}</td>
-            <td>${teamBadge(c.team_name, c.team_colour)}</td>
-            <td style="width:340px">
+            <td class="col-pos"><span class="pos-medal" style="color:${c.position <= 3 ? ['#ffd700','#c0c0c0','#cd7f32'][c.position-1] : 'var(--text-secondary)'}">${c.position}</span></td>
+            <td class="col-team">${teamBadge(c.team_name, c.team_colour)}</td>
+            <td class="col-progress">
               <div class="flex items-center gap-2">
-                <div style="flex:1;background:var(--bg-primary);border-radius:5px;height:14px;overflow:hidden">
-                  <div style="width:${pct}%;height:100%;background:${col};border-radius:5px;transition:width 0.5s"></div>
+                <div style="flex:1;background:var(--bg-primary);border-radius:6px;height:14px;overflow:hidden">
+                  <div style="width:${pct}%;height:100%;background:${col};border-radius:6px;transition:width 0.5s"></div>
                 </div>
                 <span class="font-mono text-xs font-bold" style="color:${col};min-width:32px;text-align:right">${c.points}</span>
               </div>
