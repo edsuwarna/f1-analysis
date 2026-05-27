@@ -1,8 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#e10600">
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>F1 Analysis 2026</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://cdn.tailwindcss.com">
@@ -1434,6 +1437,24 @@
             <div class="text-center py-8" style="color:var(--text-muted)">
               <button onclick="loadWeather(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">🌤️ Load Weather Timeline</button>
               <div class="mt-2 text-xs">Air temp, track temp, humidity, and rainfall changes throughout the session.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 🏁 Race Director Timeline -->
+      <div class="card p-5 mt-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm">🏁 Race Director Timeline
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Flags, SC, VSC, penalties &amp; incidents</span>
+          </h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body closed">
+          <div id="racecontrol-area-${sessionId}">
+            <div class="text-center py-8" style="color:var(--text-muted)">
+              <button onclick="loadRaceControl(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">🏁 Load Race Director Timeline</button>
+              <div class="mt-2 text-xs">Race control messages including flags, safety car periods, VSC, penalties, and track limits.</div>
             </div>
           </div>
         </div>
@@ -3639,6 +3660,112 @@
     }
   }
 
+  // ── Race Director Timeline ──
+  async function loadRaceControl(sessionId) {
+    const el = document.getElementById(`racecontrol-area-${sessionId}`);
+    if (!el) return;
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading race control data...</div>';
+
+    try {
+      const data = await api(`/sessions/${sessionId}/race-control`);
+      if (!data || data.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No race control messages for this session</div>';
+        return;
+      }
+
+      // Categorize messages
+      const categories = {};
+      const FLAG_ICONS = { 'YELLOW': '🟡', 'RED': '🔴', 'GREEN': '🟢', 'CHEQUERED': '🏁', 'BLUE': '🔵', 'DOUBLE YELLOW': '🟡🟡', 'WHITE': '⚪', 'BLACK': '⚫', 'BLACK AND WHITE': '🏳️', 'CLEAR': '🟢' };
+      const CAT_ICONS = { 'Flag': '🚩', 'SafetyCar': '🚗', 'Penalty': '⏱️', 'Incident': '⚠️', 'TrackLimit': '📏', 'Other': 'ℹ️' };
+
+      let totalSC = 0, totalVSC = 0, totalPenalties = 0, totalFlags = 0;
+
+      for (const msg of data) {
+        const cat = msg.category || 'Other';
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(msg);
+        if (cat === 'SafetyCar') {
+          if (msg.flag === 'VSC' || (msg.message && msg.message.includes('VSC'))) totalVSC++;
+          else totalSC++;
+        }
+        if (cat === 'Penalty') totalPenalties++;
+        if (cat === 'Flag' || msg.flag) totalFlags++;
+      }
+
+      // Summary cards
+      const uniqueLaps = new Set(data.filter(m => m.lap_number).map(m => m.lap_number)).size;
+      let html = `
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4 text-xs" style="color:var(--text-secondary)">
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">${data.length}</div>
+            <div>Total Messages</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">${uniqueLaps}</div>
+            <div>Laps with Events</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:#f59e0b">${totalSC + totalVSC}</div>
+            <div>SC/VSC Periods (${totalSC} SC + ${totalVSC} VSC)</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:#dc2626">${totalPenalties}</div>
+            <div>Penalties</div>
+          </div>
+          <div class="card p-3 text-center">
+            <div class="font-bold" style="color:var(--text-primary)">${totalFlags}</div>
+            <div>Flag Events</div>
+          </div>
+        </div>
+      `;
+
+      // Timeline table — grouped by category
+      const categoryOrder = ['SafetyCar', 'Flag', 'Penalty', 'Incident', 'TrackLimit', 'Other'];
+      for (const cat of categoryOrder) {
+        if (!categories[cat] || categories[cat].length === 0) continue;
+        const icon = CAT_ICONS[cat] || 'ℹ️';
+        html += `
+          <div class="mb-4">
+            <div class="text-xs font-semibold mb-2" style="color:var(--text-muted)">${icon} ${cat} (${categories[cat].length})</div>
+            <div class="overflow-x-auto" style="max-height:300px;overflow-y:auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="text-right">Lap</th>
+                    <th>Flag</th>
+                    <th>Scope</th>
+                    <th>Driver</th>
+                    <th>Message</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${categories[cat].map(m => {
+                    const flagIcon = FLAG_ICONS[m.flag] || '';
+                    const driverLabel = m.driver_number ? `#${m.driver_number}` : '—';
+                    const lapLabel = m.lap_number ? `L${m.lap_number}` : '—';
+                    const scopeLabel = m.scope || (m.sector != null ? `S${m.sector}` : '—');
+                    return `
+                    <tr>
+                      <td class="text-right font-mono" style="color:var(--text-secondary)">${lapLabel}</td>
+                      <td><span class="font-bold">${flagIcon} ${m.flag || '—'}</span></td>
+                      <td style="color:var(--text-secondary)">${scopeLabel}</td>
+                      <td style="color:var(--text-secondary)">${driverLabel}</td>
+                      <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${m.message || '—'}</td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+
+      el.innerHTML = html;
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
+  }
+
   // ── Overtake Mode Analysis ──
   async function loadOvertakeMode(sessionId) {
     const el = document.getElementById('overtake-mode-chart-area');
@@ -5102,12 +5229,193 @@
       }
       html += `</div></div>`;
 
+      // ── Points Per Weekend ──
+      if (races.length > 0) {
+        // Compute per-GP points per driver
+        const ppwRaces = races.toReversed(); // chronological order
+        const ppwDrivers = drivers.map(d => d.driver_number);
+        const ppwData = {};
+        const ppwRaceNames = [];
+        const allPpwDrivers = new Set();
+
+        for (const race of ppwRaces) {
+          const raceName = race.race_name;
+          ppwRaceNames.push(raceName);
+          // Group points by driver for this weekend (Race + Sprint)
+          const driverPts = {};
+          for (const r of race.results) {
+            const dn = r.driver_number;
+            allPpwDrivers.add(dn);
+            driverPts[dn] = (driverPts[dn] || 0) + (r.points || 0);
+          }
+          ppwData[raceName] = driverPts;
+        }
+
+        const ppwDriverList = [...allPpwDrivers];
+        // Sort drivers by total points
+        ppwDriverList.sort((a, b) => {
+          const aPts = drivers.find(d => d.driver_number === a)?.points || 0;
+          const bPts = drivers.find(d => d.driver_number === b)?.points || 0;
+          return bPts - aPts;
+        });
+
+        // Build driver color map
+        const ppwColorMap = {};
+        for (const d of drivers) {
+          ppwColorMap[d.driver_number] = d.team_colour ? teamColor(d.team_colour) : '#666';
+        }
+        for (const d of constructors) {
+          // also fill missing
+        }
+
+        html += `
+        <div class="card p-5 mb-6">
+          <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+            <h3 class="font-semibold text-sm">📊 Points Per Weekend
+              <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Points distribution across rounds</span>
+            </h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="collapse-body closed">
+            <div class="flex flex-wrap gap-2 mb-3" id="ppw-drivers">
+              ${ppwDriverList.map((dn, i) => {
+                const d = drivers.find(x => x.driver_number === dn);
+                const acronym = d?.acronym || `#${dn}`;
+                const colour = d?.team_colour ? teamColor(d.team_colour) : '#666';
+                return `<label class="flex items-center gap-1.5 text-xs cursor-pointer" style="color:var(--text-primary)">
+                  <input type="checkbox" class="ppw-cb" value="${dn}" data-acronym="${acronym}" ${i < 10 ? 'checked' : ''}>
+                  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colour}"></span>
+                  ${acronym}
+                </label>`;
+              }).join('')}
+            </div>
+            <div class="flex gap-2 mb-3">
+              <button onclick="renderPointsPerWeekend()" class="bg-f1-red text-white px-3 py-1.5 rounded text-xs font-medium hover:opacity-90 transition">📊 Render Chart</button>
+              <button onclick="ppwSelectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">✅ Select All</button>
+              <button onclick="ppwDeselectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">⬜ Clear</button>
+            </div>
+            <div class="relative" style="height:400px">
+              <canvas id="ppw-chart-canvas"></canvas>
+            </div>
+            <div id="ppw-status" class="text-xs mt-2" style="color:var(--text-muted);text-align:center">Select drivers and click Render Chart</div>
+          </div>
+        </div>`;
+
+        // Store data for chart rendering
+        window._ppwData = { ppwRaces, ppwData, ppwDriverList, ppwColorMap, ppwRaceNames };
+      }
+
       el.innerHTML = html;
     } catch(e) {
       el.innerHTML = `<div class="text-center py-20" style="color:#dc2626">Error: ${e.message}</div>`;
     }
   }
 
+  // ── Points Per Weekend ──
+  let ppwChartInstance = null;
+
+  function ppwSelectAll() {
+    document.querySelectorAll('.ppw-cb').forEach(cb => cb.checked = true);
+  }
+  function ppwDeselectAll() {
+    document.querySelectorAll('.ppw-cb').forEach(cb => cb.checked = false);
+  }
+
+  function renderPointsPerWeekend() {
+    if (!window._ppwData) return;
+    const { ppwRaces, ppwData, ppwDriverList, ppwColorMap, ppwRaceNames } = window._ppwData;
+    const el = document.getElementById('ppw-chart-canvas');
+    if (!el) return;
+
+    if (ppwChartInstance) { ppwChartInstance.destroy(); ppwChartInstance = null; }
+
+    // Get selected drivers
+    const selected = [];
+    document.querySelectorAll('.ppw-cb:checked').forEach(cb => selected.push(parseInt(cb.value)));
+    const showDrivers = selected.length > 0 ? ppwDriverList.filter(dn => selected.includes(dn)) : ppwDriverList;
+
+    if (showDrivers.length === 0) {
+      document.getElementById('ppw-status').textContent = '⚠️ Select at least one driver';
+      return;
+    }
+
+    // Build datasets per driver (stacked bar)
+    const datasets = showDrivers.map((dn, idx) => {
+      const d = ppwDriverList.includes(dn) ? null : null;
+      const color = ppwColorMap[dn] || ['#e10600','#16a34a','#3b82f6','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#dc2626','#6366f1','#d946ef','#22c55e','#eab308','#64748b','#0ea5e9','#a855f7','#10b981','#9ca3af'][idx % 20];
+      const data = ppwRaceNames.map(rn => ppwData[rn][dn] || 0);
+      const acronym = document.querySelector(`.ppw-cb[value="${dn}"]`)?.dataset?.acronym || `#${dn}`;
+      return {
+        label: acronym,
+        data: data,
+        backgroundColor: color,
+        borderColor: '#111',
+        borderWidth: 1,
+      };
+    });
+
+    const ctx = el.getContext('2d');
+    const isLight = document.documentElement.classList.contains('light');
+    const gridColor = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+    const textColor = isLight ? '#64748b' : '#8b949e';
+
+    ppwChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ppwRaceNames,
+        datasets: datasets,
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        plugins: {
+          title: {
+            display: true,
+            text: showDrivers.length + ' driver(s) · Each bar = total weekend points (Race + Sprint)',
+            color: textColor,
+            font: { size: 11 },
+            padding: { bottom: 8 },
+          },
+          legend: {
+            position: 'top',
+            labels: { color: textColor, font: { size: 9 }, boxWidth: 12, padding: 6 },
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            callbacks: {
+              title: (items) => items[0].label,
+              label: (ctx) => {
+                const val = ctx.parsed.y;
+                if (val === 0) return null;
+                return ctx.dataset.label + ': ' + val + ' pts';
+              },
+              footer: (items) => {
+                const total = items.reduce((s, i) => s + (i.parsed.y || 0), 0);
+                return 'Total: ' + total + ' pts';
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { color: gridColor },
+            ticks: { color: textColor, font: { size: 9 }, maxRotation: 30 },
+          },
+          y: {
+            stacked: true,
+            title: { display: true, text: 'Points', color: textColor, font: { size: 11 } },
+            grid: { color: gridColor },
+            ticks: { color: textColor, font: { size: 9 }, stepSize: 5 },
+            beginAtZero: true,
+          },
+        },
+      },
+    });
+
+    document.getElementById('ppw-status').textContent = 'Showing ' + showDrivers.length + ' drivers · ' + ppwRaceNames.length + ' rounds';
+  }
 
   // ── Season Analysis ──
   let seasonChartInstance = null;
@@ -5636,4 +5944,12 @@
     </div>
   </div>
 </body>
+<script>
+  // ⚡ Register Service Worker for PWA
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
+</script>
 </html>

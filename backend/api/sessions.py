@@ -276,6 +276,35 @@ async def get_session_weather(session_id: int, db: AsyncSession = Depends(get_db
     ]
 
 
+@router.get("/sessions/{session_id}/race-control")
+async def get_race_control_messages(session_id: int, db: AsyncSession = Depends(get_db)):
+    """Get race control messages (flags, SC, VSC, penalties, incidents) for a session.
+
+    Includes flag status, safety car periods, penalty decisions, and track limits.
+    Ordered chronologically by timestamp.
+    """
+    from backend.models.models import RaceControl
+    result = await db.execute(
+        select(RaceControl)
+        .where(RaceControl.session_id == session_id)
+        .order_by(RaceControl.timestamp, RaceControl.lap_number)
+    )
+    messages = result.scalars().all()
+    return [
+        {
+            "lap_number": m.lap_number,
+            "category": m.category,
+            "flag": m.flag,
+            "scope": m.scope,
+            "sector": m.sector,
+            "driver_number": m.driver_number,
+            "message": m.message,
+            "timestamp": str(m.timestamp) if m.timestamp else None,
+        }
+        for m in messages
+    ]
+
+
 @router.get("/sessions/{session_id}/gaps")
 async def get_session_gaps(
     session_id: int,
