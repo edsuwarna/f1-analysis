@@ -133,9 +133,10 @@
   .standings-table tr:last-child td { border-bottom: none; }
   .standings-table .col-pos { width: 8%; }
   .standings-table .col-driver { width: 14%; }
-  .standings-table .col-country { width: 4%; min-width: 28px; text-align: center; }
+  .standings-table .col-country { width: 7%; min-width: 48px; text-align: center; }
   .standings-table .col-team { width: 14%; }
-  .standings-table .col-progress { width: 60%; }
+  .standings-table .col-progress { width: 57%; }
+  .flag-text { font-size: 11px; font-weight: 600; letter-spacing: 0.3px; display: inline-flex; align-items: center; gap: 3px; }
   .pos-medal { font-size: 16px; }
 
   /* ── Tyre Timeline ── */
@@ -5106,7 +5107,7 @@
                   <tr>
                     <th class="col-pos">Pos</th>
                     <th class="col-driver">Driver</th>
-                    <th class="col-country"></th>
+                    <th class="col-country">Ctry</th>
                     <th class="col-team">Team</th>
                     <th class="col-progress">Points</th>
                   </tr>
@@ -5122,7 +5123,7 @@
           <tr>
             <td class="col-pos">${medal}</td>
             <td class="col-driver">${driverCell(d.acronym, d.team_colour)}</td>
-            <td class="col-country">${flagEmoji(d.country_code)}</td>
+            <td class="col-country"><span class="flag-text">${flagEmoji(d.country_code)} ${d.country_code || ''}</span></td>
             <td class="col-team">${teamBadge(d.team_name, d.team_colour)}</td>
             <td class="col-progress">
               <div class="flex items-center gap-2">
@@ -5153,7 +5154,7 @@
                 <thead>
                   <tr>
                     <th class="col-pos">Pos</th>
-                    <th class="col-country"></th>
+                    <th class="col-country">Ctry</th>
                     <th class="col-team">Team</th>
                     <th class="col-progress">Points</th>
                   </tr>
@@ -5166,7 +5167,7 @@
         html += `
           <tr>
             <td class="col-pos"><span class="pos-medal" style="color:${c.position <= 3 ? ['#ffd700','#c0c0c0','#cd7f32'][c.position-1] : 'var(--text-secondary)'}">${c.position}</span></td>
-            <td class="col-country">${flagEmoji(c.country_code)}</td>
+            <td class="col-country"><span class="flag-text">${flagEmoji(c.country_code)} ${c.country_code || ''}</span></td>
             <td class="col-team">${teamBadge(c.team_name, c.team_colour)}</td>
             <td class="col-progress">
               <div class="flex items-center gap-2">
