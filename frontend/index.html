@@ -5307,8 +5307,8 @@
             </div>
             <!-- Legend -->
             <div class="flex items-center gap-4 mb-3 text-xs" style="color:var(--text-muted)">
-              <span><span class="font-bold" style="color:var(--text-secondary)">25</span> = 🏁 Race pts</span>
-              <span><span style="font-size:8px;opacity:0.8">+3</span> = ⚡ Sprint pts</span>
+              <span>🏁 Main number = Race pts</span>
+              <span>⚡ Small <span style="font-size:8px;opacity:0.8">+N</span> below = Sprint pts</span>
             </div>
             <div id="ppw-heatmap-container" style="overflow-x:auto;overflow-y:auto;max-height:600px"></div>
             <div id="ppw-status" class="text-xs mt-2" style="color:var(--text-muted);text-align:center">Select drivers and click Heatmap</div>
@@ -5453,7 +5453,7 @@
 
     html += '</div>';
     el.innerHTML = html;
-    document.getElementById('ppw-status').textContent = showDrivers.length + ' drivers &times; ' + ppwRaceNames.length + ' rounds';
+    document.getElementById('ppw-status').textContent = showDrivers.length + ' drivers \u00d7 ' + ppwRaceNames.length + ' rounds';
   }
 
   // ── Season Analysis ──
