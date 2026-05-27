@@ -15,11 +15,25 @@ router = APIRouter()
 @router.get("/meetings")
 async def list_meetings(year: int | None = None, db: AsyncSession = Depends(get_db)):
     """List all race weekends, optionally filtered by year."""
-    query = select(Meeting).order_by(Meeting.date_start.desc())
+    from sqlalchemy import func
+    from models.models import Session
+
+    # Subquery: count sessions per meeting
+    session_count_q = (
+        select(Session.meeting_id, func.count().label("cnt"))
+        .group_by(Session.meeting_id)
+        .subquery()
+    )
+
+    query = (
+        select(Meeting, session_count_q.c.cnt)
+        .outerjoin(session_count_q, Meeting.id == session_count_q.c.meeting_id)
+        .order_by(Meeting.date_start.desc())
+    )
     if year:
         query = query.where(Meeting.year == year)
     result = await db.execute(query)
-    meetings = result.scalars().all()
+    rows = result.all()
     return [
         {
             "id": m.id,
@@ -31,8 +45,9 @@ async def list_meetings(year: int | None = None, db: AsyncSession = Depends(get_
             "circuit_name": m.circuit_name,
             "date_start": str(m.date_start) if m.date_start else None,
             "date_end": str(m.date_end) if m.date_end else None,
+            "session_count": cnt or 0,
         }
-        for m in meetings
+        for m, cnt in rows
     ]
 
 

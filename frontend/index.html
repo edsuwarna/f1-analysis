@@ -677,24 +677,33 @@
 
   function renderRaceList() {
     const el = document.getElementById('content');
+    const now = new Date();
     const completed = meetings.filter(m => m.name !== 'Pre-Season Testing');
     let html = `
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      ${completed.map(m => `
-        <div class="card p-5 cursor-pointer hover:border-gray-500 transition" onclick="loadSessions(${m.id}, '${m.name.replace(/'/g, "\\'")}')">
+      ${completed.map(m => {
+        const hasData = m.session_count > 0;
+        const isPast = m.date_start ? new Date(m.date_start) < now : false;
+        const status = hasData ? '✅ Completed' : (isPast ? '⚠️ No data' : '📅 Upcoming');
+        const opacity = hasData ? '1' : '0.55';
+        const border = hasData ? '' : ' style="border-color:var(--border-color);opacity:' + opacity + '"';
+        const clickHandler = hasData ? `loadSessions(${m.id}, '${m.name.replace(/'/g, "\\'")}')` : '';
+        const cursor = hasData ? 'pointer' : 'default';
+        return `
+        <div class="card p-5 transition" onclick="${clickHandler}" style="cursor:${cursor}${hasData ? '' : ';opacity:' + opacity + ';border-color:var(--border-color)'}">
           <div class="flex items-center gap-3 mb-3">
             <span class="text-2xl">🏎️</span>
             <div>
               <div class="font-semibold text-sm">${m.name}</div>
-              <div class="text-xs" style="color:var(--text-secondary)">${m.location}, ${m.country_name}</div>
+              <div class="text-xs" style="color:var(--text-secondary)">${m.location || ''}, ${m.country_name || ''}</div>
             </div>
           </div>
           <div class="flex justify-between text-xs" style="color:var(--text-secondary)">
             <span>🗓️ ${m.date_start ? m.date_start.slice(0,10) : 'TBD'}</span>
-            <span>🏟️ ${m.circuit_name || '—'}</span>
+            <span style="font-weight:600">${status}</span>
           </div>
-        </div>
-      `).join('')}
+        </div>`;
+      }).join('')}
       </div>
       <div class="mt-6 text-xs text-center" style="color:var(--text-muted)">${completed.length} race weekend(s)</div>
     `;
