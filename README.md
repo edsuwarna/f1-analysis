@@ -1,5 +1,7 @@
 # F1 Analysis 2026 🏎️📊
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > **Formula 1 telemetry & performance analysis platform.**  
 > Real-time race data visualization, driver comparisons, and season analytics powered by [OpenF1 API](https://openf1.org/).
 
