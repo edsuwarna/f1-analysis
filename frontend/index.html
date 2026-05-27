@@ -5305,6 +5305,11 @@
               <button onclick="ppwSelectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">✅ Select All</button>
               <button onclick="ppwDeselectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">⬜ Clear</button>
             </div>
+            <!-- Legend -->
+            <div class="flex items-center gap-4 mb-3 text-xs" style="color:var(--text-muted)">
+              <span><span class="font-bold" style="color:var(--text-secondary)">25</span> = 🏁 Race pts</span>
+              <span><span style="font-size:8px;opacity:0.8">+3</span> = ⚡ Sprint pts</span>
+            </div>
             <div id="ppw-heatmap-container" style="overflow-x:auto;overflow-y:auto;max-height:600px"></div>
             <div id="ppw-status" class="text-xs mt-2" style="color:var(--text-muted);text-align:center">Select drivers and click Heatmap</div>
           </div>
@@ -5448,7 +5453,7 @@
 
     html += '</div>';
     el.innerHTML = html;
-    document.getElementById('ppw-status').textContent = showDrivers.length + ' drivers &times; ' + ppwRaceNames.length + ' rounds &mdash; race pts (main) + sprint (small)';
+    document.getElementById('ppw-status').textContent = showDrivers.length + ' drivers &times; ' + ppwRaceNames.length + ' rounds &mdash; 🏁 race pts (main) + ⚡ sprint pts (small below)';
   }
 
   // ── Season Analysis ──
