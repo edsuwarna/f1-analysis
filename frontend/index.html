@@ -5262,6 +5262,9 @@
           ppwData[raceName] = driverPts;
         }
 
+        // Country codes for race name headers
+        const ppwCountryCodes = ppwRaces.map(r => r.country_code || r.race_name.slice(0, 3).toUpperCase());
+
         const ppwDriverList = [...allPpwDrivers];
         // Sort drivers by total points
         ppwDriverList.sort((a, b) => {
@@ -5316,7 +5319,70 @@
         </div>`;
 
         // Store data for chart rendering
-        window._ppwData = { ppwRaces, ppwData, ppwDriverList, ppwColorMap, ppwRaceNames };
+        window._ppwData = { ppwRaces, ppwData, ppwDriverList, ppwColorMap, ppwRaceNames, ppwCountryCodes };
+
+        // ── Constructor Points Per Weekend ──
+        const ppwConData = {};
+        const ppwConList = new Set();
+        const ppwConColorMap = {};
+        for (const race of ppwRaces) {
+          const rn = race.race_name;
+          const teamPts = {};
+          for (const r of race.results) {
+            const team = r.team_name || 'Unknown';
+            ppwConList.add(team);
+            if (!teamPts[team]) teamPts[team] = { race: 0, sprint: 0 };
+            if (r.session_name === 'Sprint') {
+              teamPts[team].sprint += r.points || 0;
+            } else {
+              teamPts[team].race += r.points || 0;
+            }
+          }
+          ppwConData[rn] = teamPts;
+        }
+        const sortedConList = [...ppwConList].sort((a, b) => {
+          const aPts = constructors.find(c => c.team_name === a)?.points || 0;
+          const bPts = constructors.find(c => c.team_name === b)?.points || 0;
+          return bPts - aPts;
+        });
+        for (const c of constructors) {
+          ppwConColorMap[c.team_name] = c.team_colour ? teamColor(c.team_colour) : '#666';
+        }
+        html += `
+        <div class="card p-5 mb-6">
+          <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+            <h3 class="font-semibold text-sm">🏭 Constructor Points Per Weekend
+              <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Per-team points across rounds</span>
+            </h3>
+            <span class="collapse-icon">▼</span>
+          </div>
+          <div class="collapse-body closed">
+            <div class="flex flex-wrap gap-2 mb-3" id="ppw-con-drivers">
+              ${sortedConList.map((team, i) => {
+                const colour = ppwConColorMap[team] || '#666';
+                const short = team.replace(/Team|Racing|Racing Bulls/g, '').trim() || team;
+                return `<label class="flex items-center gap-1.5 text-xs cursor-pointer" style="color:var(--text-primary)">
+                  <input type="checkbox" class="ppw-con-cb" value="${team.replace(/"/g, '')}" data-team="${team}" ${i < 10 ? 'checked' : ''}>
+                  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colour}"></span>
+                  ${short}
+                </label>`;
+              }).join('')}
+            </div>
+            <div class="flex gap-2 mb-3">
+              <button onclick="renderConstructorPpw()" class="bg-f1-red text-white px-3 py-1.5 rounded text-xs font-medium hover:opacity-90 transition">🔥 Heatmap</button>
+              <button onclick="ppwConSelectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">✅ Select All</button>
+              <button onclick="ppwConDeselectAll()" class="text-xs px-3 py-1.5 rounded" style="background:var(--badge-soft);color:var(--badge-soft-text);border:1px solid var(--border-color);cursor:pointer">⬜ Clear</button>
+            </div>
+            <!-- Legend -->
+            <div class="flex items-center gap-4 mb-3 text-xs" style="color:var(--text-muted)">
+              <span>🏁 Main number = Race pts</span>
+              <span>⚡ Small <span style="font-size:8px;opacity:0.8">+N</span> below = Sprint pts</span>
+            </div>
+            <div id="ppw-con-heatmap-container" style="overflow-x:auto;overflow-y:auto;max-height:600px"></div>
+            <div id="ppw-con-status" class="text-xs mt-2" style="color:var(--text-muted);text-align:center">Select teams and click Heatmap</div>
+          </div>
+        </div>`;
+        window._ppwConData = { ppwRaces, ppwConData, ppwConList: sortedConList, ppwConColorMap, ppwRaceNames, ppwCountryCodes };
       }
 
       el.innerHTML = html;
@@ -5337,6 +5403,7 @@
   function renderPointsPerWeekend() {
     if (!window._ppwData) return;
     const { ppwRaces, ppwData, ppwDriverList, ppwColorMap, ppwRaceNames } = window._ppwData;
+    const ppwCountryCodes = window._ppwData.ppwCountryCodes || ppwRaceNames.map(rn => rn.slice(0, 3).toUpperCase());
     const el = document.getElementById('ppw-heatmap-container');
     if (!el) return;
 
@@ -5396,11 +5463,11 @@
 
     let html = `<div style="min-width:${rowLabelW + nCols * cellW + 8}px">`;
 
-    // Header row (race names)
+    // Header row (race names via country_code)
     html += `<div style="display:flex;gap:2px;margin-bottom:4px;padding-left:${rowLabelW}px">`;
-    for (const rn of ppwRaceNames) {
-      const short = rn.replace(/ Grand Prix$/, '').replace(/^.*\s/, '').slice(0, 4);
-      html += `<div style="width:${cellW}px;text-align:center;font-size:9px;color:${textColor};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${rn}">${short}</div>`;
+    for (let ci = 0; ci < ppwRaceNames.length; ci++) {
+      const code = ppwCountryCodes[ci] || ppwRaceNames[ci].slice(0, 3).toUpperCase();
+      html += `<div style="width:${cellW}px;text-align:center;font-size:9px;font-weight:bold;color:${textColor};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${ppwRaceNames[ci]}">${code}</div>`;
     }
     html += `<div style="width:36px;text-align:center;font-size:9px;color:${textColor};font-weight:bold">Tot</div>`;
     html += '</div>';
@@ -5454,6 +5521,119 @@
     html += '</div>';
     el.innerHTML = html;
     document.getElementById('ppw-status').textContent = showDrivers.length + ' drivers \u00d7 ' + ppwRaceNames.length + ' rounds';
+  }
+
+  // ── Constructor Points Per Weekend ──
+
+  function ppwConSelectAll() {
+    document.querySelectorAll('.ppw-con-cb').forEach(cb => cb.checked = true);
+  }
+  function ppwConDeselectAll() {
+    document.querySelectorAll('.ppw-con-cb').forEach(cb => cb.checked = false);
+  }
+
+  function renderConstructorPpw() {
+    if (!window._ppwConData) return;
+    const { ppwRaces, ppwConData, ppwConList, ppwConColorMap, ppwRaceNames, ppwCountryCodes } = window._ppwConData;
+    const el = document.getElementById('ppw-con-heatmap-container');
+    if (!el) return;
+
+    const selected = [];
+    document.querySelectorAll('.ppw-con-cb:checked').forEach(cb => {
+      const team = cb.dataset.team;
+      if (team) selected.push(team);
+    });
+    const showTeams = selected.length > 0 ? ppwConList.filter(t => selected.includes(t)) : ppwConList;
+
+    if (showTeams.length === 0) {
+      document.getElementById('ppw-con-status').textContent = '⚠️ Select at least one team';
+      return;
+    }
+
+    const isLight = document.documentElement.classList.contains('light');
+    const textColor = isLight ? '#64748b' : '#8b949e';
+    const zeroColor = isLight ? '#f1f5f9' : '#0d1117';
+
+    let maxPts = 0;
+    for (const team of showTeams) {
+      for (const rn of ppwRaceNames) {
+        const p = ppwConData[rn][team];
+        maxPts = Math.max(maxPts, p ? p.race || 0 : 0);
+      }
+    }
+    maxPts = Math.max(maxPts, 1);
+
+    const teamTotals = {};
+    for (const team of showTeams) {
+      let total = 0;
+      for (const rn of ppwRaceNames) {
+        const p = ppwConData[rn][team];
+        total += p ? (p.race || 0) + (p.sprint || 0) : 0;
+      }
+      teamTotals[team] = total;
+    }
+    const sortedTeams = [...showTeams].sort((a, b) => teamTotals[b] - teamTotals[a]);
+
+    const nCols = ppwRaceNames.length;
+    const cellW = Math.max(48, Math.min(72, 600 / nCols));
+    const cellH = 34;
+    const rowLabelW = 48;
+
+    let html = `<div style="min-width:${rowLabelW + nCols * cellW + 8}px">`;
+
+    // Header
+    html += `<div style="display:flex;gap:2px;margin-bottom:4px;padding-left:${rowLabelW}px">`;
+    for (let ci = 0; ci < ppwRaceNames.length; ci++) {
+      const code = ppwCountryCodes[ci] || ppwRaceNames[ci].slice(0, 3).toUpperCase();
+      html += `<div style="width:${cellW}px;text-align:center;font-size:9px;font-weight:bold;color:${textColor};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${ppwRaceNames[ci]}">${code}</div>`;
+    }
+    html += `<div style="width:36px;text-align:center;font-size:9px;color:${textColor};font-weight:bold">Tot</div>`;
+    html += '</div>';
+
+    // Data rows
+    for (const team of sortedTeams) {
+      const baseColor = ppwConColorMap[team] || '#666';
+      const rgb = baseColor.replace('#', '');
+      const r = parseInt(rgb.slice(0,2), 16);
+      const g = parseInt(rgb.slice(2,4), 16);
+      const b = parseInt(rgb.slice(4,6), 16);
+      const short = team.replace(/Team|Racing|Racing Bulls/g, '').trim() || team;
+
+      html += `<div style="display:flex;align-items:center;gap:2px;margin-bottom:1px">`;
+      html += `<div style="width:${rowLabelW}px;text-align:right;padding-right:6px;font-size:9px;font-weight:600;color:${baseColor};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${short}</div>`;
+
+      let rowTotal = 0;
+      for (const rn of ppwRaceNames) {
+        const p = ppwConData[rn][team];
+        const racePts = p ? p.race || 0 : 0;
+        const sprintPts = p ? p.sprint || 0 : 0;
+        const pts = racePts + sprintPts;
+        rowTotal += pts;
+        if (pts === 0) {
+          html += `<div style="width:${cellW}px;height:${cellH}px;background:${zeroColor};border-radius:3px;font-size:9px;display:flex;align-items:center;justify-content:center;color:${textColor};opacity:0.3">0</div>`;
+        } else {
+          const intensity = Math.min(1, racePts / maxPts);
+          const alpha = 0.15 + intensity * 0.85;
+          const cellBg = `rgba(${r},${g},${b},${alpha})`;
+          const textBrightness = (r*0.299 + g*0.587 + b*0.114) * alpha;
+          const cellTextColor = textBrightness > 80 ? '#000' : '#fff';
+          if (sprintPts > 0) {
+            html += `<div style="width:${cellW}px;height:${cellH}px;background:${cellBg};border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:${cellTextColor};line-height:1.2" title="${short} - ${rn}: Race ${racePts} + Sprint ${sprintPts} = ${pts} pts">
+              <span style="font-size:10px;font-weight:bold">${racePts}</span>
+              <span style="font-size:7px;opacity:0.85">+${sprintPts}</span>
+            </div>`;
+          } else {
+            html += `<div style="width:${cellW}px;height:${cellH}px;background:${cellBg};border-radius:3px;font-size:10px;font-weight:bold;display:flex;align-items:center;justify-content:center;color:${cellTextColor}" title="${short} - ${rn}: ${racePts} pts">${racePts}</div>`;
+          }
+        }
+      }
+      html += `<div style="width:36px;text-align:center;font-size:9px;font-weight:bold;color:${textColor}">${rowTotal}</div>`;
+      html += '</div>';
+    }
+
+    html += '</div>';
+    el.innerHTML = html;
+    document.getElementById('ppw-con-status').textContent = sortedTeams.length + ' teams \u00d7 ' + ppwRaceNames.length + ' rounds';
   }
 
   // ── Season Analysis ──

@@ -125,6 +125,7 @@ async def championship_standings(
         SELECT
             m.id AS meeting_id,
             m.name AS race_name,
+            m.country_code,
             m.date_start,
             s.id AS session_id,
             s.session_type,
@@ -164,6 +165,7 @@ async def championship_standings(
     driver_details = {}
     race_list = []
     race_results = defaultdict(list)
+    race_country = {}  # (race_name, meeting_id) -> country_code
 
     for r in rows:
         pos = r.position
@@ -196,9 +198,13 @@ async def championship_standings(
             "position": pos,
             "points": pts,
             "acronym": r.name_acronym or f"#{driver_num}",
+            "team_name": team,
             "team_colour": team_colour,
             "session_name": session_name,
         })
+
+        if (r.race_name, r.meeting_id) not in race_country and hasattr(r, 'country_code'):
+            race_country[(r.race_name, r.meeting_id)] = r.country_code or r.race_name[:3].upper()
 
     # Build race list ordered by date (latest first)
     race_order = []  # [(rname, mid), ...] in chronological order
@@ -217,6 +223,7 @@ async def championship_standings(
         race_list.append({
             "meeting_id": mid,
             "race_name": rname,
+            "country_code": race_country.get((rname, mid), rname[:3].upper()),
             "results": results,
         })
 
