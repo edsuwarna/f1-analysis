@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 
 from backend.core.database import get_db
-from backend.models.models import Session, SessionDriver, Lap, PitStop
+from backend.models.models import Session, SessionDriver, Lap, PitStop, Telemetry
 
 router = APIRouter()
 
@@ -1494,4 +1494,509 @@ async def driver_form(
         "year": year,
         "rounds": list(rounds_map.values()),
         "drivers": driver_list,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+# P1: Overtake Mode Analysis (2026 — replaces DRS analysis)
+# ═══════════════════════════════════════════════════════════════
+@router.get("/sessions/{session_id}/overtake-mode")
+async def get_overtake_mode_analysis(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Overtake Mode analysis — replaces DRS analysis for 2026 regs.
+
+    Analyzes when Overtake Mode (electrical boost) is used relative to
+    the gap to the car ahead. Shows effectiveness, frequency, and speed gains.
+    """
+    # Get all telemetry for this session
+    result = await db.execute(
+        select(Telemetry).where(
+            Telemetry.session_id == session_id,
+            Telemetry.driver_number.isnot(None),
+        ).order_by(Telemetry.driver_number, Telemetry.timestamp)
+    )
+    all_tele = result.scalars().all()
+
+    if not all_tele:
+        return {"session_id": session_id, "overtake_mode": False, "message": "No telemetry data available"}
+
+    # Get driver info
+    drv = await db.execute(
+        select(SessionDriver).where(SessionDriver.session_id == session_id)
+    )
+    driver_info = {d.driver_number: {
+        "acronym": d.name_acronym or f"#{d.driver_number}",
+        "full_name": d.full_name or "",
+        "team_name": d.team_name or "",
+        "team_colour": d.team_colour or "",
+    } for d in drv.scalars().all()}
+
+    from collections import defaultdict
+    import math
+
+    # Group telemetry by driver
+    by_driver = defaultdict(list)
+    for t in all_tele:
+        by_driver[t.driver_number].append(t)
+
+    # Get lap data for gap/position context
+    lap_result = await db.execute(
+        select(Lap).where(
+            Lap.session_id == session_id,
+            Lap.lap_duration.isnot(None),
+            Lap.lap_duration > 0,
+            Lap.position.isnot(None),
+        ).order_by(Lap.driver_number, Lap.lap_number)
+    )
+    laps = lap_result.scalars().all()
+
+    # Build per-lap position map: {lap_num: {driver_number: position}}
+    pos_by_lap = defaultdict(dict)
+    for l in laps:
+        pos_by_lap[l.lap_number][l.driver_number] = l.position
+
+    drivers_data = []
+    for dn, tele in by_driver.items():
+        if len(tele) < 5:
+            continue
+
+        # Count overtake mode activations (drs == True / 10 / 12 / 14)
+        om_active = [t for t in tele if t.drs is True or (isinstance(t.drs, int) and t.drs in (10, 12, 14))]
+        om_count = len(om_active)
+        total_count = len(tele)
+        om_pct = round((om_count / total_count) * 100, 1) if total_count else 0
+
+        # Speed analysis: avg speed with OM on vs off
+        speeds_om = [t.speed for t in om_active if t.speed and t.speed > 0]
+        speeds_regular = [t.speed for t in tele if (t.drs is False or t.drs == 0) and t.speed and t.speed > 0]
+
+        avg_speed_om = round(sum(speeds_om) / len(speeds_om), 1) if speeds_om else 0
+        avg_speed_regular = round(sum(speeds_regular) / len(speeds_regular), 1) if speeds_regular else 0
+        speed_gain = round(avg_speed_om - avg_speed_regular, 1)
+
+        # Detect individual Overtake Mode activation events (consecutive drs=on sequences)
+        events = []
+        in_om = False
+        event_start = None
+        for t in tele:
+            is_om = t.drs is True or (isinstance(t.drs, int) and t.drs in (10, 12, 14))
+            if is_om and not in_om:
+                in_om = True
+                event_start = t
+            elif not is_om and in_om:
+                in_om = False
+                if event_start:
+                    events.append({
+                        "start_time": event_start.timestamp,
+                        "end_time": t.timestamp,
+                        "duration": round(t.timestamp - event_start.timestamp, 2),
+                        "start_speed": event_start.speed or 0,
+                        "end_speed": t.speed or 0,
+                    })
+        if in_om and event_start:
+            events.append({
+                "start_time": event_start.timestamp,
+                "end_time": tele[-1].timestamp,
+                "duration": round(tele[-1].timestamp - event_start.timestamp, 2),
+                "start_speed": event_start.speed or 0,
+                "end_speed": tele[-1].speed or 0,
+            })
+
+        drivers_data.append({
+            "driver_number": dn,
+            **driver_info.get(dn, {"acronym": f"#{dn}", "full_name": "", "team_name": "", "team_colour": ""}),
+            "total_telemetry_points": total_count,
+            "om_activations": om_count,
+            "om_percentage": om_pct,
+            "avg_speed_om": avg_speed_om,
+            "avg_speed_regular": avg_speed_regular,
+            "speed_gain": speed_gain,
+            "avg_om_duration": round(sum(e["duration"] for e in events) / len(events), 2) if events else 0,
+            "max_om_duration": round(max(e["duration"] for e in events), 2) if events else 0,
+            "total_om_events": len(events),
+        })
+
+    drivers_data.sort(key=lambda x: x["om_percentage"], reverse=True)
+
+    return {
+        "session_id": session_id,
+        "overtake_mode": True,
+        "note": "Overtake Mode replaces DRS in 2026 regs — electrical boost when within 1s of car ahead",
+        "total_drivers_analyzed": len(drivers_data),
+        "drivers": drivers_data,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+# P2: Braking Analysis
+# ═══════════════════════════════════════════════════════════════
+@router.get("/sessions/{session_id}/braking")
+async def get_braking_analysis(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Braking analysis — brake pressure, frequency, late braking index.
+
+    Analyzes telemetry brake data to identify braking events, measure
+    brake pressure patterns, and calculate a late-braking aggressiveness score.
+    """
+    result = await db.execute(
+        select(Telemetry).where(
+            Telemetry.session_id == session_id,
+            Telemetry.driver_number.isnot(None),
+        ).order_by(Telemetry.driver_number, Telemetry.timestamp)
+    )
+    all_tele = result.scalars().all()
+
+    if not all_tele:
+        return {"session_id": session_id, "braking": False, "message": "No telemetry data available"}
+
+    drv = await db.execute(
+        select(SessionDriver).where(SessionDriver.session_id == session_id)
+    )
+    driver_info = {d.driver_number: {
+        "acronym": d.name_acronym or f"#{d.driver_number}",
+        "full_name": d.full_name or "",
+        "team_name": d.team_name or "",
+        "team_colour": d.team_colour or "",
+    } for d in drv.scalars().all()}
+
+    from collections import defaultdict
+    by_driver = defaultdict(list)
+    for t in all_tele:
+        by_driver[t.driver_number].append(t)
+
+    drivers_data = []
+    for dn, tele in by_driver.items():
+        if len(tele) < 5:
+            continue
+
+        # Braking events: sequence where brake > 0
+        braking_events = []
+        in_brake = False
+        brake_start = None
+        peak_brake = 0
+        brake_speeds = []
+
+        for t in tele:
+            is_braking = t.brake and t.brake > 0
+            if is_braking and not in_brake:
+                in_brake = True
+                brake_start = t
+                peak_brake = t.brake
+                brake_speeds = [t.speed] if t.speed else []
+            elif is_braking and in_brake:
+                peak_brake = max(peak_brake, t.brake)
+                if t.speed:
+                    brake_speeds.append(t.speed)
+            elif not is_braking and in_brake:
+                in_brake = False
+                if brake_start:
+                    braking_events.append({
+                        "start_time": brake_start.timestamp,
+                        "end_time": t.timestamp,
+                        "duration": round(t.timestamp - brake_start.timestamp, 2),
+                        "peak_brake": peak_brake,
+                        "start_speed": brake_start.speed or 0,
+                        "end_speed": t.speed or 0,
+                        "speed_lost": round((brake_start.speed or 0) - (t.speed or 0), 1),
+                    })
+                    peak_brake = 0
+                    brake_speeds = []
+
+        all_brake_pcts = [t.brake for t in tele if t.brake and t.brake > 0]
+        all_brake_speeds_start = [e["start_speed"] for e in braking_events if e["start_speed"] > 0]
+
+        avg_brake_pct = round(sum(all_brake_pcts) / len(all_brake_pcts), 1) if all_brake_pcts else 0
+        max_brake_pct = max(all_brake_pcts) if all_brake_pcts else 0
+        braking_freq = round(len(braking_events) / max(len(tele) / 3.7 / 60, 0.01), 1) if len(tele) > 3 else 0
+
+        # Late braking index: composite score
+        avg_brake_speed = round(sum(all_brake_speeds_start) / len(all_brake_speeds_start), 1) if all_brake_speeds_start else 0
+
+        # Aggressiveness
+        aggression_scores = []
+        for e in braking_events:
+            if e["duration"] > 0 and e["speed_lost"] > 0:
+                aggression_scores.append(e["speed_lost"] / e["duration"])
+        avg_aggression = round(sum(aggression_scores) / len(aggression_scores), 2) if aggression_scores else 0
+
+        # Brake heatmap by speed
+        brake_vs_speed = defaultdict(list)
+        for t in tele:
+            if t.brake and t.brake > 0 and t.speed and t.speed > 0:
+                bracket = round(t.speed / 50) * 50
+                brake_vs_speed[bracket].append(t.brake)
+
+        brake_heatmap = [{
+            "speed_bracket": bracket,
+            "avg_brake_pressure": round(sum(v) / len(v), 1),
+            "count": len(v),
+        } for bracket, v in sorted(brake_vs_speed.items())]
+
+        drivers_data.append({
+            "driver_number": dn,
+            **driver_info.get(dn, {"acronym": f"#{dn}", "full_name": "", "team_name": "", "team_colour": ""}),
+            "braking_events": len(braking_events),
+            "braking_freq_per_min": braking_freq,
+            "avg_brake_pressure": avg_brake_pct,
+            "max_brake_pressure": max_brake_pct,
+            "avg_brake_onset_speed": avg_brake_speed,
+            "avg_brake_duration": round(sum(e["duration"] for e in braking_events) / len(braking_events), 2) if braking_events else 0,
+            "late_braking_index": round(avg_brake_speed * avg_brake_pct / 100, 1),
+            "aggression_score": avg_aggression,
+            "avg_speed_lost_per_brake": round(sum(e["speed_lost"] for e in braking_events) / len(braking_events), 1) if braking_events else 0,
+            "brake_heatmap": brake_heatmap,
+        })
+
+    drivers_data.sort(key=lambda x: x["late_braking_index"], reverse=True)
+
+    return {
+        "session_id": session_id,
+        "total_drivers_analyzed": len(drivers_data),
+        "drivers": drivers_data,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+# P3: Corner Performance Analysis (Active Aero context)
+# ═══════════════════════════════════════════════════════════════
+@router.get("/sessions/{session_id}/corner-analysis")
+async def get_corner_analysis(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Corner performance analysis — detect corners from telemetry.
+
+    Identifies cornering phases (brake + turn + exit) and computes
+    min corner speed, exit speed, and compares across drivers.
+    Works with 2026 active aero data — high-downforce mode in corners.
+    """
+    result = await db.execute(
+        select(Telemetry).where(
+            Telemetry.session_id == session_id,
+            Telemetry.driver_number.isnot(None),
+        ).order_by(Telemetry.driver_number, Telemetry.timestamp)
+    )
+    all_tele = result.scalars().all()
+
+    if not all_tele:
+        return {"session_id": session_id, "corners": False, "message": "No telemetry data available"}
+
+    drv = await db.execute(
+        select(SessionDriver).where(SessionDriver.session_id == session_id)
+    )
+    driver_info = {d.driver_number: {
+        "acronym": d.name_acronym or f"#{d.driver_number}",
+        "full_name": d.full_name or "",
+        "team_name": d.team_name or "",
+        "team_colour": d.team_colour or "",
+    } for d in drv.scalars().all()}
+
+    from collections import defaultdict
+    by_driver = defaultdict(list)
+    for t in all_tele:
+        by_driver[t.driver_number].append(t)
+
+    drivers_data = []
+    for dn, tele in by_driver.items():
+        if len(tele) < 10:
+            continue
+
+        # Detect corners: braking→low speed→acceleration sequence
+        corners = []
+        i = 0
+        while i < len(tele) - 3:
+            t = tele[i]
+            # Corner entry: braking hard (>30%) at medium-high speed
+            if (t.brake and t.brake > 30 and t.speed and t.speed > 100):
+                entry_speed = t.speed
+                entry_time = t.timestamp
+                entry_brake = t.brake
+
+                # Find minimum speed point (apex)
+                min_speed = entry_speed
+                min_speed_time = entry_time
+                min_speed_gear = t.gear
+                j = i
+                while j < len(tele) and tele[j].timestamp - entry_time < 5:
+                    if tele[j].speed and tele[j].speed < min_speed:
+                        min_speed = tele[j].speed
+                        min_speed_time = tele[j].timestamp
+                        min_speed_gear = tele[j].gear
+                    # Exit found when throttle > 80%
+                    if tele[j].throttle and tele[j].throttle > 80 and tele[j].speed and tele[j].speed > min_speed * 1.15:
+                        corners.append({
+                            "entry_speed": entry_speed,
+                            "min_speed": min_speed,
+                            "exit_speed": tele[j].speed,
+                            "speed_loss": round(entry_speed - min_speed, 1),
+                            "entry_brake_pressure": entry_brake,
+                            "apex_gear": min_speed_gear,
+                            "duration": round(tele[j].timestamp - entry_time, 2),
+                            "entry_time": entry_time,
+                        })
+                        i = j
+                        break
+                    j += 1
+            i += 1
+
+        if not corners:
+            continue
+
+        min_corner_speeds = [c["min_speed"] for c in corners]
+        exit_speeds = [c["exit_speed"] for c in corners]
+        speed_losses = [c["speed_loss"] for c in corners]
+
+        drivers_data.append({
+            "driver_number": dn,
+            **driver_info.get(dn, {"acronym": f"#{dn}", "full_name": "", "team_name": "", "team_colour": ""}),
+            "corners_detected": len(corners),
+            "avg_min_corner_speed": round(sum(min_corner_speeds) / len(min_corner_speeds), 1),
+            "avg_exit_speed": round(sum(exit_speeds) / len(exit_speeds), 1),
+            "avg_speed_loss_in_corner": round(sum(speed_losses) / len(speed_losses), 1),
+            "best_min_corner_speed": min(min_corner_speeds),
+            "best_exit_speed": max(exit_speeds),
+            "avg_brake_on_entry": round(sum(c["entry_brake_pressure"] for c in corners) / len(corners), 1),
+            "recent_corners": corners[-min(15, len(corners)):],
+        })
+
+    drivers_data.sort(key=lambda x: x["avg_min_corner_speed"], reverse=True)
+
+    return {
+        "session_id": session_id,
+        "note": "Corner detection: braking + speed reduction + acceleration. 2026 active aero = high-downforce mode in corners.",
+        "total_drivers_analyzed": len(drivers_data),
+        "drivers": drivers_data,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+# P4: Gear & RPM Analysis
+# ═══════════════════════════════════════════════════════════════
+@router.get("/sessions/{session_id}/gear-analysis")
+async def get_gear_analysis(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Gear & RPM analysis — gear distribution, shift points, RPM patterns.
+
+    Analyzes telemetry gear and RPM data to show each driver's gear usage,
+    average RPM per gear, and shift point preferences.
+    """
+    result = await db.execute(
+        select(Telemetry).where(
+            Telemetry.session_id == session_id,
+            Telemetry.driver_number.isnot(None),
+        ).order_by(Telemetry.driver_number, Telemetry.timestamp)
+    )
+    all_tele = result.scalars().all()
+
+    if not all_tele:
+        return {"session_id": session_id, "gears": False, "message": "No telemetry data with gear/RPM available"}
+
+    drv = await db.execute(
+        select(SessionDriver).where(SessionDriver.session_id == session_id)
+    )
+    driver_info = {d.driver_number: {
+        "acronym": d.name_acronym or f"#{d.driver_number}",
+        "full_name": d.full_name or "",
+        "team_name": d.team_name or "",
+        "team_colour": d.team_colour or "",
+    } for d in drv.scalars().all()}
+
+    from collections import defaultdict
+    by_driver = defaultdict(list)
+    for t in all_tele:
+        by_driver[t.driver_number].append(t)
+
+    drivers_data = []
+    for dn, tele in by_driver.items():
+        if len(tele) < 10:
+            continue
+
+        # Analyze gear data if available
+        has_gear_data = any(t.gear is not None for t in tele)
+
+        if has_gear_data:
+            for t in tele:
+                if t.gear and t.gear > 0 and t.gear <= 8:
+                    gear_counts[t.gear] += 1
+                    if t.rpm and t.rpm > 0:
+                        gear_rpm[t.gear].append(t.rpm)
+                    if t.speed and t.speed > 0:
+                        gear_speed[t.gear].append(t.speed)
+
+            total_gear_points = sum(gear_counts.values())
+            for g in range(1, 9):
+                count = gear_counts.get(g, 0)
+                rpm_list = gear_rpm.get(g, [])
+                speed_list = gear_speed.get(g, [])
+                gear_distribution[str(g)] = {
+                    "count": count,
+                    "percentage": round((count / total_gear_points) * 100, 1) if total_gear_points else 0,
+                    "avg_rpm": round(sum(rpm_list) / len(rpm_list)) if rpm_list else 0,
+                    "avg_speed": round(sum(speed_list) / len(speed_list), 1) if speed_list else 0,
+                    "max_speed": max(speed_list) if speed_list else 0,
+                    "min_speed": min(speed_list) if speed_list else 0,
+                }
+        else:
+            gear_distribution = {}
+
+        # Shift point analysis (only with gear data)
+        shifts = []
+        shift_up_rpms = []
+        shift_down_rpms = []
+        if has_gear_data:
+            prev_gear = None
+            for t in tele:
+                current_gear = t.gear
+                if prev_gear is not None and current_gear != prev_gear and prev_gear and prev_gear > 0 and current_gear and current_gear > 0:
+                    direction = "up" if current_gear > prev_gear else "down"
+                    if direction == "up" and t.rpm:
+                        shift_up_rpms.append(t.rpm)
+                    elif direction == "down" and t.rpm:
+                        shift_down_rpms.append(t.rpm)
+                    shifts.append({
+                        "from_gear": prev_gear,
+                        "to_gear": current_gear,
+                        "rpm": t.rpm,
+                        "speed": t.speed,
+                        "direction": direction,
+                        "timestamp": t.timestamp,
+                    })
+                prev_gear = current_gear
+
+        avg_shift_up_rpm = round(sum(shift_up_rpms) / len(shift_up_rpms)) if shift_up_rpms else 0
+        avg_shift_down_rpm = round(sum(shift_down_rpms) / len(shift_down_rpms)) if shift_down_rpms else 0
+
+        all_rpms = [t.rpm for t in tele if t.rpm and t.rpm > 0]
+        max_rpm = max(all_rpms) if all_rpms else 0
+        avg_rpm = round(sum(all_rpms) / len(all_rpms)) if all_rpms else 0
+
+        high_rpm_threshold = max_rpm * 0.8 if max_rpm else 99999
+        high_rpm_count = sum(1 for rpm in all_rpms if rpm > high_rpm_threshold)
+        high_rpm_pct = round((high_rpm_count / len(all_rpms)) * 100, 1) if all_rpms else 0
+
+        drivers_data.append({
+            "driver_number": dn,
+            **driver_info.get(dn, {"acronym": f"#{dn}", "full_name": "", "team_name": "", "team_colour": ""}),
+            "gear_distribution": gear_distribution,
+            "total_shifts": len(shifts),
+            "avg_shift_up_rpm": avg_shift_up_rpm,
+            "avg_shift_down_rpm": avg_shift_down_rpm,
+            "max_rpm": max_rpm,
+            "avg_rpm": avg_rpm,
+            "high_rpm_percentage": high_rpm_pct,
+            "recent_shifts": shifts[-30:],
+        })
+
+    drivers_data.sort(key=lambda x: x["avg_shift_up_rpm"], reverse=True)
+
+    return {
+        "session_id": session_id,
+        "total_drivers_analyzed": len(drivers_data),
+        "drivers": drivers_data,
     }

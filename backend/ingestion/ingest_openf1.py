@@ -337,7 +337,7 @@ def _store_telemetry(engine, session_key: int, session_id: int):
                     "ts": ts,
                     "speed": entry.get("speed"),
                     "rpm": entry.get("rpm"),
-                    "gear": entry.get("gear"),
+                    "gear": entry.get("n_gear") if entry.get("n_gear") is not None else entry.get("gear"),
                     "throttle": entry.get("throttle"),
                     "brake": entry.get("brake"),
                     "drs": entry.get("drs"),

@@ -1288,6 +1288,78 @@
         </div>
       </div>
 
+      <!-- ⚡ Overtake Mode Analysis (2026) -->
+      <div class="card p-5 mt-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm">⚡ Overtake Mode Analysis
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Electrical boost usage, speed gain &amp; activation patterns (2026)</span>
+          </h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body closed">
+          <div id="overtake-mode-chart-area">
+            <div class="text-center py-8" style="color:var(--text-muted)">
+              <button onclick="loadOvertakeMode(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">⚡ Load Overtake Mode</button>
+              <div class="mt-2 text-xs">Overtake Mode replaces DRS in 2026 — electrical energy boost when within 1s of car ahead. Shows usage frequency, speed gain, and duration.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 🛑 Braking Analysis -->
+      <div class="card p-5 mt-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm">🛑 Braking Analysis
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Brake pressure, late braking index, aggression score</span>
+          </h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body closed">
+          <div id="braking-chart-area">
+            <div class="text-center py-8" style="color:var(--text-muted)">
+              <button onclick="loadBraking(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">🛑 Load Braking Analysis</button>
+              <div class="mt-2 text-xs">Telemetry brake analysis: late braking index, brake pressure patterns, and aggression scores for every driver.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 🏎️ Corner Performance Analysis -->
+      <div class="card p-5 mt-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm">🏎️ Corner Performance
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Min corner speed, exit speed, brake-on-entry (active aero)</span>
+          </h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body closed">
+          <div id="corner-chart-area">
+            <div class="text-center py-8" style="color:var(--text-muted)">
+              <button onclick="loadCornerAnalysis(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">🏎️ Load Corner Analysis</button>
+              <div class="mt-2 text-xs">Corner detection from telemetry: measures minimum corner speed, exit speed, and brake pressure on entry. 2026 active aero = high-downforce in corners.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 🔄 Gear & RPM Analysis -->
+      <div class="card p-5 mt-6">
+        <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
+          <h3 class="font-semibold text-sm">🔄 Gear &amp; RPM Analysis
+            <span class="text-xs font-normal ml-2" style="color:var(--text-muted)">Gear distribution, shift points, RPM patterns per driver</span>
+          </h3>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body closed">
+          <div id="gear-chart-area">
+            <div class="text-center py-8" style="color:var(--text-muted)">
+              <button onclick="loadGearAnalysis(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">🔄 Load Gear &amp; RPM Analysis</button>
+              <div class="mt-2 text-xs">Gear usage distribution, average shift RPM, and high-RPM percentage. 8-speed gearbox with paddle shift.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 🌤️ Weather Timeline -->
       <div class="card p-5 mt-6">
         <div class="collapse-header flex items-center justify-between mb-4" onclick="toggleCollapse(this)">
@@ -1323,6 +1395,10 @@
   let pitStrategyChartInstance = null;
   let speedtrapChartInstance = null;
   let weatherChartInstance = null;
+  let overtakeModeChartInstance = null;
+  let brakingChartInstance = null;
+  let cornerChartInstance = null;
+  let gearChartInstance = null;
 
   // ── Tyre Degradation ──
   async function loadDegradation(sessionId) {
@@ -3502,6 +3578,557 @@
     } catch(e) {
       el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
     }
+  }
+
+  // ── Overtake Mode Analysis ──
+  async function loadOvertakeMode(sessionId) {
+    const el = document.getElementById('overtake-mode-chart-area');
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading overtake mode data...</div>';
+    if (overtakeModeChartInstance) { overtakeModeChartInstance.destroy(); overtakeModeChartInstance = null; }
+
+    try {
+      const data = await api(`/analytics/sessions/${sessionId}/overtake-mode`);
+      if (!data.drivers || data.drivers.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No telemetry data available for Overtake Mode analysis</div>';
+        return;
+      }
+
+      const drivers = data.drivers;
+      const labels = drivers.map(d => d.acronym);
+      const omPct = drivers.map(d => d.om_percentage);
+      const speedGain = drivers.map(d => d.speed_gain);
+      const colors = drivers.map(d => d.team_colour ? `#${d.team_colour.replace('#','')}` : '#666');
+
+      const chartContainer = document.createElement('div');
+      chartContainer.style.cssText = 'position:relative;height:' + Math.max(200, drivers.length * 28) + 'px';
+      const ctx = document.createElement('canvas');
+      chartContainer.appendChild(ctx);
+      el.innerHTML = '';
+      el.appendChild(chartContainer);
+
+      overtakeModeChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Overtake Mode Usage (%)',
+            data: omPct,
+            backgroundColor: colors.map(c => c + 'CC'),
+            borderColor: colors,
+            borderWidth: 1,
+            borderRadius: 3,
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                afterBody: function(context) {
+                  const idx = context[0].dataIndex;
+                  const d = drivers[idx];
+                  return `${d.full_name} (${d.team_name})\nOM activations: ${d.om_activations}\nSpeed gain: ${d.speed_gain} km/h\nAvg duration: ${d.avg_om_duration}s`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              title: { display: true, text: '% of telemetry points', color: '#8b949e', font: { size: 10 } },
+              ticks: { color: '#8b949e', font: { size: 10 } },
+              grid: { color: 'rgba(255,255,255,0.05)' },
+            },
+            y: {
+              ticks: { color: '#8b949e', font: { size: 10 } },
+              grid: { display: false },
+            }
+          }
+        }
+      });
+
+      // Stats table
+      let tableHtml = `
+        <div class="mt-4 overflow-x-auto">
+          <table class="text-xs w-full">
+            <thead>
+              <tr>
+                <th>Pos</th>
+                <th>Driver</th>
+                <th style="text-align:right">OM Usage</th>
+                <th style="text-align:right">Activations</th>
+                <th style="text-align:right">Speed (OM)</th>
+                <th style="text-align:right">Speed (No OM)</th>
+                <th style="text-align:right">Speed Gain</th>
+                <th style="text-align:right">Avg Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${drivers.map((d, i) => `
+                <tr>
+                  <td style="color:var(--text-muted)">${i + 1}</td>
+                  <td><span style="background:#${d.team_colour || '666'};width:8px;height:8px;display:inline-block;border-radius:2px;margin-right:4px;vertical-align:middle"></span>${d.acronym}</td>
+                  <td style="text-align:right;font-weight:bold">${d.om_percentage}%</td>
+                  <td style="text-align:right">${d.om_activations}</td>
+                  <td style="text-align:right">${d.avg_speed_om} km/h</td>
+                  <td style="text-align:right">${d.avg_speed_regular} km/h</td>
+                  <td style="text-align:right;color:${d.speed_gain > 0 ? '#22c55e' : '#ef4444'}">${d.speed_gain > 0 ? '+' : ''}${d.speed_gain}</td>
+                  <td style="text-align:right">${d.avg_om_duration}s</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="mt-2 text-xs" style="color:var(--text-muted)">⚡ Overtake Mode: Electrical boost from ERS, replaces DRS in 2026 regulations</div>
+        </div>`;
+      el.insertAdjacentHTML('beforeend', tableHtml);
+
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
+  }
+
+  // ── Braking Analysis ──
+  async function loadBraking(sessionId) {
+    const el = document.getElementById('braking-chart-area');
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading braking data...</div>';
+    if (brakingChartInstance) { brakingChartInstance.destroy(); brakingChartInstance = null; }
+
+    try {
+      const data = await api(`/analytics/sessions/${sessionId}/braking`);
+      if (!data.drivers || data.drivers.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No telemetry data available for braking analysis</div>';
+        return;
+      }
+
+      const drivers = data.drivers;
+      const labels = drivers.map(d => d.acronym);
+      const lateBrakeIdx = drivers.map(d => d.late_braking_index);
+      const colors = drivers.map(d => d.team_colour ? `#${d.team_colour.replace('#','')}` : '#666');
+
+      const chartContainer = document.createElement('div');
+      chartContainer.style.cssText = 'position:relative;height:' + Math.max(200, drivers.length * 28) + 'px';
+      const ctx = document.createElement('canvas');
+      chartContainer.appendChild(ctx);
+      el.innerHTML = '';
+      el.appendChild(chartContainer);
+
+      brakingChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Late Braking Index',
+            data: lateBrakeIdx,
+            backgroundColor: colors.map(c => c + 'CC'),
+            borderColor: colors,
+            borderWidth: 1,
+            borderRadius: 3,
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                afterBody: function(context) {
+                  const idx = context[0].dataIndex;
+                  const d = drivers[idx];
+                  return `${d.full_name} (${d.team_name})\nEvents: ${d.braking_events}\nAvg pressure: ${d.avg_brake_pressure}%\nOnset speed: ${d.avg_brake_onset_speed} km/h\nAggression: ${d.aggression_score}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              title: { display: true, text: 'Late Braking Index (composite)', color: '#8b949e', font: { size: 10 } },
+              ticks: { color: '#8b949e', font: { size: 10 } },
+              grid: { color: 'rgba(255,255,255,0.05)' },
+            },
+            y: {
+              ticks: { color: '#8b949e', font: { size: 10 } },
+              grid: { display: false },
+            }
+          }
+        }
+      });
+
+      let tableHtml = `
+        <div class="mt-4 overflow-x-auto">
+          <table class="text-xs w-full">
+            <thead>
+              <tr>
+                <th>Pos</th>
+                <th>Driver</th>
+                <th style="text-align:right">LBI</th>
+                <th style="text-align:right">Brake Events</th>
+                <th style="text-align:right">Frequency/min</th>
+                <th style="text-align:right">Avg Pressure</th>
+                <th style="text-align:right">Onset Speed</th>
+                <th style="text-align:right">Aggression</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${drivers.map((d, i) => `
+                <tr>
+                  <td style="color:var(--text-muted)">${i + 1}</td>
+                  <td><span style="background:#${d.team_colour || '666'};width:8px;height:8px;display:inline-block;border-radius:2px;margin-right:4px;vertical-align:middle"></span>${d.acronym}</td>
+                  <td style="text-align:right;font-weight:bold">${d.late_braking_index}</td>
+                  <td style="text-align:right">${d.braking_events}</td>
+                  <td style="text-align:right">${d.braking_freq_per_min}</td>
+                  <td style="text-align:right">${d.avg_brake_pressure}%</td>
+                  <td style="text-align:right">${d.avg_brake_onset_speed} km/h</td>
+                  <td style="text-align:right">${d.aggression_score}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>`;
+      el.insertAdjacentHTML('beforeend', tableHtml);
+
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
+  }
+
+  // ── Corner Performance Analysis ──
+  async function loadCornerAnalysis(sessionId) {
+    const el = document.getElementById('corner-chart-area');
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading corner analysis...</div>';
+    if (cornerChartInstance) { cornerChartInstance.destroy(); cornerChartInstance = null; }
+
+    try {
+      const data = await api(`/analytics/sessions/${sessionId}/corner-analysis`);
+      if (!data.drivers || data.drivers.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No telemetry data available for corner analysis</div>';
+        return;
+      }
+
+      const drivers = data.drivers;
+      const labels = drivers.map(d => d.acronym);
+      const cornerSpeeds = drivers.map(d => d.avg_min_corner_speed);
+      const exitSpeeds = drivers.map(d => d.avg_exit_speed);
+      const colors = drivers.map(d => d.team_colour ? `#${d.team_colour.replace('#','')}` : '#666');
+
+      const chartContainer = document.createElement('div');
+      chartContainer.style.cssText = 'position:relative;height:' + Math.max(200, drivers.length * 28) + 'px';
+      const ctx = document.createElement('canvas');
+      chartContainer.appendChild(ctx);
+      el.innerHTML = '';
+      el.appendChild(chartContainer);
+
+      cornerChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Avg Min Corner Speed',
+              data: cornerSpeeds,
+              backgroundColor: colors.map(c => c + 'CC'),
+              borderColor: colors,
+              borderWidth: 1,
+              borderRadius: 3,
+            },
+            {
+              label: 'Avg Exit Speed',
+              data: exitSpeeds,
+              backgroundColor: colors.map(c => c + '66'),
+              borderColor: colors,
+              borderWidth: 1,
+              borderRadius: 3,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#8b949e', font: { size: 10 }, boxWidth: 12 } },
+            tooltip: {
+              callbacks: {
+                afterBody: function(context) {
+                  const idx = context[0].dataIndex;
+                  const d = drivers[idx];
+                  return `${d.full_name} (${d.team_name})\nCorners: ${d.corners_detected}\nSpeed loss: ${d.avg_speed_loss_in_corner} km/h\nBrake entry: ${d.avg_brake_on_entry}%`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#8b949e', font: { size: 9 } },
+              grid: { display: false },
+            },
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: 'Speed (km/h)', color: '#8b949e', font: { size: 10 } },
+              ticks: { color: '#8b949e', font: { size: 10 } },
+              grid: { color: 'rgba(255,255,255,0.05)' },
+            }
+          }
+        }
+      });
+
+      let tableHtml = `
+        <div class="mt-4 overflow-x-auto">
+          <table class="text-xs w-full">
+            <thead>
+              <tr>
+                <th>Pos</th>
+                <th>Driver</th>
+                <th style="text-align:right">Corners</th>
+                <th style="text-align:right">Min Speed</th>
+                <th style="text-align:right">Exit Speed</th>
+                <th style="text-align:right">Speed Loss</th>
+                <th style="text-align:right">Brake %</th>
+                <th style="text-align:right">Best Min</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${drivers.map((d, i) => `
+                <tr>
+                  <td style="color:var(--text-muted)">${i + 1}</td>
+                  <td><span style="background:#${d.team_colour || '666'};width:8px;height:8px;display:inline-block;border-radius:2px;margin-right:4px;vertical-align:middle"></span>${d.acronym}</td>
+                  <td style="text-align:right">${d.corners_detected}</td>
+                  <td style="text-align:right;font-weight:bold">${d.avg_min_corner_speed} km/h</td>
+                  <td style="text-align:right">${d.avg_exit_speed} km/h</td>
+                  <td style="text-align:right">${d.avg_speed_loss_in_corner} km/h</td>
+                  <td style="text-align:right">${d.avg_brake_on_entry}%</td>
+                  <td style="text-align:right">${d.best_min_corner_speed} km/h</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="mt-2 text-xs" style="color:var(--text-muted)">🏎️ 2026: Active aero switches to high-downforce mode in corners. Lower min speed = more downforce grip or tighter corner.</div>
+        </div>`;
+      el.insertAdjacentHTML('beforeend', tableHtml);
+
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
+  }
+
+  // ── Gear & RPM Analysis ──
+  async function loadGearAnalysis(sessionId) {
+    const el = document.getElementById('gear-chart-area');
+    el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">Loading gear & RPM data...</div>';
+    if (gearChartInstance) { gearChartInstance.destroy(); gearChartInstance = null; }
+
+    try {
+      const data = await api(`/analytics/sessions/${sessionId}/gear-analysis`);
+      if (!data.drivers || data.drivers.length === 0) {
+        el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No telemetry data available for gear analysis</div>';
+        return;
+      }
+
+      const drivers = data.drivers;
+      const labels = drivers.map(d => d.acronym);
+      const avgShiftRpm = drivers.map(d => d.avg_shift_up_rpm);
+      const maxRpm = drivers.map(d => d.max_rpm);
+      const colors = drivers.map(d => d.team_colour ? `#${d.team_colour.replace('#','')}` : '#666');
+
+      const chartContainer = document.createElement('div');
+      chartContainer.style.cssText = 'position:relative;height:' + Math.max(200, drivers.length * 28) + 'px';
+      const ctx = document.createElement('canvas');
+      chartContainer.appendChild(ctx);
+      el.innerHTML = '';
+      el.appendChild(chartContainer);
+
+      gearChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Avg Shift-Up RPM',
+              data: avgShiftRpm,
+              backgroundColor: colors.map(c => c + 'CC'),
+              borderColor: colors,
+              borderWidth: 1,
+              borderRadius: 3,
+            },
+            {
+              label: 'Max RPM',
+              data: maxRpm,
+              backgroundColor: colors.map(c => c + '44'),
+              borderColor: colors,
+              borderWidth: 1,
+              borderRadius: 3,
+              borderDash: [4, 4],
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#8b949e', font: { size: 10 }, boxWidth: 12 } },
+            tooltip: {
+              callbacks: {
+                afterBody: function(context) {
+                  const idx = context[0].dataIndex;
+                  const d = drivers[idx];
+                  return `${d.full_name} (${d.team_name})\nAvg RPM: ${d.avg_rpm}\nShifts: ${d.total_shifts}\nHigh RPM: ${d.high_rpm_percentage}%`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#8b949e', font: { size: 9 } },
+              grid: { display: false },
+            },
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: 'RPM', color: '#8b949e', font: { size: 10 } },
+              ticks: { color: '#8b949e', font: { size: 10 } },
+              grid: { color: 'rgba(255,255,255,0.05)' },
+            }
+          }
+        }
+      });
+
+      // Driver selector for gear distribution detail
+      let detailHtml = `
+        <div class="mt-4 overflow-x-auto">
+          <div class="mb-2">
+            <select id="gear-driver-select" class="text-xs px-3 py-1.5 rounded" style="background:var(--input-bg);color:var(--text-primary);border:1px solid var(--border-color)">
+              ${drivers.map(d => `<option value="${d.driver_number}">${d.acronym} — ${d.full_name}</option>`).join('')}
+            </select>
+            <button onclick="renderGearDistribution()" class="ml-2 text-xs px-3 py-1.5 rounded bg-f1-red text-white">Show Gear Distribution</button>
+          </div>
+          <div id="gear-distribution-detail"></div>
+        </div>`;
+      el.insertAdjacentHTML('beforeend', detailHtml);
+
+      // Store data for gear detail view
+      window._gearAnalysisData = data.drivers;
+
+      // Table
+      let tableHtml = `
+        <div class="mt-3 overflow-x-auto">
+          <table class="text-xs w-full">
+            <thead>
+              <tr>
+                <th>Pos</th>
+                <th>Driver</th>
+                <th style="text-align:right">Shifts</th>
+                <th style="text-align:right">Shift-Up RPM</th>
+                <th style="text-align:right">Max RPM</th>
+                <th style="text-align:right">Avg RPM</th>
+                <th style="text-align:right">High RPM%</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${drivers.map((d, i) => `
+                <tr>
+                  <td style="color:var(--text-muted)">${i + 1}</td>
+                  <td><span style="background:#${d.team_colour || '666'};width:8px;height:8px;display:inline-block;border-radius:2px;margin-right:4px;vertical-align:middle"></span>${d.acronym}</td>
+                  <td style="text-align:right">${d.total_shifts}</td>
+                  <td style="text-align:right;font-weight:bold">${d.avg_shift_up_rpm}</td>
+                  <td style="text-align:right">${d.max_rpm}</td>
+                  <td style="text-align:right">${d.avg_rpm}</td>
+                  <td style="text-align:right">${d.high_rpm_percentage}%</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>`;
+      el.insertAdjacentHTML('beforeend', tableHtml);
+
+    } catch(e) {
+      el.innerHTML = `<div class="text-center py-8" style="color:#dc2626">Error: ${e.message}</div>`;
+    }
+  }
+
+  // ── Gear Distribution detail renderer ──
+  function renderGearDistribution() {
+    const sel = document.getElementById('gear-driver-select');
+    if (!sel) return;
+    const dn = parseInt(sel.value);
+    const drivers = window._gearAnalysisData || [];
+    const d = drivers.find(d => d.driver_number === dn);
+    if (!d || !d.gear_distribution) return;
+    const el = document.getElementById('gear-distribution-detail');
+    if (el._gearChart) { el._gearChart.destroy(); }
+
+    const gears = Object.keys(d.gear_distribution).sort((a,b) => parseInt(a) - parseInt(b));
+    const labels = gears.map(g => `G${g}`);
+    const pcts = gears.map(g => d.gear_distribution[g].percentage);
+    const avgRpms = gears.map(g => d.gear_distribution[g].avg_rpm);
+
+    const ctx = document.createElement('canvas');
+    el.innerHTML = '';
+    el.appendChild(ctx);
+
+    el._gearChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Usage %',
+            data: pcts,
+            backgroundColor: '#e10600CC',
+            borderColor: '#e10600',
+            borderWidth: 1,
+            borderRadius: 3,
+            yAxisID: 'y',
+          },
+          {
+            label: 'Avg RPM',
+            data: avgRpms,
+            type: 'line',
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245,158,11,0.1)',
+            borderWidth: 2,
+            pointRadius: 4,
+            tension: 0.3,
+            yAxisID: 'y1',
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#8b949e', font: { size: 10 }, boxWidth: 12 } },
+          title: {
+            display: true,
+            text: `${d.acronym} — ${d.full_name} Gear Distribution`,
+            color: '#e1e1e6',
+            font: { size: 12 },
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#8b949e', font: { size: 10 } },
+            grid: { display: false },
+          },
+          y: {
+            beginAtZero: true,
+            position: 'left',
+            title: { display: true, text: 'Usage %', color: '#8b949e', font: { size: 9 } },
+            ticks: { color: '#8b949e', font: { size: 9 } },
+            grid: { color: 'rgba(255,255,255,0.05)' },
+          },
+          y1: {
+            beginAtZero: true,
+            position: 'right',
+            title: { display: true, text: 'Avg RPM', color: '#8b949e', font: { size: 9 } },
+            ticks: { color: '#8b949e', font: { size: 9 } },
+            grid: { display: false },
+          }
+        }
+      }
+    });
   }
 
   // ── Circuit Detail ──
