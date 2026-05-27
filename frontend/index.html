@@ -51,7 +51,7 @@
   .sector-badge { font-variant-numeric: tabular-nums; }
   .team-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
   .team-badge { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; line-height: 1.4; }
-  .team-logo { display: inline-block; height: 20px; width: auto; vertical-align: middle; object-fit: contain; }
+  .team-logo { display: inline-block; height: 24px; width: auto; vertical-align: middle; object-fit: contain; }
   .nav-link { color: var(--text-secondary); cursor: pointer; padding: 8px 16px; border-radius: 6px; transition: all .15s; }
   .nav-link:hover { color: var(--text-primary); background: var(--hover-bg); }
   .nav-link.active { color: #fff; background: #e10600; }
@@ -493,10 +493,10 @@
   function teamBadge(teamName, colour) {
     const c = teamColor(colour);
     if (teamName && TEAM_LOGO_MAP[teamName]) {
-      return `<img class="team-logo" src="logos/${TEAM_LOGO_MAP[teamName]}" alt="${teamName}" title="${teamName}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block'" onload="this.style.display='inline-block';this.nextElementSibling.style.display='none'"><span class="team-badge" style="background:${c};color:#fff;border:1px solid rgba(255,255,255,0.1);display:none">${teamName.replace(/ F1 Team$/, '').replace(/ Team$/, '').substring(0, 12)}</span>`;
+      return `<span style="display:flex;align-items:center;justify-content:center;width:100%"><img class="team-logo" src="logos/${TEAM_LOGO_MAP[teamName]}" alt="${teamName}" title="${teamName}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block'" onload="this.style.display='inline-block';this.nextElementSibling.style.display='none'"><span class="team-badge" style="background:${c};color:#fff;border:1px solid rgba(255,255,255,0.1);display:none">${teamName.replace(/ F1 Team$/, '').replace(/ Team$/, '').substring(0, 8)}</span></span>`;
     }
-    const acronym = (teamName || '').replace(/ F1 Team$/, '').replace(/ Team$/, '').substring(0, 12);
-    return `<span class="team-badge" style="background:${c};color:#fff;border:1px solid rgba(255,255,255,0.1)">${acronym}</span>`;
+    const acronym = (teamName || '').replace(/ F1 Team$/, '').replace(/ Team$/, '').substring(0, 10);
+    return `<span style="display:flex;align-items:center;justify-content:center;width:100%"><span class="team-badge" style="background:${c};color:#fff;border:1px solid rgba(255,255,255,0.1)">${acronym}</span></span>`;
   }
 
   // ── Driver Cell (colored acronym + team dot, properly aligned) ──
@@ -3439,7 +3439,7 @@
           <tr>
             <td><span class="badge badge-soft">#${i+1}</span></td>
             <td>${driverCell(d.acronym, tc)}</td>
-            <td style="color:${tc}">${d.team_name}</td>
+            <td style="text-align:center">${teamBadge(d.team_name, tc)}</td>
             <td style="text-align:right;font-weight:700">${d.max_speed} <span style="color:var(--text-muted);font-weight:400">km/h</span></td>
             <td style="text-align:right">${d.p95_speed} km/h</td>
             <td style="text-align:right">${d.avg_speed} km/h</td>
@@ -4956,7 +4956,7 @@
                     return `
                     <tr>
                       <td class="font-bold" style="font-size:14px">${medal}</td>
-                      <td class="font-medium">${t.team_name}</td>
+                      <td style="text-align:center">${teamBadge(t.team_name, t.team_colour)}</td>
                       <td class="text-right font-mono font-bold">${t.avg_pit_duration}s</td>
                       <td class="text-right font-mono" style="color:#16a34a">${t.fastest_stop}s</td>
                       <td class="text-right font-mono" style="color:#dc2626">${t.slowest_stop}s</td>
