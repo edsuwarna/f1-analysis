@@ -4741,16 +4741,17 @@
                 </thead>
                 <tbody>
       `;
-      for (const c of constructors) {
+    for (const c of constructors) {
         const pct = (c.points / maxCPts * 100).toFixed(0);
+        const col = c.team_colour ? `#${c.team_colour.replace('#', '')}` : '#666';
         html += `
           <tr>
             <td class="font-bold" style="color:${c.position <= 3 ? ['#ffd700','#c0c0c0','#cd7f32'][c.position-1] : 'var(--text-secondary)'}">${c.position}</td>
-            <td>${teamBadge(c.team_name, '')}</td>
+            <td>${teamBadge(c.team_name, c.team_colour)}</td>
             <td class="text-right font-mono font-bold">${c.points}</td>
             <td style="width:150px">
               <div style="background:var(--bg-primary);border-radius:4px;height:8px;overflow:hidden">
-                <div style="width:${pct}%;height:100%;background:#e10600;border-radius:4px;transition:width 0.5s"></div>
+                <div style="width:${pct}%;height:100%;background:${col};border-radius:4px;transition:width 0.5s"></div>
               </div>
             </td>
           </tr>

@@ -238,11 +238,17 @@ async def championship_standings(
     ]
 
     # Constructor standings
+    team_colours = {}
+    for info in driver_details.values():
+        if info["team_name"] and info["team_colour"]:
+            team_colours[info["team_name"]] = info["team_colour"]
+
     constructor_standings = [
         {
             "position": i + 1,
             "team_name": team,
             "points": pts,
+            "team_colour": team_colours.get(team, ""),
         }
         for i, (team, pts) in enumerate(
             sorted(constructor_points.items(), key=lambda x: -x[1])
