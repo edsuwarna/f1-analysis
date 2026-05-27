@@ -486,6 +486,12 @@
     return `<span class="team-badge" style="background:${c};color:#fff;border:1px solid rgba(255,255,255,0.1)">${acronym}</span>`;
   }
 
+  // ── Driver Cell (colored acronym + team dot, properly aligned) ──
+  function driverCell(acronym, colour) {
+    const c = teamColor(colour);
+    return `<span style="display:inline-flex;align-items:center;gap:4px"><span style="background:${c};width:8px;height:8px;border-radius:2px;flex-shrink:0"></span><span style="color:${c};font-weight:500">${acronym}</span></span>`;
+  }
+
   // ── Tyre Strategy Timeline ──
   function renderTyreTimeline(stints, driverMap) {
     if (!stints || stints.length === 0) return '';
@@ -2145,7 +2151,7 @@
         html += `
           <tr>
             <td style="color:var(--text-secondary)">${i + 1}</td>
-            <td class="font-medium">${d.acronym}</td>
+            <td>${driverCell(d.acronym, d.team_colour)}</td>
             <td>${teamBadge(d.team_name, d.team_colour)}</td>
             <td class="text-right" style="color:var(--text-secondary)">${d.total_laps}</td>
             <td class="text-right font-mono">${d.avg_lap_time.toFixed(3)}s</td>
@@ -3421,7 +3427,7 @@
         tableHtml += `
           <tr>
             <td><span class="badge badge-soft">#${i+1}</span></td>
-            <td><span class="team-dot" style="background:${tc}"></span>${d.acronym}</td>
+            <td>${driverCell(d.acronym, tc)}</td>
             <td style="color:${tc}">${d.team_name}</td>
             <td style="text-align:right;font-weight:700">${d.max_speed} <span style="color:var(--text-muted);font-weight:400">km/h</span></td>
             <td style="text-align:right">${d.p95_speed} km/h</td>
@@ -3678,7 +3684,7 @@
               ${drivers.map((d, i) => `
                 <tr>
                   <td style="color:var(--text-muted)">${i + 1}</td>
-                  <td><span style="background:#${d.team_colour || '666'};width:8px;height:8px;display:inline-block;border-radius:2px;margin-right:4px;vertical-align:middle"></span>${d.acronym}</td>
+                  <td>${driverCell(d.acronym, d.team_colour)}</td>
                   <td style="text-align:right;font-weight:bold">${d.om_percentage}%</td>
                   <td style="text-align:right">${d.om_activations}</td>
                   <td style="text-align:right">${d.avg_speed_om} km/h</td>
@@ -3786,7 +3792,7 @@
               ${drivers.map((d, i) => `
                 <tr>
                   <td style="color:var(--text-muted)">${i + 1}</td>
-                  <td><span style="background:#${d.team_colour || '666'};width:8px;height:8px;display:inline-block;border-radius:2px;margin-right:4px;vertical-align:middle"></span>${d.acronym}</td>
+                  <td>${driverCell(d.acronym, d.team_colour)}</td>
                   <td style="text-align:right;font-weight:bold">${d.late_braking_index}</td>
                   <td style="text-align:right">${d.braking_events}</td>
                   <td style="text-align:right">${d.braking_freq_per_min}</td>
@@ -3904,7 +3910,7 @@
               ${drivers.map((d, i) => `
                 <tr>
                   <td style="color:var(--text-muted)">${i + 1}</td>
-                  <td><span style="background:#${d.team_colour || '666'};width:8px;height:8px;display:inline-block;border-radius:2px;margin-right:4px;vertical-align:middle"></span>${d.acronym}</td>
+                  <td>${driverCell(d.acronym, d.team_colour)}</td>
                   <td style="text-align:right">${d.corners_detected}</td>
                   <td style="text-align:right;font-weight:bold">${d.avg_min_corner_speed} km/h</td>
                   <td style="text-align:right">${d.avg_exit_speed} km/h</td>
@@ -4041,7 +4047,7 @@
               ${drivers.map((d, i) => `
                 <tr>
                   <td style="color:var(--text-muted)">${i + 1}</td>
-                  <td><span style="background:#${d.team_colour || '666'};width:8px;height:8px;display:inline-block;border-radius:2px;margin-right:4px;vertical-align:middle"></span>${d.acronym}</td>
+                  <td>${driverCell(d.acronym, d.team_colour)}</td>
                   <td style="text-align:right">${d.total_shifts > 0 ? d.total_shifts : '—'}</td>
                   <td style="text-align:right;font-weight:bold">${d.avg_shift_up_rpm > 0 ? d.avg_shift_up_rpm : '—'}</td>
                   <td style="text-align:right">${d.max_rpm}</td>
@@ -4693,7 +4699,7 @@
         html += `
           <tr>
             <td class="font-bold" style="color:${d.position <= 3 ? ['#ffd700','#c0c0c0','#cd7f32'][d.position-1] : 'var(--text-secondary)'}">${medal}</td>
-            <td class="font-medium">${d.acronym}</td>
+            <td>${driverCell(d.acronym, d.team_colour)}</td>
             <td>${teamBadge(d.team_name, d.team_colour)}</td>
             <td class="text-right font-mono font-bold">${d.points}</td>
             <td style="width:150px">
