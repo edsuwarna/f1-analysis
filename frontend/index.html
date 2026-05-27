@@ -531,10 +531,20 @@
   }
 
   // ── Country Flag Emoji ──
+  const IOC_TO_ISO = {
+    'AUS':'AU','AUT':'AT','AZE':'AZ','BEL':'BE','BRA':'BR','BRN':'BH',
+    'CAN':'CA','CHN':'CN','CZE':'CZ','DEN':'DK','ESP':'ES','FIN':'FI',
+    'FRA':'FR','GBR':'GB','GER':'DE','HUN':'HU','INA':'ID','IRL':'IE',
+    'ITA':'IT','JPN':'JP','KSA':'SA','MAS':'MY','MEX':'MX','MON':'MC',
+    'NED':'NL','NOR':'NO','NZL':'NZ','POL':'PL','POR':'PT','PRT':'PT',
+    'QAT':'QA','ROU':'RO','RSA':'ZA','RUS':'RU','SGP':'SG','SUI':'CH',
+    'SWE':'SE','THA':'TH','TUR':'TR','UAE':'AE','USA':'US','VIE':'VN',
+  };
   function flagEmoji(cc) {
     if (!cc || cc === 'XX') return '';
+    const iso = cc.length === 3 ? (IOC_TO_ISO[cc] || cc.slice(0,2)) : cc;
     const base = 0x1F1E6;
-    return String.fromCodePoint(base + (cc.charCodeAt(0) - 65), base + (cc.charCodeAt(1) - 65));
+    return String.fromCodePoint(base + (iso.charCodeAt(0) - 65), base + (iso.charCodeAt(1) - 65));
   }
 
   // ── Driver Cell (colored acronym + team dot, properly aligned) ──
