@@ -1354,7 +1354,7 @@
           <div id="gear-chart-area">
             <div class="text-center py-8" style="color:var(--text-muted)">
               <button onclick="loadGearAnalysis(${sessionId})" class="bg-f1-red text-white px-4 py-2 rounded text-sm font-medium hover:opacity-90 transition">🔄 Load Gear &amp; RPM Analysis</button>
-              <div class="mt-2 text-xs">Gear usage distribution, average shift RPM, and high-RPM percentage. 8-speed gearbox with paddle shift.</div>
+              <div class="mt-2 text-xs">Gear usage distribution (unavailable for 2026), RPM profile, shift points, and high-RPM percentage.</div>
             </div>
           </div>
         </div>
@@ -3997,21 +3997,22 @@
         }
       });
 
-      // Driver selector for gear distribution detail
+      // Driver selector for RPM profile detail (gear unavailable for 2026)
       let detailHtml = `
         <div class="mt-4 overflow-x-auto">
           <div class="mb-2">
-            <select id="gear-driver-select" class="text-xs px-3 py-1.5 rounded" style="background:var(--input-bg);color:var(--text-primary);border:1px solid var(--border-color)">
+            <select id="gear-driver-select" class="text-xs px-3 py-1.5 rounded" style="background:var(--input-bg);color:var(--text-primary);border:1px solid var(--border-color)" onchange="renderRpmProfile()">
               ${drivers.map(d => `<option value="${d.driver_number}">${d.acronym} — ${d.full_name}</option>`).join('')}
             </select>
-            <button onclick="renderGearDistribution()" class="ml-2 text-xs px-3 py-1.5 rounded bg-f1-red text-white">Show Gear Distribution</button>
+            <span class="ml-2 text-xs" style="color:var(--text-muted)">📡 Gear data unavailable for 2026 — showing RPM profile instead</span>
           </div>
           <div id="gear-distribution-detail"></div>
         </div>`;
       el.insertAdjacentHTML('beforeend', detailHtml);
 
-      // Store data for gear detail view
+      // Store data + auto-render first driver
       window._gearAnalysisData = data.drivers;
+      setTimeout(() => renderRpmProfile(), 50);
 
       // Table
       let tableHtml = `
@@ -4050,95 +4051,123 @@
     }
   }
 
-  // ── Gear Distribution detail renderer ──
-  function renderGearDistribution() {
+  // ── RPM Profile detail renderer (replaces gear distribution — gear unavailable for 2026) ──
+  function renderRpmProfile() {
     const sel = document.getElementById('gear-driver-select');
     if (!sel) return;
     const dn = parseInt(sel.value);
     const drivers = window._gearAnalysisData || [];
     const d = drivers.find(d => d.driver_number === dn);
     const el = document.getElementById('gear-distribution-detail');
-    if (el._gearChart) { el._gearChart.destroy(); }
+    if (!d || !el) return;
+    if (el._rpmChart) { el._rpmChart.destroy(); }
 
-    // No gear data available from API — show RPM stats instead
-    if (!d || !d.gear_distribution || Object.keys(d.gear_distribution).length === 0) {
-      el.innerHTML = `<div class="text-xs" style="color:var(--text-muted)">
-        <p>📡 Gear data not available for this session (OpenF1 doesn't provide gear telemetry for 2026).</p>
-        <p class="mt-1">RPM data available: Avg ${d?.avg_rpm || '—'} RPM | Max ${d?.max_rpm || '—'} RPM | ${d?.high_rpm_percentage || '—'}% high RPM</p>
-      </div>`;
-      return;
-    }
-
-    const gears = Object.keys(d.gear_distribution).sort((a,b) => parseInt(a) - parseInt(b));
-    const labels = gears.map(g => `G${g}`);
-    const pcts = gears.map(g => d.gear_distribution[g].percentage);
-    const avgRpms = gears.map(g => d.gear_distribution[g].avg_rpm);
-
-    const ctx = document.createElement('canvas');
     el.innerHTML = '';
-    el.appendChild(ctx);
 
-    el._gearChart = new Chart(ctx, {
+    // RPM bands: calculate low/mid/high percentages
+    const highPct = d.high_rpm_percentage || 0;
+    // Estimate mid RPM (60-80% of max) from avg_rpm / max_rpm ratio
+    const avgRatio = d.avg_rpm / Math.max(d.max_rpm, 1);
+    const midPct = Math.round(Math.max(0, (1 - avgRatio - 0.15)) * 100);
+    const lowPct = Math.round(Math.max(0, 100 - highPct - midPct));
+
+    // Stats card
+    const statsHtml = `
+      <div class="grid grid-cols-4 gap-3 mt-2 text-xs">
+        <div class="p-3 rounded" style="background:var(--card-bg);border:1px solid var(--border-color)">
+          <div style="color:var(--text-muted)">Max RPM</div>
+          <div class="text-lg font-semibold mt-1">${d.max_rpm.toLocaleString()}</div>
+        </div>
+        <div class="p-3 rounded" style="background:var(--card-bg);border:1px solid var(--border-color)">
+          <div style="color:var(--text-muted)">Avg RPM</div>
+          <div class="text-lg font-semibold mt-1">${d.avg_rpm.toLocaleString()}</div>
+        </div>
+        <div class="p-3 rounded" style="background:var(--card-bg);border:1px solid var(--border-color)">
+          <div style="color:var(--text-muted)">Shift-Up RPM</div>
+          <div class="text-lg font-semibold mt-1">${d.avg_shift_up_rpm.toLocaleString()}</div>
+        </div>
+        <div class="p-3 rounded" style="background:var(--card-bg);border:1px solid var(--border-color)">
+          <div style="color:var(--text-muted)">Total Shifts</div>
+          <div class="text-lg font-semibold mt-1">${d.total_shifts.toLocaleString()}</div>
+        </div>
+      </div>
+      <div class="mt-3 text-xs" style="color:var(--text-muted)">
+        ⚡ <strong>High RPM</strong> (≥80% of max): ${highPct}% of telemetry points
+      </div>`;
+
+    // Mini RPM gauge — horizontal stacked bar
+    const gaugeContainer = document.createElement('div');
+    gaugeContainer.style.cssText = 'height:60px;position:relative;margin-top:12px';
+    const canvas = document.createElement('canvas');
+    gaugeContainer.appendChild(canvas);
+    el.appendChild(gaugeContainer);
+
+    el._rpmChart = new Chart(canvas, {
       type: 'bar',
       data: {
-        labels: labels,
+        labels: [`${d.acronym} RPM Profile`],
         datasets: [
           {
-            label: 'Usage %',
-            data: pcts,
-            backgroundColor: '#e10600CC',
-            borderColor: '#e10600',
-            borderWidth: 1,
+            label: 'Low RPM',
+            data: [Math.round(lowPct)],
+            backgroundColor: '#64748b88',
+            borderWidth: 0,
             borderRadius: 3,
-            yAxisID: 'y',
+            barPercentage: 1,
+            categoryPercentage: 0.6,
           },
           {
-            label: 'Avg RPM',
-            data: avgRpms,
-            type: 'line',
-            borderColor: '#f59e0b',
-            backgroundColor: 'rgba(245,158,11,0.1)',
-            borderWidth: 2,
-            pointRadius: 4,
-            tension: 0.3,
-            yAxisID: 'y1',
-          }
+            label: 'Mid RPM',
+            data: [Math.round(midPct)],
+            backgroundColor: '#f59e0b88',
+            borderWidth: 0,
+            borderRadius: 3,
+            barPercentage: 1,
+            categoryPercentage: 0.6,
+          },
+          {
+            label: 'High RPM',
+            data: [Math.round(highPct)],
+            backgroundColor: '#e10600cc',
+            borderWidth: 0,
+            borderRadius: 3,
+            barPercentage: 1,
+            categoryPercentage: 0.6,
+          },
         ]
       },
       options: {
+        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { labels: { color: '#8b949e', font: { size: 10 }, boxWidth: 12 } },
-          title: {
-            display: true,
-            text: `${d.acronym} — ${d.full_name} Gear Distribution`,
-            color: '#e1e1e6',
-            font: { size: 12 },
+          legend: { labels: { color: '#8b949e', font: { size: 9 }, boxWidth: 10 } },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                return `${ctx.dataset.label}: ${ctx.parsed.x}%`;
+              }
+            }
           }
         },
         scales: {
           x: {
-            ticks: { color: '#8b949e', font: { size: 10 } },
-            grid: { display: false },
-          },
-          y: {
-            beginAtZero: true,
-            position: 'left',
-            title: { display: true, text: 'Usage %', color: '#8b949e', font: { size: 9 } },
-            ticks: { color: '#8b949e', font: { size: 9 } },
+            stacked: true,
+            max: 100,
+            title: { display: true, text: '% of Telemetry Points', color: '#8b949e', font: { size: 9 } },
+            ticks: { color: '#8b949e', font: { size: 9 }, callback: v => v + '%' },
             grid: { color: 'rgba(255,255,255,0.05)' },
           },
-          y1: {
-            beginAtZero: true,
-            position: 'right',
-            title: { display: true, text: 'Avg RPM', color: '#8b949e', font: { size: 9 } },
-            ticks: { color: '#8b949e', font: { size: 9 } },
+          y: {
+            stacked: true,
+            ticks: { color: '#e1e1e6', font: { size: 11, weight: 'bold' } },
             grid: { display: false },
           }
         }
       }
     });
+
+    el.insertAdjacentHTML('beforeend', statsHtml);
   }
 
   // ── Circuit Detail ──
