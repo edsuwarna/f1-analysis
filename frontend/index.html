@@ -4258,7 +4258,7 @@
       const drivers = champ?.driver_standings || [];
       const constructors = champ?.constructor_standings || [];
       const races = champ?.races || [];
-      const gpCount = meetingsData.length || '—';
+      const gpCount = meetingsData.filter(m => m.name).length || '—';
       const driverCount = drivers.length || '—';
       const teamCount = constructors.length || '—';
       const raceCount = races.length;

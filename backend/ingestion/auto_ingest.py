@@ -71,9 +71,8 @@ def fetch_new_data():
                 sn = ses.get("session_name", "?")
                 st = ses.get("session_type", "Practice")
                 try:
-                    _store_session(engine, meeting_id, sk, sn, st)
-                    # Also fetch telemetry right away for this session
-                    _store_telemetry(engine, sk, meeting_id)
+                    sid = _store_session(engine, meeting_id, sk, sn, st)
+                    # _store_session already fetches telemetry internally
                     time.sleep(REQUEST_DELAY)
                 except Exception as e:
                     log.warning(f"    ⚠️ Session {sn} error: {e}")

@@ -285,11 +285,13 @@ def _store_session(engine, meeting_id: int, session_key: int,
         time.sleep(REQUEST_DELAY)
         _store_weather(session, session_key, session_id)
 
+        # Commit session data first so telemetry (separate connection) can FK reference it
+        session.commit()
+
         # Store telemetry (car_data) — needs engine for parallel connection
         time.sleep(REQUEST_DELAY)
         _store_telemetry(engine, session_key, session_id)
 
-        session.commit()
         return session_id
 
 
