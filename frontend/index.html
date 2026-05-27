@@ -51,7 +51,7 @@
   .sector-badge { font-variant-numeric: tabular-nums; }
   .team-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
   .team-badge { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; line-height: 1.4; }
-  .team-logo { display: inline-block; width: 52px; height: 22px; vertical-align: middle; object-fit: contain; }
+  .team-logo { display: inline-block; width: 28px; height: 18px; vertical-align: middle; object-fit: contain; }
   .nav-link { color: var(--text-secondary); cursor: pointer; padding: 8px 16px; border-radius: 6px; transition: all .15s; }
   .nav-link:hover { color: var(--text-primary); background: var(--hover-bg); }
   .nav-link.active { color: #fff; background: #e10600; }
@@ -4942,8 +4942,8 @@
                   <tr>
                     <th style="width:50px">Pos</th>
                     <th style="width:110px">Driver</th>
-                    <th style="min-width:100px">Team</th>
-                    <th style="width:310px">Progress</th>
+                    <th style="min-width:80px">Team</th>
+                    <th style="width:340px">Progress</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4958,7 +4958,7 @@
             <td class="font-bold" style="color:${d.position <= 3 ? ['#ffd700','#c0c0c0','#cd7f32'][d.position-1] : 'var(--text-secondary)'}">${medal}</td>
             <td>${driverCell(d.acronym, d.team_colour)}</td>
             <td>${teamBadge(d.team_name, d.team_colour)}</td>
-            <td style="width:310px">
+            <td style="width:340px">
               <div class="flex items-center gap-2">
                 <div style="flex:1;background:var(--bg-primary);border-radius:5px;height:14px;overflow:hidden">
                   <div style="width:${pct}%;height:100%;background:${teamC};border-radius:5px;transition:width 0.5s"></div>
@@ -4987,8 +4987,8 @@
                 <thead>
                   <tr>
                     <th style="width:50px">Pos</th>
-                    <th style="min-width:100px">Team</th>
-                    <th style="width:310px">Progress</th>
+                    <th style="min-width:80px">Team</th>
+                    <th style="width:340px">Progress</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -5000,7 +5000,7 @@
           <tr>
             <td class="font-bold" style="color:${c.position <= 3 ? ['#ffd700','#c0c0c0','#cd7f32'][c.position-1] : 'var(--text-secondary)'}">${c.position}</td>
             <td>${teamBadge(c.team_name, c.team_colour)}</td>
-            <td style="width:310px">
+            <td style="width:340px">
               <div class="flex items-center gap-2">
                 <div style="flex:1;background:var(--bg-primary);border-radius:5px;height:14px;overflow:hidden">
                   <div style="width:${pct}%;height:100%;background:${col};border-radius:5px;transition:width 0.5s"></div>
