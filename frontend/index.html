@@ -1444,7 +1444,7 @@
       }
 
       const compoundLabels = { 'SOFT': 'Soft', 'MEDIUM': 'Medium', 'HARD': 'Hard', 'INTERMEDIATE': 'Intermediate', 'WET': 'Wet' };
-      const tyreColors = { 'SOFT': '#FFD700', 'MEDIUM': '#A0A0A0', 'HARD': '#E10600', 'INTERMEDIATE': '#00A651', 'WET': '#005DB9' };
+      const tyreColors = { 'SOFT': '#E10600', 'MEDIUM': '#FFD700', 'HARD': '#A0A0A0', 'INTERMEDIATE': '#00A651', 'WET': '#005DB9' };
       const lineDashMap = { 'SOFT': [], 'MEDIUM': [6, 4], 'HARD': [3, 6], 'INTERMEDIATE': [10, 4, 4, 4], 'WET': [4, 4, 8, 4] };
       const compoundOrder = ['SOFT', 'MEDIUM', 'HARD', 'INTERMEDIATE', 'WET'];
 
@@ -1531,7 +1531,7 @@
         <div class="text-xs mb-2 flex flex-wrap gap-3 justify-center" style="color:var(--text-muted)">
           <span>● <strong style="color:${drv1Meta}">${d1name}</strong> (circle)</span>
           <span>▲ <strong style="color:${drv2Meta}">${d2name}</strong> (triangle)</span>
-          <span>🟡 Soft — ⬜ Medium — 🔴 Hard — 🟢 Inter — 🔵 Wet</span>
+          <span>🔴 Soft — 🟡 Medium — ⚪ Hard — 🟢 Inter — 🔵 Wet</span>
         </div>
         <div class="relative" style="height:350px">
           <canvas id="deg-chart-canvas"></canvas>
