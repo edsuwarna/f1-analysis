@@ -4262,41 +4262,80 @@
     try {
       const data = await api('/news');
       const articles = data.articles || [];
-
       if (articles.length === 0) {
         el.innerHTML = '<div class="text-center py-8" style="color:var(--text-muted)">No news available</div>';
         return;
       }
 
-      let html = '<div class="card p-6">';
-      html += '<h2 class="text-xl font-bold mb-1">📰 F1 News</h2>';
-      html += '<p class="text-xs mb-4" style="color:var(--text-muted)">Latest from Motorsport, The Guardian, RaceFans & F1i</p>';
-      html += '<div class="space-y-3">';
+      window._newsArticles = articles;
+      window._newsLoaded = 25;
+      window._newsPageSize = 25;
+      window._newsSourceColors = {
+        'Motorsport': '#e10600',
+        'The Guardian': '#052962',
+        'RaceFans': '#faa41a',
+        'F1i': '#00bd68',
+      };
 
-      for (const a of articles) {
-        const pubDate = a.pub_date ? new Date(a.pub_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-        html += '<div class="card p-4 hover:opacity-90 transition-opacity" style="border-left:4px solid var(--text-muted)">';
-        html += '<a href="' + a.link + '" target="_blank" rel="noopener noreferrer" style="color:var(--text-primary);text-decoration:none">';
-        html += '<div class="flex items-start gap-3">';
-        if (a.thumbnail) {
-          html += '<img src="' + a.thumbnail + '" alt="" class="rounded hidden sm:block" style="width:100px;height:70px;object-fit:cover;flex-shrink:0" loading="lazy" onerror="this.style.display=\'none\'">';
-        }
-        html += '<div class="flex-1 min-w-0">';
-        html += '<div class="font-semibold text-sm leading-snug mb-1">' + a.title + '</div>';
-        if (a.description) {
-          html += '<div class="text-xs mb-1.5" style="color:var(--text-secondary)">' + a.description.slice(0, 200) + '</div>';
-        }
-        html += '<div class="flex items-center gap-2 text-xs" style="color:var(--text-muted)">';
-        html += '<span class="px-2 py-0.5 rounded text-xs font-medium" style="background:var(--accent);color:#fff">' + a.source_icon + ' ' + a.source + '</span>';
-        if (pubDate) html += '<span>' + pubDate + '</span>';
-        html += '</div></div></div></a></div>';
-      }
-
-      html += '</div></div>';
-      el.innerHTML = html;
+      renderNewsList();
     } catch(e) {
       el.innerHTML = '<div class="text-center py-8" style="color:#dc2626">Error loading news: ' + e.message + '</div>';
     }
+  }
+
+  function renderNewsList() {
+    const articles = window._newsArticles || [];
+    const loaded = window._newsLoaded || 25;
+    const colors = window._newsSourceColors || {};
+    const PAGE_SIZE = window._newsPageSize || 25;
+    const show = articles.slice(0, loaded);
+    const el = document.getElementById('content');
+
+    let html = '<div class="card p-6">';
+    html += '<h2 class="text-xl font-bold mb-1">📰 F1 News</h2>';
+    html += '<p class="text-xs mb-4" style="color:var(--text-muted)">Latest from Motorsport, The Guardian, RaceFans &amp; F1i — ' + articles.length + ' articles</p>';
+    html += '<div class="space-y-3">';
+
+    for (const a of show) {
+      const pubDate = a.pub_date ? new Date(a.pub_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+      const c = colors[a.source] || '#666';
+      html += '<div class="card p-4 hover:opacity-90 transition-opacity" style="border-left:4px solid ' + c + '">';
+      html += '<a href="' + a.link + '" target="_blank" rel="noopener noreferrer" style="color:var(--text-primary);text-decoration:none">';
+      html += '<div class="flex items-start gap-3">';
+      if (a.thumbnail) {
+        html += '<img src="' + a.thumbnail + '" alt="" class="rounded hidden sm:block" style="width:100px;height:70px;object-fit:cover;flex-shrink:0" loading="lazy" onerror="this.style.display=\'none\'">';
+      }
+      html += '<div class="flex-1 min-w-0">';
+      html += '<div class="font-semibold text-sm leading-snug mb-1">' + a.title + '</div>';
+      if (a.description) {
+        html += '<div class="text-xs mb-1.5" style="color:var(--text-secondary)">' + a.description.slice(0, 200) + '</div>';
+      }
+      html += '<div class="flex items-center gap-2 text-xs" style="color:var(--text-muted)">';
+      html += '<span class="px-2 py-0.5 rounded text-xs font-semibold" style="background:' + c + ';color:#fff">' + a.source_icon + ' ' + a.source + '</span>';
+      if (pubDate) html += '<span>' + pubDate + '</span>';
+      html += '</div></div></div></a></div>';
+    }
+
+    html += '</div>';
+
+    if (loaded < articles.length) {
+      const remaining = articles.length - loaded;
+      const next = Math.min(PAGE_SIZE, remaining);
+      html += '<div class="text-center mt-4"><button onclick="moreNews()" class="nav-link" style="padding:8px 24px;font-size:13px">⬇️ Load More (' + next + ' more)</button></div>';
+    } else {
+      html += '<div class="text-center mt-4 text-xs" style="color:var(--text-muted)">Showing all ' + articles.length + ' articles</div>';
+    }
+
+    html += '</div>';
+    el.innerHTML = html;
+  }
+
+  function moreNews() {
+    window._newsLoaded = Math.min(
+      (window._newsLoaded || 25) + (window._newsPageSize || 25),
+      (window._newsArticles || []).length
+    );
+    renderNewsList();
   }
 
   async function showAbout() {
