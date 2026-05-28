@@ -4467,8 +4467,8 @@
       }
 
       window._newsArticles = articles;
-      window._newsLoaded = 25;
-      window._newsPageSize = 25;
+      window._newsLoaded = 10;
+      window._newsPageSize = 10;
       window._newsSourceColors = {
         'Motorsport': '#e10600',
         'The Guardian': '#052962',
@@ -4484,9 +4484,9 @@
 
   function renderNewsList() {
     const articles = window._newsArticles || [];
-    const loaded = window._newsLoaded || 25;
+    const loaded = window._newsLoaded || 10;
     const colors = window._newsSourceColors || {};
-    const PAGE_SIZE = window._newsPageSize || 25;
+    const PAGE_SIZE = window._newsPageSize || 10;
     const show = articles.slice(0, loaded);
     const el = document.getElementById('content');
 
@@ -4531,7 +4531,7 @@
 
   function moreNews() {
     window._newsLoaded = Math.min(
-      (window._newsLoaded || 25) + (window._newsPageSize || 25),
+      (window._newsLoaded || 10) + (window._newsPageSize || 10),
       (window._newsArticles || []).length
     );
     renderNewsList();
