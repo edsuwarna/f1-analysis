@@ -468,37 +468,59 @@
     document.getElementById('toc-btn').textContent = open ? '✕' : '📋';
 
     if (open) {
-      // Scan DOM for visible section cards
       const cards = document.querySelectorAll('.card.p-5');
       const list = document.getElementById('toc-list');
       list.innerHTML = '';
       cards.forEach(card => {
+        // Strategy 1: collapsible section cards (session detail, standings, etc.)
         const header = card.querySelector('.collapse-header h3');
-        if (!header) return;
-        // Skip if section content is empty / unavailable
-        const text = header.textContent.replace(/[▼▲]\s*$/, '').trim();
-        if (!text || text.includes('Only available')) return;
-        const item = document.createElement('div');
-        item.className = 'toc-item';
-        item.textContent = text;
-        item.onclick = () => {
-          toggleToc();
-          // Auto-open if collapsed
-          const body = card.querySelector('.collapse-body.closed');
-          if (body) {
-            body.classList.remove('closed');
-            const icon = body.previousElementSibling?.querySelector('.collapse-icon');
-            if (icon) icon.classList.add('open');
-          }
-          // Scroll with offset for sticky top bar
-          const topBar = document.querySelector('.top-bar');
-          const offset = topBar ? topBar.offsetHeight + 12 : 0;
-          const top = card.getBoundingClientRect().top + window.scrollY - offset;
-          window.scrollTo({ top, behavior: 'smooth' });
-        };
-        list.appendChild(item);
+        if (header) {
+          // Grab only the heading text, not the subtitle <span>
+          const headingOnly = Array.from(header.childNodes)
+            .filter(n => n.nodeType === 3) // text nodes only
+            .map(n => n.textContent.trim())
+            .join(' ')
+            .trim() || header.textContent.replace(/[▼▲]\s*$/, '').trim();
+          if (!headingOnly || headingOnly.includes('Only available')) return;
+          const item = document.createElement('div');
+          item.className = 'toc-item';
+          item.textContent = headingOnly;
+          item.onclick = () => {
+            toggleToc();
+            const body = card.querySelector('.collapse-body.closed');
+            if (body) {
+              body.classList.remove('closed');
+              const icon = body.previousElementSibling?.querySelector('.collapse-icon');
+              if (icon) icon.classList.add('open');
+            }
+            scrollToCard(card);
+          };
+          list.appendChild(item);
+          return;
+        }
+        // Strategy 2: flat cards with .font-semibold.text-sm (race list, session list)
+        const title = card.querySelector('.font-semibold.text-sm');
+        if (title) {
+          const text = title.textContent.trim();
+          if (!text) return;
+          const item = document.createElement('div');
+          item.className = 'toc-item';
+          item.textContent = text;
+          item.onclick = () => {
+            toggleToc();
+            scrollToCard(card);
+          };
+          list.appendChild(item);
+        }
       });
     }
+  }
+
+  function scrollToCard(card) {
+    const topBar = document.querySelector('.top-bar');
+    const offset = topBar ? topBar.offsetHeight + 12 : 0;
+    const top = card.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top, behavior: 'smooth' });
   }
 
   function teamColor(colour) {
