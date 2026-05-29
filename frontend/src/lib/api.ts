@@ -223,7 +223,41 @@ export const getStints = (sessionId: number) =>
 export const getTelemetry = (sessionId: number, driver: number) =>
   request<TelemetrySample[]>(`/sessions/${sessionId}/telemetry?driver=${driver}`);
 
-// ── Standings ──
+export const getTelemetryLap = (sessionId: number, driver: number, lap?: number) =>
+  request<TelemetrySample[]>(`/sessions/${sessionId}/telemetry/${driver}${lap ? `?lap=${lap}` : ''}`);
+
+// ── Session Data ──
+export interface SessionSectorRow {
+  driver_number: number;
+  full_name: string;
+  acronym: string;
+  team: string;
+  team_colour: string;
+  best_sector_1: number;
+  best_sector_2: number;
+  best_sector_3: number;
+  best_lap: number;
+  total_laps: number;
+}
+
+export const getSessionSectors = (sessionId: number) =>
+  request<SessionSectorRow[]>(`/sessions/${sessionId}/sectors`);
+
+export interface PositionChange {
+  driver_number: number;
+  acronym: string;
+  full_name: string;
+  team_name: string;
+  team_colour: string;
+  positions_gained: number;
+  start_position: number;
+  end_position: number;
+}
+
+export const getPositions = (sessionId: number) =>
+  request<PositionChange[]>(`/sessions/${sessionId}/positions`);
+
+// ── Analytics ──
 export const getChampionship = async (year?: number): Promise<ChampionshipData> => {
   const data = await request<ChampionshipData>(`/analytics/championship${year ? `?year=${year}` : ''}`);
   // API returns 'acronym' but code expects 'name_acronym'
@@ -245,11 +279,118 @@ export const getConstructorStandings = async (year?: number): Promise<Constructo
 };
 
 // ── Analytics ──
+export interface PitStrategyData {
+  session_id: number;
+  total_stops: number;
+  drivers: Array<{
+    driver_number: number;
+    acronym: string;
+    full_name: string;
+    team_name: string;
+    team_colour: string;
+    total_stops: number;
+    pit_analysis: Array<{
+      lap_number: number;
+      pit_duration: number;
+      in_lap_time: number;
+      out_lap_time: number;
+      prev_lap_time: number;
+      avg_before: number;
+      avg_after: number;
+      position_change: number;
+      net_gain?: number;
+    }>;
+    avg_pit_duration: number;
+    total_pit_time: number;
+    strategy_summary: string;
+  }>;
+  undercut_opportunities: Array<{
+    defending_driver: string;
+    attacking_driver: string;
+    pit_lap: number;
+    undercut_delta: number;
+    position_changed: boolean;
+  }>;
+}
+
+export interface OvertakeModeData {
+  session_id: number;
+  overtake_mode: boolean;
+  note: string;
+  total_drivers_analyzed: number;
+  drivers: Array<{
+    driver_number: number;
+    acronym: string;
+    full_name: string;
+    team_name: string;
+    team_colour: string;
+    total_telemetry_points: number;
+    om_activations: number;
+    om_percentage: number;
+    avg_speed_om: number;
+    avg_speed_non_om: number;
+    speed_gain: number;
+    peak_speed_om: number;
+    peak_speed_non_om: number;
+  }>;
+}
+
+export interface QualifyingSummaryData {
+  meeting_id: number;
+  session: { session_id: number; session_name: string };
+  segments: string[];
+  drivers: Array<{
+    driver_number: number;
+    acronym: string;
+    full_name: string;
+    team_name: string;
+    team_colour: string;
+    best_laps: Record<string, number>;
+    segments_completed: number;
+    total_improvement: number;
+  }>;
+}
+
+export interface LapDistributionData {
+  session_id: number;
+  session_name: string;
+  session_type: string;
+  total_drivers: number;
+  total_laps: number;
+  drivers: Array<{
+    driver_number: number;
+    acronym: string;
+    full_name: string;
+    team_name: string;
+    team_colour: string;
+    total_laps: number;
+    avg_lap_time: number;
+    median_lap_time: number;
+    std_dev: number;
+    fastest_lap: number;
+    slowest_lap: number;
+    range: number;
+    consistency: number;
+    lap_times: number[];
+  }>;
+}
+
+export interface DriverProgressRow {
+  race_name: string;
+  date: string;
+  session_type: string;
+  best_lap: number;
+  best_sector_1: number;
+  best_sector_2: number;
+  best_sector_3: number;
+  valid_laps: number;
+}
+
 export const getSectorTrends = (year?: number, sessionType?: string) =>
   request<SectorTrend[]>(`/analytics/sectors${year ? `?year=${year}&session_type=${sessionType || 'Race'}` : ''}`);
 
 export const getDriverProgress = (driverNumber: number, year?: number) =>
-  request<any[]>(`/analytics/driver-progress/${driverNumber}${year ? `?year=${year}` : ''}`);
+  request<DriverProgressRow[]>(`/analytics/driver-progress/${driverNumber}${year ? `?year=${year}` : ''}`);
 
 export const getSeasonProgression = (year?: number) =>
   request<{ year: number; rounds: SeasonProgressionRound[] }>(`/analytics/season-progression${year ? `?year=${year}` : ''}`);
@@ -258,7 +399,19 @@ export const getDriverForm = (year?: number) =>
   request<{ year: number; rounds: DriverFormRow[] }>(`/analytics/driver-form${year ? `?year=${year}` : ''}`);
 
 export const getPitStopChampionship = (year?: number) =>
-  request<any[]>(`/analytics/pit-stop-championship${year ? `?year=${year}` : ''}`);
+  request<{ year: number; teams: Array<any>; total_teams: number; total_stops: number; overall_fastest_stop: any }>(`/analytics/pit-stop-championship${year ? `?year=${year}` : ''}`);
+
+export const getPitStrategy = (sessionId: number) =>
+  request<PitStrategyData>(`/analytics/sessions/${sessionId}/pit-strategy`);
+
+export const getOvertakeMode = (sessionId: number) =>
+  request<OvertakeModeData>(`/analytics/sessions/${sessionId}/overtake-mode`);
+
+export const getQualifyingSummary = (meetingId: number) =>
+  request<QualifyingSummaryData>(`/analytics/qualifying-summary?meeting_id=${meetingId}`);
+
+export const getLapDistribution = (sessionId: number) =>
+  request<LapDistributionData>(`/analytics/lap-distribution?session_id=${sessionId}`);
 
 // ── News ──
 export const getNews = () => request<any[]>('/news');
