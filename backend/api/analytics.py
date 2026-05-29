@@ -73,7 +73,7 @@ async def driver_season_progress(
     query = text("""
         SELECT
             m.name AS race_name,
-            m.date_start,
+            m.date_start AS race_date,
             s.session_type,
             MIN(l.lap_duration) FILTER (WHERE l.lap_duration > 0) AS best_lap,
             MIN(l.duration_sector_1) FILTER (WHERE l.duration_sector_1 > 0) AS best_s1,
@@ -87,7 +87,7 @@ async def driver_season_progress(
           AND m.year = :year
           AND l.lap_duration > 0
         GROUP BY m.name, m.date_start, s.session_type
-        ORDER BY m.date_start, s.date_start
+        ORDER BY m.date_start, MIN(s.date_start)
     """)
     result = await db.execute(query, {"driver": driver_number, "year": year})
     rows = result.fetchall()
@@ -100,7 +100,7 @@ async def driver_season_progress(
             "best_sector_1": r[4],
             "best_sector_2": r[5],
             "best_sector_3": r[6],
-            "valid_laps": r[7],
+            "valid_laps": r[7] or 0,
         }
         for r in rows
     ]
