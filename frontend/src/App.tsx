@@ -21,10 +21,13 @@ import NewsPage from '@/pages/NewsPage';
 import GuidePage from '@/pages/GuidePage';
 import GlossaryPage from '@/pages/GlossaryPage';
 import AboutPage from '@/pages/AboutPage';
+import DriversPage from '@/pages/DriversPage';
+import ConsistencyPage from '@/pages/ConsistencyPage';
 import {
   Home, Trophy, Users, Calendar, Gauge, Swords, Flame,
   Wrench, ScrollText, Sun, Moon, Flag, BarChart3, Building2,
   Newspaper, BookOpen, BookMarked, Info, ChevronDown, ChevronRight,
+  Activity, UserCircle,
 } from 'lucide-react';
 
 interface NavItem {
@@ -36,10 +39,12 @@ interface NavItem {
 const mainNavItems: NavItem[] = [
   { icon: Home, label: 'Home', path: '/' },
   { icon: Calendar, label: 'Races', path: '/races' },
+  { icon: UserCircle, label: 'Drivers', path: '/drivers' },
   { icon: BarChart3, label: 'Season Analysis', path: '/season' },
   { icon: Swords, label: 'Team Battle', path: '/team-battle' },
   { icon: Building2, label: 'Teams', path: '/teams' },
   { icon: Gauge, label: 'Driver Stats', path: '/stats/drivers' },
+  { icon: Activity, label: 'Consistency', path: '/consistency' },
   { icon: Flame, label: 'Race Pace', path: '/race-pace' },
   { icon: Swords, label: 'Head to Head', path: '/head-to-head' },
   { icon: Flag, label: 'Pit Stops', path: '/pit-stops' },
@@ -211,11 +216,13 @@ function AppLayout() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/races" element={<MeetingsPage onSelectSession={(mId, sId) => navigate(`/session/${mId}/${sId}`)} />} />
+            <Route path="/drivers" element={<DriversPage />} />
             <Route path="/session/:meetingId/:sessionId" element={<SessionDetailPage />} />
             <Route path="/standings/drivers" element={<DriverStandingsPage />} />
             <Route path="/standings/constructors" element={<ConstructorStandingsPage />} />
             <Route path="/stats/drivers" element={<DriverStatsPage />} />
             <Route path="/head-to-head" element={<HeadToHeadPage />} />
+            <Route path="/consistency" element={<ConsistencyPage />} />
             <Route path="/race-pace" element={<RacePacePage />} />
             <Route path="/pit-stops" element={<PitStopsPage />} />
             <Route path="/tech-updates" element={<TechUpdatesPage />} />
@@ -243,10 +250,12 @@ function getPageTitle(pathname: string): string {
   const titles: Record<string, string> = {
     '/': 'Home',
     '/races': 'Races',
+    '/drivers': 'Drivers',
     '/standings/drivers': 'Driver Standings',
     '/standings/constructors': 'Constructor Standings',
     '/stats/drivers': 'Driver Stats',
     '/head-to-head': 'Head to Head',
+    '/consistency': 'Consistency',
     '/race-pace': 'Race Pace',
     '/pit-stops': 'Pit Stops',
     '/tech-updates': 'Tech Updates',
