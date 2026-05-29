@@ -310,7 +310,20 @@ export default function SessionDetailPage() {
   const [posLoaded, setPosLoaded] = useState(false);
   const loadPosHistory = useCallback(async () => {
     setPosLoading(true);
-    try { setPosHistory(await getPositionHistory(numSessionId)); }
+    try {
+      const data = await getPositionHistory(numSessionId);
+      setPosHistory(data);
+      if (data?.timeline?.length) {
+        const drvs: Record<string, { acronym: string; team_colour: string; driver_number: number }> = {};
+        for (const e of data.timeline) {
+          if (!drvs[e.driver_number]) {
+            drvs[e.driver_number] = { acronym: e.acronym, team_colour: e.team_colour, driver_number: e.driver_number };
+          }
+        }
+        setPosDrivers(drvs);
+        setSelectedPosDrivers(new Set(Object.keys(drvs).map(Number)));
+      }
+    }
     catch { setPosHistory(null); }
     finally { setPosLoading(false); setPosLoaded(true); }
   }, [numSessionId]);
@@ -320,7 +333,20 @@ export default function SessionDetailPage() {
   const [gapsLoaded, setGapsLoaded] = useState(false);
   const loadGaps = useCallback(async () => {
     setGapsLoading(true);
-    try { setGaps(await getSessionGaps(numSessionId)); }
+    try {
+      const data = await getSessionGaps(numSessionId);
+      setGaps(data);
+      if (data?.timeline?.length) {
+        const drvs: Record<string, { acronym: string; team_colour: string; driver_number: number }> = {};
+        for (const g of data.timeline) {
+          if (g.driver_number && !drvs[g.driver_number]) {
+            drvs[g.driver_number] = { acronym: g.acronym || `#${g.driver_number}`, team_colour: g.team_colour || '#666', driver_number: g.driver_number };
+          }
+        }
+        setGapDrivers(drvs);
+        setSelectedGapDrivers(new Set(Object.keys(drvs).map(Number)));
+      }
+    }
     catch { setGaps(null); }
     finally { setGapsLoading(false); setGapsLoaded(true); }
   }, [numSessionId]);
@@ -389,7 +415,34 @@ export default function SessionDetailPage() {
   // Auto-load circuit on mount
   useEffect(() => { loadCircuit(); }, [loadCircuit]);
 
-  // ── Overtake Analysis (from position history) ──
+  // ── Position History driver toggle ──
+  const [selectedPosDrivers, setSelectedPosDrivers] = useState<Set<number>>(new Set());
+  const [posDrivers, setPosDrivers] = useState<Record<string, { acronym: string; team_colour: string; driver_number: number }>>({});
+  // All drivers toggle helper
+  const togglePosDriver = (dn: number) => {
+    setSelectedPosDrivers(prev => {
+      const next = new Set(prev);
+      if (next.has(dn)) next.delete(dn); else next.add(dn);
+      return next;
+    });
+  };
+  const selectAllPosDrivers = () => {
+    setSelectedPosDrivers(new Set(Object.keys(posDrivers).map(Number)));
+  };
+
+  // ── Gap Timeline driver toggle ──
+  const [selectedGapDrivers, setSelectedGapDrivers] = useState<Set<number>>(new Set());
+  const [gapDrivers, setGapDrivers] = useState<Record<string, { acronym: string; team_colour: string; driver_number: number }>>({});
+  const toggleGapDriver = (dn: number) => {
+    setSelectedGapDrivers(prev => {
+      const next = new Set(prev);
+      if (next.has(dn)) next.delete(dn); else next.add(dn);
+      return next;
+    });
+  };
+  const selectAllGapDrivers = () => {
+    setSelectedGapDrivers(new Set(Object.keys(gapDrivers).map(Number)));
+  };
   const [overtakeData, setOvertakeData] = useState<any>(null);
   const [overtakeLoading, setOvertakeLoading] = useState(false);
   const [overtakeLoaded, setOvertakeLoaded] = useState(false);
@@ -451,12 +504,10 @@ export default function SessionDetailPage() {
   const [degDrv2, setDegDrv2] = useState(0);
   const [degData, setDegData] = useState<{ drv1: number; drv2: number; points: { lap: number; drv1: number | null; drv2: number | null }[] } | null>(null);
   const [degLoading, setDegLoading] = useState(false);
-  const [degLoaded, setDegLoaded] = useState(false);
+  const [degOpen, setDegOpen] = useState(false);
   const [showAllDrivers, setShowAllDrivers] = useState(false);
-  // Set default degradation drivers once drivers load
-  const effectiveDegDrv1 = degDrv1 || drivers[0]?.driver_number || 0;
-  const effectiveDegDrv2 = degDrv2 || (drivers.length > 1 ? drivers[1]?.driver_number || 0 : 0);
-  const loadDegradation = useCallback(() => {
+  // Read current selected driver numbers directly at call time
+  function loadDegradation() {
     const d1 = degDrv1 || drivers[0]?.driver_number || 0;
     const d2 = degDrv2 || (drivers.length > 1 ? drivers[1]?.driver_number || 0 : 0);
     if (!d1 || !d2) return;
@@ -472,9 +523,8 @@ export default function SessionDetailPage() {
       drv2: d2Laps.find(l => l.lap_number === lap)?.lap_duration || null,
     }));
     setDegData({ drv1: d1, drv2: d2, points });
-    setDegLoaded(true);
     setDegLoading(false);
-  }, [drivers, laps]);
+  }
 
   if (loading) {
     return <div className="text-center p-12 text-muted-foreground">Loading session...</div>;
@@ -527,7 +577,7 @@ export default function SessionDetailPage() {
       </div>
 
       {/* ═══ DRIVER GRID ═══ */}
-      <CardSection title="Drivers" subtitle={`${drivers.length} drivers — sorted by number — tap to view telemetry`} icon={<Activity className="h-4 w-4 text-blue-500" />}>
+      <CardSection title="Drivers" subtitle={`${drivers.length} drivers — sorted by driver # — tap to view telemetry`} icon={<Activity className="h-4 w-4 text-blue-500" />}>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
           {(showAllDrivers ? drivers : drivers.slice(0, 10)).map(d => (
             <Card key={d.driver_number} className={`p-2.5 text-center cursor-pointer transition-colors ${selectedDriver === d.driver_number ? 'ring-2 ring-primary' : 'hover:bg-muted/50'}`}
@@ -540,6 +590,7 @@ export default function SessionDetailPage() {
               ) : null}
               <p className="font-bold text-xs">{d.name_acronym}</p>
               <p className="text-[10px] text-muted-foreground truncate">{d.team_name}</p>
+              <p className="text-[9px] text-muted-foreground/60 mt-0.5">#{d.driver_number}</p>
             </Card>
           ))}
         </div>
@@ -952,6 +1003,7 @@ export default function SessionDetailPage() {
                 return pt;
               });
               const driverEntries = Object.entries(byDriver);
+              const filteredEntries = driverEntries.filter(([dn]) => selectedPosDrivers.has(parseInt(dn)));
               return (
                 <div className="overflow-x-auto">
                   <div style={{ minWidth: 500 }}>
@@ -963,20 +1015,35 @@ export default function SessionDetailPage() {
                         <Tooltip
                           contentStyle={{ background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }}
                           formatter={(value: any, name: any) => [`P${value}`, String(name).replace('p_', '')]} />
-                        {driverEntries.map(([dn, info]) => (
+                        {filteredEntries.map(([dn, info]) => (
                           <Line key={dn} type="monotone" dataKey={`p_${dn}`} name={info.acronym}
                             stroke={teamColor(info.team_colour)} strokeWidth={1.5} dot={false} connectNulls />
                         ))}
                       </LineChart>
                     </ResponsiveContainer>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {driverEntries.slice(0, 22).map(([dn, info]) => (
-                        <span key={dn} className="flex items-center gap-1 text-[10px]">
-                          <span className="w-2 h-2 rounded-full inline-block" style={{ background: teamColor(info.team_colour) }} />
-                          {info.acronym}
-                        </span>
-                      ))}
-                      {driverEntries.length > 22 && <span className="text-[10px] text-muted-foreground">+{driverEntries.length - 22} more</span>}
+                    {filteredEntries.length === 0 && (
+                      <p className="text-center py-3 text-muted-foreground text-xs">Select at least one driver to display</p>
+                    )}
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {driverEntries.slice(0, 44).map(([dn, info]) => {
+                        const numDn = parseInt(dn);
+                        const isSelected = selectedPosDrivers.has(numDn);
+                        return (
+                          <button key={dn} onClick={() => togglePosDriver(numDn)}
+                            className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                              isSelected
+                                ? 'border-foreground/30 bg-foreground/5 text-foreground'
+                                : 'border-transparent text-muted-foreground/50 hover:text-muted-foreground'
+                            }`}>
+                            <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: teamColor(info.team_colour), opacity: isSelected ? 1 : 0.3 }} />
+                            {info.acronym}
+                          </button>
+                        );
+                      })}
+                      {driverEntries.length > 44 && <span className="text-[10px] text-muted-foreground">+{driverEntries.length - 44} more</span>}
+                      <button onClick={selectAllPosDrivers} className="text-[10px] text-muted-foreground hover:text-foreground ml-1 underline">
+                        Select all
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1069,6 +1136,7 @@ export default function SessionDetailPage() {
               const drvEntries = gaps.leader
                 ? [[gaps.leader.driver_number.toString(), { acronym: gaps.leader.acronym, team_colour: gaps.leader.team_colour }] as const, ...Object.entries(drvMap).filter(([k]) => k !== gaps.leader!.driver_number.toString())]
                 : Object.entries(drvMap);
+              const gapFilteredEntries = drvEntries.filter(([dn]) => selectedGapDrivers.has(parseInt(dn)));
               const chartData = sampledLaps.map(lap => {
                 const entries = byLap[lap] || [];
                 const pt: Record<string, any> = { lap };
@@ -1089,20 +1157,35 @@ export default function SessionDetailPage() {
                         <Tooltip
                           contentStyle={{ background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }}
                           formatter={(value: any, name: any) => [`${value.toFixed(2)}s`, String(name).replace('g_', '')]} />
-                        {drvEntries.slice(0, 20).map(([dn, info]) => (
+                        {gapFilteredEntries.map(([dn, info]) => (
                           <Line key={dn} type="monotone" dataKey={`g_${dn}`} name={info.acronym}
                             stroke={teamColor(info.team_colour)} strokeWidth={1.5} dot={false} connectNulls />
                         ))}
                       </LineChart>
                     </ResponsiveContainer>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {drvEntries.slice(0, 22).map(([dn, info]) => (
-                        <span key={dn} className="flex items-center gap-1 text-[10px]">
-                          <span className="w-2 h-2 rounded-full inline-block" style={{ background: teamColor(info.team_colour) }} />
-                          {info.acronym}
-                        </span>
-                      ))}
-                      {drvEntries.length > 22 && <span className="text-[10px] text-muted-foreground">+{drvEntries.length - 22} more</span>}
+                    {gapFilteredEntries.length === 0 && (
+                      <p className="text-center py-3 text-muted-foreground text-xs">Select at least one driver to display</p>
+                    )}
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {drvEntries.slice(0, 44).map(([dn, info]) => {
+                        const numDn = parseInt(dn);
+                        const isSelected = selectedGapDrivers.has(numDn);
+                        return (
+                          <button key={dn} onClick={() => toggleGapDriver(numDn)}
+                            className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                              isSelected
+                                ? 'border-foreground/30 bg-foreground/5 text-foreground'
+                                : 'border-transparent text-muted-foreground/50 hover:text-muted-foreground'
+                            }`}>
+                            <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: teamColor(info.team_colour), opacity: isSelected ? 1 : 0.3 }} />
+                            {info.acronym}
+                          </button>
+                        );
+                      })}
+                      {drvEntries.length > 44 && <span className="text-[10px] text-muted-foreground">+{drvEntries.length - 44} more</span>}
+                      <button onClick={selectAllGapDrivers} className="text-[10px] text-muted-foreground hover:text-foreground ml-1 underline">
+                        Select all
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1118,57 +1201,72 @@ export default function SessionDetailPage() {
       <CardSection title="Telemetry Analysis" subtitle="Tyre deg, speed, braking, gear & more" icon={<Gauge className="h-4 w-4 text-blue-500" />}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {/* Tyre Degradation */}
-          <LoadableCard title="Tyre Degradation" subtitle="Lap time vs tyre age" icon={<TrendingUp className="h-4 w-4 text-green-500" />}
-            loading={degLoading} loaded={degLoaded} onLoad={loadDegradation}>
-            <div className="flex flex-wrap gap-2 items-center mb-3">
-              <select className="bg-secondary text-foreground border border-border rounded px-2 py-1 text-xs" value={effectiveDegDrv1}
-                onChange={e => { setDegDrv1(parseInt(e.target.value)); setDegLoaded(false); }}>
-                {drivers.map(d => <option key={d.driver_number} value={d.driver_number}>{d.name_acronym}</option>)}
-              </select>
-              <span className="text-muted-foreground text-xs">vs</span>
-              <select className="bg-secondary text-foreground border border-border rounded px-2 py-1 text-xs" value={effectiveDegDrv2}
-                onChange={e => { setDegDrv2(parseInt(e.target.value)); setDegLoaded(false); }}>
-                {drivers.map(d => <option key={d.driver_number} value={d.driver_number}>{d.name_acronym}</option>)}
-              </select>
-              <button onClick={loadDegradation} className="bg-f1-red text-white px-3 py-1 rounded text-xs font-medium hover:opacity-90">Plot</button>
-            </div>
-            {degData?.points?.length ? (
-              <div className="overflow-x-auto">
-                <div style={{ minWidth: 400, height: 200 }} className="relative">
-                  <div className="absolute inset-0 flex flex-col">
-                    <div className="flex-1 relative border-b border-border">
-                      {degData.points.map((p, i) => {
-                        const times = degData.points.filter(x => x.drv1 || x.drv2).map(x => Math.min(x.drv1 || 999, x.drv2 || 999));
-                        const minTime = Math.min(...times, 60);
-                        const maxTime = Math.max(...times, 90);
-                        const range = maxTime - minTime || 1;
-                        return (
-                          <div key={i} className="absolute" style={{
-                            left: `${(i / degData.points.length) * 100}%`, bottom: 0,
-                          }}>
-                            {p.drv1 && <div className="absolute w-1.5 h-1.5 rounded-full bg-red-500"
-                              style={{ bottom: `${((p.drv1 - minTime) / range) * 100}%`, left: 0 }} title={`L${p.lap}: ${p.drv1.toFixed(3)}s`} />}
-                            {p.drv2 && <div className="absolute w-1.5 h-1.5 rounded-full bg-blue-500"
-                              style={{ bottom: `${((p.drv2 - minTime) / range) * 100}%`, left: 0 }} title={`L${p.lap}: ${p.drv2.toFixed(3)}s`} />}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-                      <span>L{degData.points[0]?.lap || 0}</span>
-                      <span>L{degData.points[degData.points.length - 1]?.lap || 0}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-3 text-xs text-muted-foreground mt-2">
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> {driverMap[degData.drv1]?.name_acronym}</span>
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> {driverMap[degData.drv2]?.name_acronym}</span>
+          <Card className="p-5 border border-border">
+            <div className="flex items-center justify-between cursor-pointer" onClick={() => setDegOpen(!degOpen)}>
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-green-500 shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-sm">Tyre Degradation</h3>
+                  <p className="text-xs text-muted-foreground">Lap time vs tyre age</p>
                 </div>
               </div>
-            ) : degLoaded ? (
-              <p className="text-center py-4 text-muted-foreground text-sm">No degradation data</p>
-            ) : null}
-          </LoadableCard>
+              <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${degOpen ? 'rotate-180' : ''}`} />
+            </div>
+            {degOpen && (
+              <div className="mt-4">
+                <div className="flex flex-wrap gap-2 items-center mb-3">
+                  <select className="bg-secondary text-foreground border border-border rounded px-2 py-1 text-xs" value={degDrv1 || drivers[0]?.driver_number || 0}
+                    onChange={e => { setDegDrv1(parseInt(e.target.value)); }}>
+                    {drivers.map(d => <option key={d.driver_number} value={d.driver_number}>{d.name_acronym}</option>)}
+                  </select>
+                  <span className="text-muted-foreground text-xs">vs</span>
+                  <select className="bg-secondary text-foreground border border-border rounded px-2 py-1 text-xs" value={degDrv2 || (drivers.length > 1 ? drivers[1]?.driver_number || 0 : 0)}
+                    onChange={e => { setDegDrv2(parseInt(e.target.value)); }}>
+                    {drivers.map(d => <option key={d.driver_number} value={d.driver_number}>{d.name_acronym}</option>)}
+                  </select>
+                  <button onClick={loadDegradation} className="bg-f1-red text-white px-3 py-1 rounded text-xs font-medium hover:opacity-90">
+                    {degLoading ? <><RefreshCw className="h-3 w-3 inline animate-spin" /> Plotting...</> : 'Plot'}
+                  </button>
+                </div>
+                {degData?.points?.length ? (
+                  <div className="overflow-x-auto">
+                    <div style={{ minWidth: 400, height: 200 }} className="relative">
+                      <div className="absolute inset-0 flex flex-col">
+                        <div className="flex-1 relative border-b border-border">
+                          {degData.points.map((p, i) => {
+                            const times = degData.points.filter(x => x.drv1 || x.drv2).map(x => Math.min(x.drv1 || 999, x.drv2 || 999));
+                            const minTime = Math.min(...times, 60);
+                            const maxTime = Math.max(...times, 90);
+                            const range = maxTime - minTime || 1;
+                            return (
+                              <div key={i} className="absolute" style={{
+                                left: `${(i / degData.points.length) * 100}%`, bottom: 0,
+                              }}>
+                                {p.drv1 && <div className="absolute w-1.5 h-1.5 rounded-full bg-red-500"
+                                  style={{ bottom: `${((p.drv1 - minTime) / range) * 100}%`, left: 0 }} title={`L${p.lap}: ${p.drv1.toFixed(3)}s`} />}
+                                {p.drv2 && <div className="absolute w-1.5 h-1.5 rounded-full bg-blue-500"
+                                  style={{ bottom: `${((p.drv2 - minTime) / range) * 100}%`, left: 0 }} title={`L${p.lap}: ${p.drv2.toFixed(3)}s`} />}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                          <span>L{degData.points[0]?.lap || 0}</span>
+                          <span>L{degData.points[degData.points.length - 1]?.lap || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 text-xs text-muted-foreground mt-2">
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> {driverMap[degData.drv1]?.name_acronym}</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> {driverMap[degData.drv2]?.name_acronym}</span>
+                    </div>
+                  </div>
+                ) : degData && !degData?.points?.length ? (
+                  <p className="text-center py-4 text-muted-foreground text-sm">No degradation data for selected drivers</p>
+                ) : null}
+              </div>
+            )}
+          </Card>
 
           {/* Speed Traps */}
           <LoadableCard title="Speed Trap" subtitle="Top speed & average speed per driver" icon={<Zap className="h-4 w-4 text-yellow-500" />}
