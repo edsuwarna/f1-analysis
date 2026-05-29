@@ -51,17 +51,18 @@ export default function TechUpdatesPage() {
       </h1>
 
       {/* Race selector */}
-      <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1">
-        {meetings.map(m => (
-          <Badge
-            key={m.id}
-            variant={selectedId === m.id ? 'default' : 'outline'}
-            className="cursor-pointer text-xs"
-            onClick={() => setSelectedId(m.id)}
-          >
-            {m.name}
-          </Badge>
-        ))}
+      <div className="max-w-md">
+        <label className="text-xs text-muted-foreground mb-1 block">Select Grand Prix</label>
+        <select
+          className="w-full bg-secondary text-foreground border border-border rounded-md px-3 py-2 text-sm"
+          value={selectedId ?? ''}
+          onChange={e => setSelectedId(Number(e.target.value) || null)}
+        >
+          <option value="">Choose a race...</option>
+          {meetings.map(m => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+        </select>
       </div>
 
       {loading && <div className="text-center py-8 text-muted-foreground">Loading telemetry data...</div>}
