@@ -89,6 +89,7 @@ export interface TelemetrySample {
   rpm: number;
   gear: number;
   drs: number;
+  timestamp?: string;
 }
 
 export interface Stint {

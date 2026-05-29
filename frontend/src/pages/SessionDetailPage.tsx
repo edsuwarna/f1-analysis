@@ -303,7 +303,7 @@ export default function SessionDetailPage() {
                           {driverStints.map((stint, si) => {
                             const width = maxStintLap > 0 ? ((stint.lap_end - stint.lap_start + 1) / maxStintLap) * 100 : 0;
                             const color = COMPOUND_COLORS[stint.compound?.toUpperCase()] || '#6b7280';
-                            const isFresh = stint.fresh_tyre || stint.tyre_age_at_start === 0;
+                            const isFresh = stint.tyre_age_at_start === 0;
                             return (
                               <div
                                 key={si}
