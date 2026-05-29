@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
-import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarFooter, SidebarInset, SidebarTrigger, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton } from '@/components/ui/sidebar';
+import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarFooter, SidebarInset, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
 import { useTheme } from '@/hooks/use-theme';
@@ -26,7 +25,7 @@ import ConsistencyPage from '@/pages/ConsistencyPage';
 import {
   Home, Trophy, Users, Calendar, Gauge, Swords, Flame,
   Wrench, ScrollText, Sun, Moon, Flag, BarChart3, Building2,
-  Newspaper, BookOpen, BookMarked, Info, ChevronDown, ChevronRight,
+  Newspaper, BookOpen, BookMarked, Info,
   Activity, UserCircle,
 } from 'lucide-react';
 
@@ -41,6 +40,8 @@ const mainNavItems: NavItem[] = [
   { icon: Calendar, label: 'Races', path: '/races' },
   { icon: UserCircle, label: 'Drivers', path: '/drivers' },
   { icon: BarChart3, label: 'Season Analysis', path: '/season' },
+  { icon: Trophy, label: 'Driver Standings', path: '/standings/drivers' },
+  { icon: Building2, label: 'Constructor Standings', path: '/standings/constructors' },
   { icon: Swords, label: 'Team Battle', path: '/team-battle' },
   { icon: Building2, label: 'Teams', path: '/teams' },
   { icon: Gauge, label: 'Driver Stats', path: '/stats/drivers' },
@@ -60,15 +61,18 @@ const bottomNavItems: NavItem[] = [
 
 function AppLayout() {
   const { theme, toggle } = useTheme();
+  const { setOpenMobile } = useSidebar();
   const navigate = useNavigate();
   const location = useLocation();
-  const [standingsOpen, setStandingsOpen] = useState(
-    location.pathname.startsWith('/standings')
-  );
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
+  };
+
+  const navAndClose = (path: string) => {
+    navigate(path);
+    setOpenMobile(false);
   };
 
   return (
@@ -78,7 +82,7 @@ function AppLayout() {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild>
-                <Link to="/">
+                <Link to="/" onClick={() => setOpenMobile(false)}>
                   <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                     <Flag className="size-4" />
                   </div>
@@ -98,27 +102,15 @@ function AppLayout() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {mainNavItems.map(item => {
-                  if (item.path === '/races') {
-                    // Races and Session routes check
-                    const isActiveRaces = location.pathname === '/races' || location.pathname.startsWith('/session/');
-                    return (
-                      <SidebarMenuItem key={item.path}>
-                        <SidebarMenuButton
-                          isActive={isActiveRaces}
-                          onClick={() => navigate(item.path)}
-                          tooltip={item.label}
-                        >
-                          <item.icon className="size-4" />
-                          <span>{item.label}</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  }
+                  const isRaces = item.path === '/races';
+                  const isActiveItem = isRaces
+                    ? (location.pathname === '/races' || location.pathname.startsWith('/session/'))
+                    : isActive(item.path);
                   return (
                     <SidebarMenuItem key={item.path}>
                       <SidebarMenuButton
-                        isActive={isActive(item.path)}
-                        onClick={() => navigate(item.path)}
+                        isActive={isActiveItem}
+                        onClick={() => navAndClose(item.path)}
                         tooltip={item.label}
                       >
                         <item.icon className="size-4" />
@@ -127,43 +119,6 @@ function AppLayout() {
                     </SidebarMenuItem>
                   );
                 })}
-
-                {/* Standings Submenu */}
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={location.pathname.startsWith('/standings')}
-                    onClick={() => setStandingsOpen(!standingsOpen)}
-                    tooltip="Standings"
-                  >
-                    <Trophy className="size-4" />
-                    <span>Standings</span>
-                    <span className="ml-auto">
-                      {standingsOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-                    </span>
-                  </SidebarMenuButton>
-                  {standingsOpen && (
-                    <SidebarMenuSub>
-                      <SidebarMenuSubItem>
-                        <SidebarMenuSubButton
-                          isActive={location.pathname === '/standings/drivers'}
-                          onClick={() => navigate('/standings/drivers')}
-                        >
-                          <Users className="size-3.5" />
-                          <span>Driver Standings</span>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                      <SidebarMenuSubItem>
-                        <SidebarMenuSubButton
-                          isActive={location.pathname === '/standings/constructors'}
-                          onClick={() => navigate('/standings/constructors')}
-                        >
-                          <Building2 className="size-3.5" />
-                          <span>Constructor Standings</span>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    </SidebarMenuSub>
-                  )}
-                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -181,7 +136,7 @@ function AppLayout() {
               <SidebarMenuItem key={item.path}>
                 <SidebarMenuButton
                   isActive={isActive(item.path)}
-                  onClick={() => navigate(item.path)}
+                  onClick={() => navAndClose(item.path)}
                   tooltip={item.label}
                 >
                   <item.icon className="size-4" />
