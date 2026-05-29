@@ -130,6 +130,29 @@ export default function SessionDetailPage() {
       .finally(() => setTelemetryLoading(false));
   }, [selectedDriver, sessionId, numSessionId]);
 
+  // ─── Tyre Strategy: Group stints by driver ─── (must be BEFORE early returns)
+  const stintsByDriver = useMemo(() => {
+    const map = new Map<number, Stint[]>();
+    for (const s of stints) {
+      if (!map.has(s.driver_number)) map.set(s.driver_number, []);
+      map.get(s.driver_number)!.push(s);
+    }
+    return map;
+  }, [stints]);
+
+  const maxStintLap = useMemo(() => {
+    let max = 0;
+    try {
+      for (const sts of stintsByDriver.values()) {
+        for (const s of sts) {
+          if (s.lap_end > max) max = s.lap_end;
+          if (s.lap_start > max) max = s.lap_start;
+        }
+      }
+    } catch {}
+    return Math.max(max, laps.reduce((mx, l) => Math.max(mx, l.lap_number || 0), 0));
+  }, [stintsByDriver, laps]);
+
   if (loading) {
     return <div className="text-center p-12 text-muted-foreground">Loading session...</div>;
   }
@@ -142,27 +165,6 @@ export default function SessionDetailPage() {
   const sessType = (session.session_type || '').toLowerCase();
   const isRaceSprint = sessType.includes('race') || sessType.includes('sprint');
   const isQualifying = sessType.includes('qualify');
-
-  // ─── Tyre Strategy: Group stints by driver ───
-  const stintsByDriver = useMemo(() => {
-    const map = new Map<number, Stint[]>();
-    for (const s of stints) {
-      if (!map.has(s.driver_number)) map.set(s.driver_number, []);
-      map.get(s.driver_number)!.push(s);
-    }
-    return map;
-  }, [stints]);
-
-  const maxStintLap = useMemo(() => {
-    let max = 0;
-    for (const sts of stintsByDriver.values()) {
-      for (const s of sts) {
-        if (s.lap_end > max) max = s.lap_end;
-        if (s.lap_start > max) max = s.lap_start;
-      }
-    }
-    return Math.max(max, laps.reduce((mx, l) => Math.max(mx, l.lap_number || 0), 0));
-  }, [stintsByDriver, laps]);
 
   // ─── Qualifying Evolution data ───
   const qualiDrivers = qualifying?.drivers || [];
@@ -500,8 +502,8 @@ export default function SessionDetailPage() {
                         <span className="text-xs text-muted-foreground">{d.team_name}</span>
                       </div>
                       <div className="flex gap-3 text-xs text-muted-foreground">
-                        <span>Avg pit: <span className="font-mono font-medium text-foreground">{d.avg_pit_duration.toFixed(1)}s</span></span>
-                        <span>Total: <span className="font-mono font-medium text-foreground">{d.total_pit_time.toFixed(0)}s</span></span>
+                        <span>Avg pit: <span className="font-mono font-medium text-foreground">{(d.avg_pit_duration || 0).toFixed(1)}s</span></span>
+                        <span>Total: <span className="font-mono font-medium text-foreground">{(d.total_pit_time || 0).toFixed(0)}s</span></span>
                       </div>
                     </div>
                     {d.strategy_summary && (
@@ -524,11 +526,11 @@ export default function SessionDetailPage() {
                           {d.pit_analysis.map((pa, j) => (
                             <tr key={j} className="border-b border-border hover:bg-muted/30">
                               <td className="p-1.5 font-medium">L{pa.lap_number}</td>
-                              <td className="p-1.5 text-right font-mono">{pa.in_lap_time.toFixed(1)}</td>
-                              <td className="p-1.5 text-right font-mono">{pa.out_lap_time.toFixed(1)}</td>
-                              <td className="p-1.5 text-right font-mono">{pa.prev_lap_time.toFixed(1)}</td>
-                              <td className="p-1.5 text-right font-mono">{pa.avg_before.toFixed(1)}</td>
-                              <td className="p-1.5 text-right font-mono">{pa.avg_after.toFixed(1)}</td>
+                              <td className="p-1.5 text-right font-mono">{(pa.in_lap_time || 0).toFixed(1)}</td>
+                              <td className="p-1.5 text-right font-mono">{(pa.out_lap_time || 0).toFixed(1)}</td>
+                              <td className="p-1.5 text-right font-mono">{(pa.prev_lap_time || 0).toFixed(1)}</td>
+                              <td className="p-1.5 text-right font-mono">{(pa.avg_before || 0).toFixed(1)}</td>
+                              <td className="p-1.5 text-right font-mono">{(pa.avg_after || 0).toFixed(1)}</td>
                               <td className={`p-1.5 text-center font-mono ${(pa.position_change || 0) > 0 ? 'text-green-400' : pa.position_change < 0 ? 'text-red-400' : ''}`}>
                                 {pa.position_change > 0 ? `+${pa.position_change}` : pa.position_change || '—'}
                               </td>
@@ -571,11 +573,11 @@ export default function SessionDetailPage() {
                           <div className="flex-1 bg-secondary rounded-full h-5 overflow-hidden">
                             <div className="h-full rounded-full flex items-center justify-end pr-2 text-[10px] font-bold text-white"
                               style={{ width: `${Math.min(d.om_percentage, 100)}%`, background: teamColor(d.team_colour) }}>
-                              {d.om_percentage > 15 && `${d.om_percentage.toFixed(1)}%`}
+                              {d.om_percentage > 15 && `${(d.om_percentage || 0).toFixed(1)}%`}
                             </div>
                           </div>
                           <div className="w-24 shrink-0 text-right text-xs text-muted-foreground">
-                            {d.speed_gain > 0 ? `+${d.speed_gain.toFixed(1)} km/h` : '-'}
+                            {d.speed_gain > 0 ? `+${(d.speed_gain || 0).toFixed(1)} km/h` : '-'}
                           </div>
                         </div>
                       ))}
@@ -604,10 +606,10 @@ export default function SessionDetailPage() {
                               </span>
                             </td>
                             <td className="p-2 text-right font-mono">{d.om_activations}</td>
-                            <td className="p-2 text-right font-mono">{d.om_percentage.toFixed(1)}%</td>
+                            <td className="p-2 text-right font-mono">{(d.om_percentage || 0).toFixed(1)}%</td>
                             <td className="p-2 text-right font-mono">{d.avg_speed_om?.toFixed(0)}</td>
                             <td className="p-2 text-right font-mono">{d.avg_speed_non_om?.toFixed(0)}</td>
-                            <td className="p-2 text-right font-mono text-green-400">+{d.speed_gain.toFixed(1)}</td>
+                            <td className="p-2 text-right font-mono text-green-400">+{(d.speed_gain || 0).toFixed(1)}</td>
                           </tr>
                         ))}
                       </tbody>
