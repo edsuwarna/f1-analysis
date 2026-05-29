@@ -1,323 +1,304 @@
 import { useEffect, useState } from 'react';
-import { getChampionship, type ChampionshipData, type RaceResult, type StandingRow } from '@/lib/api';
+import { getMeetings, getTechUpdates, type Meeting, type TechUpdatesData, type TechUpdateDriver } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { flagEmoji, teamColor } from '@/lib/formatters';
-import { Wrench, Trophy, BarChart3, Medal, Star } from 'lucide-react';
+import { teamColor } from '@/lib/formatters';
+import { Wrench, Gauge, ArrowUpDown, Sparkles, Zap, RotateCcw, BarChart3 } from 'lucide-react';
+
+const GEAR_LABELS: Record<string, string> = {
+  '1': '1st', '2': '2nd', '3': '3rd', '4': '4th',
+  '5': '5th', '6': '6th', '7': '7th', '8': '8th',
+};
 
 export default function TechUpdatesPage() {
-  const [data, setData] = useState<ChampionshipData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [data, setData] = useState<TechUpdatesData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    getChampionship(2026).then(setData).catch(console.error).finally(() => setLoading(false));
+    getMeetings(2026).then(m => {
+      const races = m.filter(x => !x.name.includes('Pre-Season') && !x.name.includes('Testing'));
+      setMeetings(races);
+      if (races.length > 0) setSelectedId(races[races.length - 1].id);
+    }).catch(console.error);
   }, []);
 
-  if (loading) return <div className="text-center p-12 text-muted-foreground">Loading season data...</div>;
-  if (!data) return <div className="text-center p-12 text-muted-foreground">No data available</div>;
+  useEffect(() => {
+    if (!selectedId) return;
+    setLoading(true);
+    setError('');
+    getTechUpdates(selectedId).then(d => {
+      if (d.error) setError(d.error);
+      else setData(d);
+    }).catch(e => setError(String(e))).finally(() => setLoading(false));
+  }, [selectedId]);
 
-  const { races, driver_standings, constructor_standings, races_completed } = data;
-
-  // Stats
-  const totalDrivers = driver_standings.length;
-  const totalConstructors = constructor_standings.length;
-  const winners = new Set(races.map(r => r.results?.[0]?.acronym).filter(Boolean));
-  const podiumDrivers = new Set(
-    races.flatMap(r => r.results?.slice(0, 3).map(res => res.acronym).filter(Boolean) || [])
-  );
-  const uniqueWinners = races.filter(r => r.results?.[0]);
-
-  // Podium counts
-  const podiumCount: Record<string, { count: number; team: string; colour: string; name: string }> = {};
-  races.forEach(r => {
-    r.results?.slice(0, 3).forEach(res => {
-      if (!podiumCount[res.acronym]) {
-        const drv = driver_standings.find(d => d.name_acronym === res.acronym);
-        podiumCount[res.acronym] = { count: 0, team: res.team_name, colour: res.team_colour, name: drv?.full_name || res.acronym };
-      }
-      podiumCount[res.acronym].count++;
-    });
-  });
-
-  // Win counts
-  const winCount: Record<string, { wins: number; team: string; colour: string; name: string }> = {};
-  races.forEach(r => {
-    const w = r.results?.[0];
-    if (w) {
-      if (!winCount[w.acronym]) {
-        const drv = driver_standings.find(d => d.name_acronym === w.acronym);
-        winCount[w.acronym] = { wins: 0, team: w.team_name, colour: w.team_colour, name: drv?.full_name || w.acronym };
-      }
-      winCount[w.acronym].wins++;
-    }
-  });
-
-  // Constructor wins
-  const constructorWins: Record<string, { wins: number; colour: string }> = {};
-  races.forEach(r => {
-    const w = r.results?.[0];
-    if (w) {
-      if (!constructorWins[w.team_name]) {
-        constructorWins[w.team_name] = { wins: 0, colour: w.team_colour };
-      }
-      constructorWins[w.team_name].wins++;
-    }
-  });
+  const drivers = data?.drivers || [];
+  const sortedMaxSpeed = [...drivers].sort((a, b) => b.speed.max_speed - a.speed.max_speed);
+  const sortedRPM = [...drivers].sort((a, b) => b.avg_rpm - a.avg_rpm);
+  const sortedDRS = [...drivers].sort((a, b) => b.drs_pct - a.drs_pct);
+  const sortedThrottle = [...drivers].sort((a, b) => b.throttle_avg - a.throttle_avg);
+  const sortedBrake = [...drivers].sort((a, b) => b.brake_avg - a.brake_avg);
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold flex items-center gap-2">
         <Wrench className="h-6 w-6 text-cyan-500" />
-        2026 Season Report
+        Tech Updates — Car Performance
       </h1>
 
-      {/* Season Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4 text-center">
-          <BarChart3 className="h-5 w-5 text-blue-500 mx-auto mb-1" />
-          <p className="text-2xl font-bold">{races_completed}</p>
-          <p className="text-xs text-muted-foreground">Races Completed</p>
-        </Card>
-        <Card className="p-4 text-center">
-          <Trophy className="h-5 w-5 text-yellow-500 mx-auto mb-1" />
-          <p className="text-2xl font-bold">{totalDrivers}</p>
-          <p className="text-xs text-muted-foreground">Drivers</p>
-        </Card>
-        <Card className="p-4 text-center">
-          <Medal className="h-5 w-5 text-purple-500 mx-auto mb-1" />
-          <p className="text-2xl font-bold">{uniqueWinners.length > 0 ? winners.size : '-'}</p>
-          <p className="text-xs text-muted-foreground">Different Winners</p>
-        </Card>
-        <Card className="p-4 text-center">
-          <Star className="h-5 w-5 text-orange-500 mx-auto mb-1" />
-          <p className="text-2xl font-bold">{totalConstructors}</p>
-          <p className="text-xs text-muted-foreground">Constructors</p>
-        </Card>
+      {/* Race selector */}
+      <div className="flex flex-wrap gap-2">
+        {meetings.map(m => (
+          <Badge
+            key={m.id}
+            variant={selectedId === m.id ? 'default' : 'outline'}
+            className="cursor-pointer text-xs"
+            onClick={() => setSelectedId(m.id)}
+          >
+            {m.name}
+          </Badge>
+        ))}
       </div>
 
-      <Tabs defaultValue="results">
-        <TabsList>
-          <TabsTrigger value="results">Race Results</TabsTrigger>
-          <TabsTrigger value="winners">Winners & Podiums</TabsTrigger>
-          <TabsTrigger value="standings">Standings</TabsTrigger>
-        </TabsList>
+      {loading && <div className="text-center py-8 text-muted-foreground">Loading telemetry data...</div>}
+      {error && <div className="text-center py-8 text-red-500">⚠️ {error}</div>}
+      {!loading && !error && drivers.length === 0 && (
+        <div className="text-center py-8 text-muted-foreground">
+          No telemetry data available for this race.
+        </div>
+      )}
 
-        {/* Race Results */}
-        <TabsContent value="results" className="mt-4 space-y-4">
-          {[...races].reverse().map(race => {
-            const results = race.results || [];
-            if (results.length === 0) return null;
+      {drivers.length > 0 && (
+        <Tabs defaultValue="speed">
+          <TabsList className="w-full flex-wrap">
+            <TabsTrigger value="speed"><Gauge className="h-3.5 w-3.5 mr-1" />Speed</TabsTrigger>
+            <TabsTrigger value="gears"><ArrowUpDown className="h-3.5 w-3.5 mr-1" />Gears</TabsTrigger>
+            <TabsTrigger value="throttle"><Sparkles className="h-3.5 w-3.5 mr-1" />Throttle</TabsTrigger>
+            <TabsTrigger value="brake"><RotateCcw className="h-3.5 w-3.5 mr-1" />Brake</TabsTrigger>
+            <TabsTrigger value="rpm"><Zap className="h-3.5 w-3.5 mr-1" />RPM</TabsTrigger>
+            <TabsTrigger value="drs"><BarChart3 className="h-3.5 w-3.5 mr-1" />DRS</TabsTrigger>
+          </TabsList>
 
-            const winner = results[0];
-            return (
-              <Card key={race.meeting_id} className="overflow-hidden">
-                <div className="p-4 border-b border-border bg-gradient-to-r from-card to-muted/30">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-bold text-base flex items-center gap-2">
-                        {flagEmoji(race.country_code)} {race.race_name}
-                      </h3>
+          {/* Speed Tab */}
+          <TabsContent value="speed" className="mt-4">
+            <Card className="p-4">
+              <h3 className="font-semibold text-sm mb-3">Top Speed per Driver (km/h)</h3>
+              <div className="space-y-2">
+                {sortedMaxSpeed.map((d, i) => {
+                  const maxSpeed = d.speed.max_speed || 0;
+                  const max = sortedMaxSpeed[0].speed.max_speed || 1;
+                  return (
+                    <div key={d.driver_number} className="flex items-center gap-2">
+                      <span className="w-6 text-xs font-bold text-muted-foreground text-right">{i + 1}</span>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: teamColor(d.team_colour) }} />
+                      <span className="w-10 text-xs font-semibold">{d.acronym}</span>
+                      <div className="flex-1 h-5 bg-muted/30 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full flex items-center justify-end px-2 text-[10px] font-bold text-white"
+                          style={{ width: `${(maxSpeed / max) * 100}%`, background: teamColor(d.team_colour) }}
+                        >
+                          {maxSpeed > 30 && `${maxSpeed} km/h`}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full" style={{ background: teamColor(winner.team_colour) }} />
-                      <span className="font-semibold text-sm">{winner.acronym}</span>
-                      <Badge className="text-[10px] bg-yellow-500/20 text-yellow-500 border-yellow-500/30">WIN</Badge>
-                    </div>
-                  </div>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left p-2 text-xs font-medium text-muted-foreground w-10">Pos</th>
-                        <th className="text-left p-2 text-xs font-medium text-muted-foreground">Driver</th>
-                        <th className="text-left p-2 text-xs font-medium text-muted-foreground hidden md:table-cell">Team</th>
-                        <th className="text-right p-2 text-xs font-medium text-muted-foreground">Points</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {results.slice(0, 10).map((res, i) => (
-                        <tr key={i} className="border-b border-border last:border-0 text-sm hover:bg-muted/20">
-                          <td className="p-2">
-                            <span className={`font-bold text-xs ${
-                              res.position === 1 ? 'text-yellow-500' :
-                              res.position === 2 ? 'text-gray-400' :
-                              res.position === 3 ? 'text-amber-600' :
-                              'text-muted-foreground'
-                            }`}>
-                              {res.position <= 3 ? ['🥇', '🥈', '🥉'][res.position - 1] : `#${res.position}`}
-                            </span>
-                          </td>
-                          <td className="p-2">
-                            <span className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full" style={{ background: teamColor(res.team_colour) }} />
-                              <span className="font-medium">{res.acronym}</span>
-                            </span>
-                          </td>
-                          <td className="p-2 text-xs text-muted-foreground hidden md:table-cell">{res.team_name}</td>
-                          <td className="p-2 text-right font-mono text-xs">{res.points}</td>
-                        </tr>
+                  );
+                })}
+              </div>
+            </Card>
+          </TabsContent>
+
+          {/* Gears Tab */}
+          <TabsContent value="gears" className="mt-4">
+            <Card className="p-4">
+              <h3 className="font-semibold text-sm mb-3">Gear Distribution per Driver (%)</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b text-muted-foreground">
+                      <th className="text-left p-1.5">Driver</th>
+                      {['1','2','3','4','5','6','7','8'].map(g => (
+                        <th key={g} className="text-right p-1.5">{GEAR_LABELS[g]}</th>
                       ))}
-                    </tbody>
-                  </table>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {drivers.map(d => {
+                      const dist = d.gear_distribution || {};
+                      return (
+                        <tr key={d.driver_number} className="border-b last:border-0 hover:bg-muted/10">
+                          <td className="p-1.5 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ background: teamColor(d.team_colour) }} />
+                            <span className="font-semibold">{d.acronym}</span>
+                          </td>
+                          {['1','2','3','4','5','6','7','8'].map(g => (
+                            <td key={g} className="text-right p-1.5 font-mono">
+                              {dist[g] ? `${dist[g].toFixed(1)}%` : '-'}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </TabsContent>
+
+          {/* Throttle Tab */}
+          <TabsContent value="throttle" className="mt-4">
+            <Card className="p-4">
+              <h3 className="font-semibold text-sm mb-3">Throttle Usage</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-xs text-muted-foreground mb-2">Average Throttle (%)</h4>
+                  <div className="space-y-1.5">
+                    {sortedThrottle.slice(0, 10).map((d, i) => {
+                      const val = d.throttle_avg;
+                      const maxVal = sortedThrottle[0].throttle_avg || 1;
+                      return (
+                        <div key={d.driver_number} className="flex items-center gap-2 text-xs">
+                          <span className="w-6 text-right text-muted-foreground">{i + 1}</span>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: teamColor(d.team_colour) }} />
+                          <span className="w-10 font-semibold">{d.acronym}</span>
+                          <div className="flex-1 h-4 bg-muted/30 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(val / maxVal) * 100}%` }} />
+                          </div>
+                          <span className="w-12 text-right">{val}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                {results.length > 10 && (
-                  <div className="p-2 text-center text-xs text-muted-foreground border-t border-border">
-                    +{results.length - 10} more drivers
-                  </div>
-                )}
-              </Card>
-            );
-          })}
-        </TabsContent>
-
-        {/* Winners & Podiums */}
-        <TabsContent value="winners" className="mt-4 space-y-6">
-          {/* Win Leaders */}
-          <Card className="p-5">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-yellow-500" />
-              Win Leaders
-            </h3>
-            <div className="space-y-3">
-              {Object.entries(winCount)
-                .sort(([, a], [, b]) => b.wins - a.wins)
-                .filter(([, v]) => v.wins > 0)
-                .map(([acronym, info], i) => (
-                  <div key={acronym} className="flex items-center gap-3">
-                    <span className={`w-6 text-center font-bold text-sm ${
-                      i === 0 ? 'text-yellow-500' : 'text-muted-foreground'
-                    }`}>{i + 1}</span>
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: teamColor(info.colour) }} />
-                    <span className="flex-1 font-medium">{info.name}</span>
-                    <span className="text-xs text-muted-foreground">{info.team}</span>
-                    <Badge className="text-xs font-bold">{info.wins} {info.wins === 1 ? 'win' : 'wins'}</Badge>
-                  </div>
-                ))}
-            </div>
-          </Card>
-
-          {/* Podium Leaders */}
-          <Card className="p-5">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <Medal className="h-4 w-4 text-purple-500" />
-              Podium Appearances
-            </h3>
-            <div className="space-y-3">
-              {Object.entries(podiumCount)
-                .sort(([, a], [, b]) => b.count - a.count)
-                .map(([acronym, info], i) => (
-                  <div key={acronym} className="flex items-center gap-3">
-                    <span className="w-6 text-center font-bold text-sm text-muted-foreground">{i + 1}</span>
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: teamColor(info.colour) }} />
-                    <span className="flex-1 font-medium">{info.name}</span>
-                    <span className="text-xs text-muted-foreground">{info.team}</span>
-                    <Badge variant="secondary" className="text-xs">{info.count} podiums</Badge>
-                  </div>
-                ))}
-            </div>
-          </Card>
-
-          {/* Constructor Wins */}
-          <Card className="p-5">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <Star className="h-4 w-4 text-blue-500" />
-              Constructor Wins
-            </h3>
-            <div className="space-y-3">
-              {Object.entries(constructorWins)
-                .sort(([, a], [, b]) => b.wins - a.wins)
-                .map(([team, info], i) => (
-                  <div key={team} className="flex items-center gap-3">
-                    <span className="w-6 text-center font-bold text-sm text-muted-foreground">{i + 1}</span>
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: teamColor(info.colour) }} />
-                    <span className="flex-1 font-medium">{team}</span>
-                    <Badge variant="outline" className="text-xs">{info.wins} {info.wins === 1 ? 'win' : 'wins'}</Badge>
-                  </div>
-                ))}
-            </div>
-          </Card>
-        </TabsContent>
-
-        {/* Standings Summary */}
-        <TabsContent value="standings" className="mt-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Driver Standings */}
-            <Card>
-              <div className="p-4 border-b border-border">
-                <h3 className="font-bold flex items-center gap-2">
-                  <Trophy className="h-4 w-4 text-yellow-500" />
-                  Driver Standings
-                </h3>
-              </div>
-              <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-                <table className="w-full">
-                  <thead className="sticky top-0 bg-card z-10">
-                    <tr className="border-b border-border">
-                      <th className="text-left p-2 text-xs font-medium text-muted-foreground">Pos</th>
-                      <th className="text-left p-2 text-xs font-medium text-muted-foreground">Driver</th>
-                      <th className="text-left p-2 text-xs font-medium text-muted-foreground hidden sm:table-cell">Team</th>
-                      <th className="text-right p-2 text-xs font-medium text-muted-foreground">Pts</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {driver_standings.map(d => (
-                      <tr key={d.driver_number} className="border-b border-border text-sm hover:bg-muted/20">
-                        <td className="p-2 font-bold text-xs text-muted-foreground">{d.position}</td>
-                        <td className="p-2">
-                          <span className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full" style={{ background: teamColor(d.team_colour) }} />
-                            <span className="font-medium">{d.name_acronym}</span>
-                            <span className="text-xs text-muted-foreground hidden md:inline">{d.full_name}</span>
-                          </span>
-                        </td>
-                        <td className="p-2 text-xs text-muted-foreground hidden sm:table-cell">{d.team_name}</td>
-                        <td className="p-2 text-right font-bold">{d.points}</td>
-                      </tr>
+                <div>
+                  <h4 className="text-xs text-muted-foreground mb-2">Max Throttle (%)</h4>
+                  <div className="space-y-1.5">
+                    {[...drivers].sort((a, b) => b.throttle_max - a.throttle_max).slice(0, 10).map((d, i) => (
+                      <div key={d.driver_number} className="flex items-center gap-2 text-xs">
+                        <span className="w-6 text-right text-muted-foreground">{i + 1}</span>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: teamColor(d.team_colour) }} />
+                        <span className="w-10 font-semibold">{d.acronym}</span>
+                        <div className="flex-1 text-right">{d.throttle_max}%</div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                </div>
               </div>
             </Card>
+          </TabsContent>
 
-            {/* Constructor Standings */}
-            <Card>
-              <div className="p-4 border-b border-border">
-                <h3 className="font-bold flex items-center gap-2">
-                  <Star className="h-4 w-4 text-blue-500" />
-                  Constructor Standings
-                </h3>
-              </div>
-              <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-                <table className="w-full">
-                  <thead className="sticky top-0 bg-card z-10">
-                    <tr className="border-b border-border">
-                      <th className="text-left p-2 text-xs font-medium text-muted-foreground">Pos</th>
-                      <th className="text-left p-2 text-xs font-medium text-muted-foreground">Team</th>
-                      <th className="text-right p-2 text-xs font-medium text-muted-foreground">Pts</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {constructor_standings.map(c => (
-                      <tr key={c.team_name} className="border-b border-border text-sm hover:bg-muted/20">
-                        <td className="p-2 font-bold text-xs text-muted-foreground">{c.position}</td>
-                        <td className="p-2">
-                          <span className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full" style={{ background: teamColor(c.team_colour) }} />
-                            <span className="font-medium">{c.team_name}</span>
-                          </span>
-                        </td>
-                        <td className="p-2 text-right font-bold">{c.points}</td>
-                      </tr>
+          {/* Brake Tab */}
+          <TabsContent value="brake" className="mt-4">
+            <Card className="p-4">
+              <h3 className="font-semibold text-sm mb-3">Brake Usage</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-xs text-muted-foreground mb-2">Average Brake (%)</h4>
+                  <div className="space-y-1.5">
+                    {sortedBrake.slice(0, 10).map((d, i) => {
+                      const val = d.brake_avg;
+                      const maxVal = sortedBrake[0].brake_avg || 1;
+                      return (
+                        <div key={d.driver_number} className="flex items-center gap-2 text-xs">
+                          <span className="w-6 text-right text-muted-foreground">{i + 1}</span>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: teamColor(d.team_colour) }} />
+                          <span className="w-10 font-semibold">{d.acronym}</span>
+                          <div className="flex-1 h-4 bg-muted/30 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full bg-red-500" style={{ width: `${(val / maxVal) * 100}%` }} />
+                          </div>
+                          <span className="w-12 text-right">{val}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-xs text-muted-foreground mb-2">Max Brake (%)</h4>
+                  <div className="space-y-1.5">
+                    {[...drivers].sort((a, b) => b.brake_max - a.brake_max).slice(0, 10).map((d, i) => (
+                      <div key={d.driver_number} className="flex items-center gap-2 text-xs">
+                        <span className="w-6 text-right text-muted-foreground">{i + 1}</span>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: teamColor(d.team_colour) }} />
+                        <span className="w-10 font-semibold">{d.acronym}</span>
+                        <div className="flex-1 text-right">{d.brake_max}%</div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                </div>
               </div>
             </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+
+          {/* RPM Tab */}
+          <TabsContent value="rpm" className="mt-4">
+            <Card className="p-4">
+              <h3 className="font-semibold text-sm mb-3">Engine RPM</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-xs text-muted-foreground mb-2">Average RPM</h4>
+                  <div className="space-y-1.5">
+                    {sortedRPM.slice(0, 10).map((d, i) => {
+                      const val = d.avg_rpm;
+                      const maxVal = sortedRPM[0].avg_rpm || 1;
+                      return (
+                        <div key={d.driver_number} className="flex items-center gap-2 text-xs">
+                          <span className="w-6 text-right text-muted-foreground">{i + 1}</span>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: teamColor(d.team_colour) }} />
+                          <span className="w-10 font-semibold">{d.acronym}</span>
+                          <div className="flex-1 h-4 bg-muted/30 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full bg-purple-500" style={{ width: `${(val / maxVal) * 100}%` }} />
+                          </div>
+                          <span className="w-16 text-right font-mono">{val.toLocaleString()}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-xs text-muted-foreground mb-2">Peak RPM</h4>
+                  <div className="space-y-1.5">
+                    {[...drivers].sort((a, b) => b.max_rpm - a.max_rpm).slice(0, 10).map((d, i) => (
+                      <div key={d.driver_number} className="flex items-center gap-2 text-xs">
+                        <span className="w-6 text-right text-muted-foreground">{i + 1}</span>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: teamColor(d.team_colour) }} />
+                        <span className="w-10 font-semibold">{d.acronym}</span>
+                        <div className="flex-1 text-right font-mono">{d.max_rpm.toLocaleString()} rpm</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </TabsContent>
+
+          {/* DRS Tab */}
+          <TabsContent value="drs" className="mt-4">
+            <Card className="p-4">
+              <h3 className="font-semibold text-sm mb-3">DRS Usage (% of lap with DRS open)</h3>
+              <div className="space-y-2">
+                {sortedDRS.map((d, i) => {
+                  const val = d.drs_pct;
+                  const maxVal = sortedDRS[0]?.drs_pct || 1;
+                  return (
+                    <div key={d.driver_number} className="flex items-center gap-2 text-xs">
+                      <span className="w-6 text-right text-muted-foreground">{i + 1}</span>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: teamColor(d.team_colour) }} />
+                      <span className="w-10 font-semibold">{d.acronym}</span>
+                      <div className="flex-1 h-4 bg-muted/30 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-blue-500" style={{ width: `${(val / maxVal) * 100}%` }} />
+                      </div>
+                      <span className="w-20 text-right">{val}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }

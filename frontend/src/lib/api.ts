@@ -420,3 +420,31 @@ export const getNews = () => request<any[]>('/news');
 // ── Circuit ──
 export const getCircuitInfo = (circuitKey: number) =>
   request<Circuit>(`/circuits/${circuitKey}`);
+
+// ── Tech Updates ──
+export interface TechUpdateDriver {
+  driver_number: number;
+  acronym: string;
+  team_name: string;
+  team_colour: string;
+  speed: { max_speed: number; avg_speed: number };
+  gear_distribution: Record<string, number>;
+  throttle_avg: number;
+  throttle_max: number;
+  brake_avg: number;
+  brake_max: number;
+  avg_rpm: number;
+  max_rpm: number;
+  drs_pct: number;
+}
+
+export interface TechUpdatesData {
+  meeting_id: number;
+  session_id: number;
+  total_drivers: number;
+  drivers: TechUpdateDriver[];
+  error?: string;
+}
+
+export const getTechUpdates = (meetingId: number) =>
+  request<TechUpdatesData>(`/tech-updates/${meetingId}`);
