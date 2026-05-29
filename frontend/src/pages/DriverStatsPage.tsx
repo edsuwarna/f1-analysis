@@ -95,23 +95,23 @@ export default function DriverStatsPage() {
         <>
           {/* Driver Profile Card */}
           <Card className="p-5 bg-gradient-to-r from-card to-muted/30">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-extrabold text-xl"
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-extrabold text-xl flex-shrink-0"
                 style={{ background: teamColor(driver.team_colour) }}>
                 {driver.name_acronym.charAt(0)}
               </div>
-              <div className="flex-1">
-                <h2 className="text-xl font-bold">{driver.full_name}</h2>
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold truncate">{driver.full_name}</h2>
+                <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
                   <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: teamColor(driver.team_colour) }} />
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: teamColor(driver.team_colour) }} />
                     {driver.team_name}
                   </span>
                   <span>{flagEmoji(driver.country_code)}</span>
                   <span>#{driver.position} in standings</span>
                 </div>
               </div>
-              <div className="text-right">
+              <div className="text-left sm:text-right flex-shrink-0">
                 <p className="text-3xl font-bold">{driver.points}</p>
                 <p className="text-xs text-muted-foreground">Points</p>
               </div>
@@ -119,11 +119,11 @@ export default function DriverStatsPage() {
           </Card>
 
           <Tabs defaultValue="season-progress">
-            <TabsList>
-              <TabsTrigger value="season-progress">Season Progress</TabsTrigger>
-              <TabsTrigger value="form">Race Results</TabsTrigger>
-              <TabsTrigger value="sectors">Sector Analysis</TabsTrigger>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsList className="overflow-x-auto flex-nowrap w-full justify-start">
+              <TabsTrigger value="season-progress" className="whitespace-nowrap">Season Progress</TabsTrigger>
+              <TabsTrigger value="form" className="whitespace-nowrap">Race Results</TabsTrigger>
+              <TabsTrigger value="sectors" className="whitespace-nowrap">Sector Analysis</TabsTrigger>
+              <TabsTrigger value="overview" className="whitespace-nowrap">Overview</TabsTrigger>
             </TabsList>
 
             {/* Season Progress - Points Accumulation Table */}

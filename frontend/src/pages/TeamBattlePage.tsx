@@ -4,16 +4,10 @@ import { Badge } from '@/components/ui/badge';
 import { teamColor } from '@/lib/formatters';
 import { Swords, Users, TrendingUp, Zap } from 'lucide-react';
 
-interface BattleDriver {
-  acronym: string;
-  wins: number;
-  percentage: number;
-}
-
 interface TeamBattle {
   team_name: string;
   team_colour: string;
-  drivers: BattleDriver[];
+  drivers: string[];  // API returns acronym strings, not objects
   race_wins: Record<string, number>;
   qual_wins: Record<string, number>;
 }
@@ -94,8 +88,8 @@ export default function TeamBattlePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {battles.map((battle) => {
             const [d1, d2] = battle.drivers;
-            const d1Stats = d1 ? getDriverStats(battle, d1.acronym) : null;
-            const d2Stats = d2 ? getDriverStats(battle, d2.acronym) : null;
+            const d1Stats = d1 ? getDriverStats(battle, d1) : null;
+            const d2Stats = d2 ? getDriverStats(battle, d2) : null;
 
             return (
               <Card
@@ -120,7 +114,7 @@ export default function TeamBattlePage() {
                         className="rounded-lg px-4 py-2.5 text-center"
                         style={{ background: `${teamColor(battle.team_colour)}20` }}
                       >
-                        <span className="font-bold text-base">{d1.acronym}</span>
+                        <span className="font-bold text-base">{d1}</span>
                       </div>
                     )}
                     {d2 && (
@@ -128,7 +122,7 @@ export default function TeamBattlePage() {
                         className="rounded-lg px-4 py-2.5 text-center"
                         style={{ background: `${teamColor(battle.team_colour)}20` }}
                       >
-                        <span className="font-bold text-base">{d2.acronym}</span>
+                        <span className="font-bold text-base">{d2}</span>
                       </div>
                     )}
                   </div>
@@ -144,7 +138,7 @@ export default function TeamBattlePage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold w-8 text-right" style={{ color: teamColor(battle.team_colour) }}>
-                          {d1.acronym}
+                          {d1}
                         </span>
                         <div className="flex-1 flex rounded-full overflow-hidden h-5 bg-secondary">
                           {/* d1 wins portion */}
@@ -170,7 +164,7 @@ export default function TeamBattlePage() {
                           </div>
                         </div>
                         <span className="text-xs font-semibold w-8" style={{ color: teamColor(battle.team_colour), opacity: 0.7 }}>
-                          {d2.acronym}
+                          {d2}
                         </span>
                       </div>
                       <div className="flex justify-between mt-1">
@@ -191,7 +185,7 @@ export default function TeamBattlePage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold w-8 text-right" style={{ color: teamColor(battle.team_colour) }}>
-                          {d1.acronym}
+                          {d1}
                         </span>
                         <div className="flex-1 flex rounded-full overflow-hidden h-5 bg-secondary">
                           <div
@@ -215,7 +209,7 @@ export default function TeamBattlePage() {
                           </div>
                         </div>
                         <span className="text-xs font-semibold w-8" style={{ color: teamColor(battle.team_colour), opacity: 0.7 }}>
-                          {d2.acronym}
+                          {d2}
                         </span>
                       </div>
                       <div className="flex justify-between mt-1">

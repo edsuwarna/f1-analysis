@@ -306,16 +306,16 @@ export default function ConsistencyPage() {
       </h1>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="race" className="flex items-center gap-1.5">
+        <TabsList className="overflow-x-auto flex-nowrap w-full justify-start">
+          <TabsTrigger value="race" className="flex items-center gap-1.5 whitespace-nowrap">
             <TrendingUp className="h-4 w-4" />
             Race Consistency
           </TabsTrigger>
-          <TabsTrigger value="sprint" className="flex items-center gap-1.5">
+          <TabsTrigger value="sprint" className="flex items-center gap-1.5 whitespace-nowrap">
             <Gauge className="h-4 w-4" />
             Sprint Consistency
           </TabsTrigger>
-          <TabsTrigger value="table" className="flex items-center gap-1.5">
+          <TabsTrigger value="table" className="flex items-center gap-1.5 whitespace-nowrap">
             <Table2 className="h-4 w-4" />
             Full Table
           </TabsTrigger>
@@ -356,7 +356,7 @@ export default function ConsistencyPage() {
                     <YAxis
                       dataKey="full_name"
                       type="category"
-                      width={140}
+                      width={110}
                       stroke="hsl(var(--muted-foreground))"
                       tick={{ fontSize: 12 }}
                       tickFormatter={(val: string) => {
@@ -447,7 +447,7 @@ export default function ConsistencyPage() {
                     <YAxis
                       dataKey="full_name"
                       type="category"
-                      width={140}
+                      width={110}
                       stroke="hsl(var(--muted-foreground))"
                       tick={{ fontSize: 12 }}
                       tickFormatter={(val: string) => {
