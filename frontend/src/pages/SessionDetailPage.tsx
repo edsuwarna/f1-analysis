@@ -1007,7 +1007,7 @@ export default function SessionDetailPage() {
               return (
                 <div className="overflow-x-auto">
                   <div style={{ minWidth: 500 }}>
-                    <ResponsiveContainer width="100%" height={280}>
+                    <ResponsiveContainer key={[...selectedPosDrivers].sort().join(',')} width="100%" height={280}>
                       <LineChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                         <XAxis dataKey="lap" tick={{ fontSize: 9 }} stroke="rgba(255,255,255,0.25)" label={{ value: 'Lap', position: 'insideBottomRight', offset: -5, style: { fontSize: 9, fill: 'rgba(255,255,255,0.3)' } }} />
@@ -1149,7 +1149,7 @@ export default function SessionDetailPage() {
               return (
                 <div className="overflow-x-auto">
                   <div style={{ minWidth: 500 }}>
-                    <ResponsiveContainer width="100%" height={280}>
+                    <ResponsiveContainer key={[...selectedGapDrivers].sort().join(',')} width="100%" height={280}>
                       <LineChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                         <XAxis dataKey="lap" tick={{ fontSize: 9 }} stroke="rgba(255,255,255,0.25)" label={{ value: 'Lap', position: 'insideBottomRight', offset: -5, style: { fontSize: 9, fill: 'rgba(255,255,255,0.3)' } }} />
