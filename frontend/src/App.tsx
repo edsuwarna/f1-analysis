@@ -11,7 +11,6 @@ import DriverStatsPage from '@/pages/DriverStatsPage';
 import HeadToHeadPage from '@/pages/HeadToHeadPage';
 import PitStopsPage from '@/pages/PitStopsPage';
 import RacePacePage from '@/pages/RacePacePage';
-import TechUpdatesPage from '@/pages/TechUpdatesPage';
 import SeasonAnalysisPage from '@/pages/SeasonAnalysisPage';
 import TeamBattlePage from '@/pages/TeamBattlePage';
 import TeamsPage from '@/pages/TeamsPage';
@@ -23,7 +22,7 @@ import DriversPage from '@/pages/DriversPage';
 import ConsistencyPage from '@/pages/ConsistencyPage';
 import {
   Home, Trophy, Users, Calendar, Gauge, Swords, Flame,
-  Wrench, ScrollText, Sun, Moon, Flag, BarChart3, Building2,
+  ScrollText, Sun, Moon, Flag, BarChart3, Building2,
   Newspaper, BookOpen, BookMarked, Info,
   Activity, UserCircle,
 } from 'lucide-react';
@@ -47,7 +46,6 @@ const mainNavItems: NavItem[] = [
   { icon: Flame, label: 'Race Pace', path: '/race-pace' },
   { icon: Swords, label: 'Head to Head', path: '/head-to-head' },
   { icon: Flag, label: 'Pit Stops', path: '/pit-stops' },
-  { icon: Wrench, label: 'Tech Updates', path: '/tech-updates' },
   { icon: Newspaper, label: 'News', path: '/news' },
 ];
 
@@ -177,7 +175,6 @@ function AppLayoutContent() {
             <Route path="/consistency" element={<ConsistencyPage />} />
             <Route path="/race-pace" element={<RacePacePage />} />
             <Route path="/pit-stops" element={<PitStopsPage />} />
-            <Route path="/tech-updates" element={<TechUpdatesPage />} />
             <Route path="/season" element={<SeasonAnalysisPage />} />
             <Route path="/team-battle" element={<TeamBattlePage />} />
             <Route path="/teams" element={<TeamsPage />} />
@@ -217,7 +214,6 @@ function getPageTitle(pathname: string): string {
     '/consistency': 'Consistency',
     '/race-pace': 'Race Pace',
     '/pit-stops': 'Pit Stops',
-    '/tech-updates': 'Tech Updates',
     '/season': 'Season Analysis',
     '/team-battle': 'Team Battle',
     '/teams': 'Teams',
