@@ -24,6 +24,10 @@ import {
   ChevronDown, CircuitBoard, Activity, GitCompare,
   Download, ExternalLink, Trophy, RefreshCw,
 } from 'lucide-react';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 
 // ── Constants ──
 const COMPOUND_COLORS: Record<string, string> = {
@@ -1284,7 +1288,35 @@ export default function SessionDetailPage() {
 
           {/* Results */}
           {compResult && (
-            <div className="overflow-x-auto">
+            <div className="space-y-3">
+              {/* Lap time comparison chart */}
+              <div className="bg-card/30 rounded-lg p-3">
+                <h4 className="text-xs font-medium mb-2">Lap Time Comparison</h4>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={(() => {
+                    const l1Map = new Map(compResult.laps1.map(l => [l.lap_number, l]));
+                    const l2Map = new Map(compResult.laps2.map(l => [l.lap_number, l]));
+                    const all = [...new Set([...l1Map.keys(), ...l2Map.keys()])].sort((a, b) => a - b);
+                    return all.map(lap => ({
+                      lap,
+                      d1: l1Map.get(lap)?.lap_duration || null,
+                      d2: l2Map.get(lap)?.lap_duration || null,
+                    }));
+                  })()} margin={{ top: 5, right: 5, left: -15, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis dataKey="lap" tick={{ fontSize: 9 }} stroke="rgba(255,255,255,0.25)" label={{ value: 'Lap', position: 'insideBottomRight', offset: -5, style: { fontSize: 9, fill: 'rgba(255,255,255,0.3)' } }} />
+                    <YAxis tick={{ fontSize: 9 }} stroke="rgba(255,255,255,0.25)" domain={['auto', 'auto']} tickFormatter={(v) => v.toFixed(1)} label={{ value: 'Time (s)', angle: -90, position: 'insideLeft', style: { fontSize: 9, fill: 'rgba(255,255,255,0.3)' } }} />
+                    <Tooltip
+                      contentStyle={{ background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }}
+                      formatter={(value: any) => value?.toFixed(3) + 's'} />
+                    <Line type="monotone" dataKey="d1" name={driverMap[compResult.drv1]?.name_acronym || 'Driver 1'}
+                      stroke={teamColor(driverMap[compResult.drv1]?.team_colour)} strokeWidth={2} dot={false} connectNulls />
+                    <Line type="monotone" dataKey="d2" name={driverMap[compResult.drv2]?.name_acronym || 'Driver 2'}
+                      stroke={teamColor(driverMap[compResult.drv2]?.team_colour)} strokeWidth={2} dot={false} connectNulls />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border">
@@ -1355,6 +1387,7 @@ export default function SessionDetailPage() {
                 </tbody>
               </table>
             </div>
+          </div>
           )}
         </div>
       </CardSection>
