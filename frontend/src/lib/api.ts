@@ -14,6 +14,7 @@ export interface Meeting {
   date_end: string;
   circuit_type?: string;
   is_cancelled: boolean;
+  session_count?: number;
 }
 
 export interface Circuit {
@@ -72,6 +73,7 @@ export interface Weather {
   track_temp: number;
   humidity: number;
   rainfall: boolean;
+  timestamp?: string;
 }
 
 export interface RaceControl {
@@ -475,6 +477,10 @@ export interface GapEntry {
   cumulative_time: number;
   gap_to_leader: number | null;
   gap_to_reference: number | null;
+  acronym?: string;
+  full_name?: string;
+  team_name?: string;
+  team_colour?: string;
 }
 
 export interface GapTimelineDriver {
@@ -486,9 +492,10 @@ export interface GapTimelineDriver {
 }
 
 export interface GapTimelineData {
-  leader: number | null;
+  leader: { driver_number: number; acronym: string; full_name: string; team_name: string; team_colour: string } | null;
   reference: number | null;
-  drivers: Record<string, GapTimelineDriver>;
+  max_lap?: number;
+  drivers?: Record<string, GapTimelineDriver>;
   timeline: GapEntry[];
 }
 
@@ -613,7 +620,11 @@ export interface GearData {
     avg_rpm: number;
     max_rpm: number;
     high_rpm_pct: number;
+    high_rpm_percentage?: number;
     most_used_gear: number;
+    total_shifts?: number;
+    avg_shift_up_rpm?: number;
+    avg_shift_down_rpm?: number;
   }>;
 }
 

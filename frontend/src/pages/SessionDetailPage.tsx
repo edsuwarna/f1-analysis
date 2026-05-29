@@ -448,6 +448,7 @@ export default function SessionDetailPage() {
   const [degData, setDegData] = useState<{ drv1: number; drv2: number; points: { lap: number; drv1: number | null; drv2: number | null }[] } | null>(null);
   const [degLoading, setDegLoading] = useState(false);
   const [degLoaded, setDegLoaded] = useState(false);
+  const [showAllDrivers, setShowAllDrivers] = useState(false);
   const loadDegradation = useCallback(() => {
     if (!degDrv1 || !degDrv2) return;
     setDegLoading(true);
@@ -517,21 +518,29 @@ export default function SessionDetailPage() {
       </div>
 
       {/* ═══ DRIVER GRID ═══ */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-        {drivers.slice(0, 10).map(d => (
-          <Card key={d.driver_number} className={`p-2.5 text-center cursor-pointer transition-colors ${selectedDriver === d.driver_number ? 'ring-2 ring-primary' : 'hover:bg-muted/50'}`}
-            onClick={() => setSelectedDriver(d.driver_number === selectedDriver ? null : d.driver_number)}>
-            <div className="flex justify-center gap-1 mb-0.5">
-              <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: teamColor(d.team_colour) }} />
-            </div>
-            {d.headshot_url ? (
-              <img src={d.headshot_url} alt={d.name_acronym} className="w-8 h-8 rounded-full mx-auto mb-0.5 object-cover" loading="lazy" />
-            ) : null}
-            <p className="font-bold text-xs">{d.name_acronym}</p>
-            <p className="text-[10px] text-muted-foreground truncate">{d.team_name}</p>
-          </Card>
-        ))}
-      </div>
+      <CardSection title="Drivers" subtitle={`${drivers.length} drivers — tap to view telemetry`} icon={<Activity className="h-4 w-4 text-blue-500" />} defaultOpen>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+          {(showAllDrivers ? drivers : drivers.slice(0, 10)).map(d => (
+            <Card key={d.driver_number} className={`p-2.5 text-center cursor-pointer transition-colors ${selectedDriver === d.driver_number ? 'ring-2 ring-primary' : 'hover:bg-muted/50'}`}
+              onClick={() => setSelectedDriver(d.driver_number === selectedDriver ? null : d.driver_number)}>
+              <div className="flex justify-center gap-1 mb-0.5">
+                <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: teamColor(d.team_colour) }} />
+              </div>
+              {d.headshot_url ? (
+                <img src={d.headshot_url} alt={d.name_acronym} className="w-8 h-8 rounded-full mx-auto mb-0.5 object-cover" loading="lazy" />
+              ) : null}
+              <p className="font-bold text-xs">{d.name_acronym}</p>
+              <p className="text-[10px] text-muted-foreground truncate">{d.team_name}</p>
+            </Card>
+          ))}
+        </div>
+        {drivers.length > 10 && (
+          <button onClick={() => setShowAllDrivers(!showAllDrivers)}
+            className="mt-3 w-full flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors border border-border">
+            {showAllDrivers ? 'Show Less' : `Show All ${drivers.length} Drivers`}
+          </button>
+        )}
+      </CardSection>
 
       {/* ═══ CIRCUIT DETAIL ═══ */}
       <CardSection title="Circuit Detail" subtitle="Track info, specs & fun facts" icon={<CircuitBoard className="h-4 w-4 text-blue-500" />}>
@@ -912,11 +921,7 @@ export default function SessionDetailPage() {
       )}
 
       {/* ═══ RACE ANALYSIS CHARTS (load-on-demand) ═══ */}
-      <Card className="p-4">
-        <h3 className="font-semibold text-sm flex items-center gap-2 mb-3">
-          <Activity className="h-4 w-4 text-blue-500" />
-          Race Analysis
-        </h3>
+      <CardSection title="Race Analysis" subtitle="Position history, gaps, overtakes & more" icon={<Activity className="h-4 w-4 text-blue-500" />}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {/* Position History */}
           <LoadableCard title="Position History" subtitle="Lap-by-lap position changes" icon={<BarChart3 className="h-4 w-4 text-blue-500" />}
@@ -977,9 +982,9 @@ export default function SessionDetailPage() {
           {/* Lap Distribution */}
           <LoadableCard title="Lap Distribution" subtitle="Pace vs consistency scatter" icon={<Activity className="h-4 w-4 text-cyan-500" />}
             loading={lapDistLoading} loaded={lapDistLoaded} onLoad={loadLapDist}>
-            {lapDist?.drivers?.length ? (
-              <div className="space-y-2">
-                {lapDist.drivers.slice(0, 10).map(d => (
+                {lapDist?.drivers?.length ? (
+              <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                {lapDist.drivers.sort((a, b) => (a.avg_lap_time || 999) - (b.avg_lap_time || 999)).map(d => (
                   <div key={d.driver_number} className="text-xs">
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className="w-2 h-2 rounded-full" style={{ background: teamColor(d.team_colour) }} />
@@ -1026,7 +1031,6 @@ export default function SessionDetailPage() {
                 <BarChart
                   data={Object.entries(overtakeData)
                     .sort((a: any, b: any) => b[1].net - a[1].net)
-                    .slice(0, 10)
                     .map(([dn, d]: any) => ({ key: d.acronym, value: Math.max(d.net, 0) }))}
                   maxValue={Math.max(...Object.values(overtakeData).map((d: any) => d.net), 1)}
                   color={(v) => v > 0 ? '#22c55e' : '#e11d48'} height={22}
@@ -1047,21 +1051,27 @@ export default function SessionDetailPage() {
                     {(() => {
                       const maxGap = Math.max(...gaps.timeline.map(g => g.gap_to_leader || 0), 1);
                       const byLap: Record<number, any[]> = {};
+                      const driverMap: Record<string, { acronym: string; team_colour: string; }> = {};
                       for (const g of gaps.timeline) {
                         if (!byLap[g.lap]) byLap[g.lap] = [];
                         byLap[g.lap].push(g);
+                        if (g.driver_number && !driverMap[g.driver_number]) {
+                          driverMap[g.driver_number] = { acronym: g.acronym || `#${g.driver_number}`, team_colour: g.team_colour || '#666' };
+                        }
                       }
                       const lapKeys = Object.keys(byLap).map(Number).sort((a, b) => a - b);
-                      const sampleStep = Math.max(1, Math.floor(lapKeys.length / 100));
+                      const sampleStep = Math.max(1, Math.floor(lapKeys.length / 80));
                       const sampledLaps = lapKeys.filter((_, i) => i % sampleStep === 0);
-                      // Pick top 5 drivers for simplicity
-                      const topDrivers = Object.entries(gaps.drivers || {}).slice(0, 5);
+                      // Include leader if available
+                      const topDrivers = gaps.leader
+                        ? [[gaps.leader.driver_number.toString(), { acronym: gaps.leader.acronym, team_colour: gaps.leader.team_colour }] as const, ...Object.entries(driverMap).filter(([k]) => k !== gaps.leader!.driver_number.toString()).slice(0, 9)]
+                        : Object.entries(driverMap).slice(0, 10);
                       return sampledLaps.map(lap => {
                         const entries = byLap[lap] || [];
                         return (
                           <div key={lap} className="flex-1 flex flex-col-reverse" style={{ height: 200 }}>
                             {topDrivers.map(([dn, info]) => {
-                              const entry = entries.find(e => e.driver_number === parseInt(dn));
+                              const entry = entries.find((e: any) => e.driver_number === parseInt(dn));
                               const gap = entry?.gap_to_leader || 0;
                               const pct = (gap / maxGap) * 100;
                               return (
@@ -1074,6 +1084,14 @@ export default function SessionDetailPage() {
                       });
                     })()}
                   </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {(gaps.leader ? [[gaps.leader.driver_number.toString(), { acronym: gaps.leader.acronym, team_colour: gaps.leader.team_colour }] as const, ...Object.entries(Object.fromEntries(gaps.timeline.map(g => [g.driver_number, { acronym: g.acronym, team_colour: g.team_colour || '#666' }]))).filter(([k]) => k !== gaps.leader!.driver_number.toString()).slice(0, 9)] : Object.entries(Object.fromEntries(gaps.timeline.map(g => [g.driver_number, { acronym: g.acronym, team_colour: g.team_colour || '#666' }]))).slice(0, 10)).map(([dn, info]) => (
+                      <span key={dn} className="flex items-center gap-1 text-[10px]">
+                        <span className="w-2 h-2 rounded-full inline-block" style={{ background: teamColor(info.team_colour) }} />
+                        {info.acronym}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1081,14 +1099,10 @@ export default function SessionDetailPage() {
             )}
           </LoadableCard>
         </div>
-      </Card>
+      </CardSection>
 
       {/* ═══ TELEMETRY ANALYSIS CHARTS (load-on-demand) ═══ */}
-      <Card className="p-4">
-        <h3 className="font-semibold text-sm flex items-center gap-2 mb-3">
-          <Gauge className="h-4 w-4 text-blue-500" />
-          Telemetry Analysis
-        </h3>
+      <CardSection title="Telemetry Analysis" subtitle="Tyre deg, speed, braking, gear & more" icon={<Gauge className="h-4 w-4 text-blue-500" />}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {/* Tyre Degradation */}
           <LoadableCard title="Tyre Degradation" subtitle="Lap time vs tyre age" icon={<TrendingUp className="h-4 w-4 text-green-500" />}
@@ -1162,12 +1176,14 @@ export default function SessionDetailPage() {
           <LoadableCard title="Braking Analysis" subtitle="Late braking index & aggression" icon={<Gauge className="h-4 w-4 text-red-500" />}
             loading={brakingLoading} loaded={brakingLoaded} onLoad={loadBraking}>
             {braking?.drivers?.length ? (
+              <div className="max-h-[400px] overflow-y-auto">
               <BarChart
-                data={braking.drivers.slice(0, 15).map(d => ({ key: d.acronym, value: Math.round(d.late_braking_index) }))}
+                data={braking.drivers.map(d => ({ key: d.acronym, value: Math.round(d.late_braking_index) }))}
                 maxValue={Math.max(...braking.drivers.map(d => d.late_braking_index), 1)}
                 color={(v) => v > 70 ? '#e11d48' : v > 40 ? '#eab308' : '#22c55e'}
                 height={20}
                 label="Late Braking Index (higher = later braking)" />
+                </div>
             ) : (
               <p className="text-center py-4 text-muted-foreground text-sm">No braking data</p>
             )}
@@ -1177,9 +1193,9 @@ export default function SessionDetailPage() {
           <LoadableCard title="Corner Performance" subtitle="Min corner & exit speeds" icon={<Radar className="h-4 w-4 text-purple-500" />}
             loading={cornerLoading} loaded={cornerLoaded} onLoad={loadCorner}>
             {corner?.drivers?.length ? (
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
                 <BarChart
-                  data={corner.drivers.slice(0, 15).map(d => ({ key: d.acronym, value: Math.round(d.avg_min_speed) }))}
+                  data={corner.drivers.map(d => ({ key: d.acronym, value: Math.round(d.avg_min_speed) }))}
                   maxValue={Math.max(...corner.drivers.map(d => d.avg_min_speed), 1)}
                   color={(v) => v > 160 ? '#22c55e' : v > 130 ? '#eab308' : '#e11d48'}
                   height={20}
@@ -1200,19 +1216,26 @@ export default function SessionDetailPage() {
           <LoadableCard title="Gear & RPM" subtitle="Gear distribution & RPM patterns" icon={<Activity className="h-4 w-4 text-blue-500" />}
             loading={gearLoading} loaded={gearLoaded} onLoad={loadGear}>
             {gear?.drivers?.length ? (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[500px] overflow-y-auto">
                 {/* RPM bar chart */}
                 <BarChart
-                  data={gear.drivers.slice(0, 15).map(d => ({ key: d.acronym, value: Math.round(d.avg_rpm) }))}
+                  data={gear.drivers.map(d => ({ key: d.acronym, value: Math.round(d.avg_rpm) }))}
                   maxValue={Math.max(...gear.drivers.map(d => d.avg_rpm), 1)}
-                  color={(v) => v > 8000 ? '#e11d48' : v > 6000 ? '#eab308' : '#22c55e'}
+                  color={(v) => v > 10000 ? '#e11d48' : v > 8000 ? '#eab308' : '#22c55e'}
                   height={20}
                   label="Avg RPM" />
-                {/* Max RPM */}
-                <div className="text-xs text-muted-foreground">
+                {/* High RPM % bar chart */}
+                <BarChart
+                  data={gear.drivers.map(d => ({ key: d.acronym, value: Math.round(d.high_rpm_percentage || d.high_rpm_pct) }))}
+                  maxValue={100}
+                  color={(v) => v > 60 ? '#e11d48' : v > 30 ? '#eab308' : '#22c55e'}
+                  height={18}
+                  label="High RPM % (>10k RPM)" />
+                {/* Max RPM + Stats */}
+                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                   <span>Max RPM: </span>
                   {gear.drivers.sort((a, b) => b.max_rpm - a.max_rpm).slice(0, 3).map(d => (
-                    <span key={d.driver_number} className="font-medium text-foreground mr-3">{d.acronym} {d.max_rpm.toFixed(0)}</span>
+                    <span key={d.driver_number} className="font-medium text-foreground mr-2">{d.acronym} {d.max_rpm.toFixed(0)}</span>
                   ))}
                 </div>
               </div>
@@ -1229,16 +1252,18 @@ export default function SessionDetailPage() {
                 Overtake Mode (2026)
               </h4>
               <p className="text-[10px] text-muted-foreground mb-3">{overtakeMode?.note || 'ERS boost'}</p>
-              <BarChart
-                data={topOm.slice(0, 10).map(d => ({ key: d.acronym, value: Math.round(d.om_percentage) }))}
+              <div className="max-h-[400px] overflow-y-auto">
+                <BarChart
+                  data={topOm.map(d => ({ key: d.acronym, value: Math.round(d.om_percentage) }))}
                 maxValue={100}
                 color={(v) => v > 50 ? '#22c55e' : v > 20 ? '#eab308' : '#3b82f6'}
                 height={18}
                 label="OM Activation %" />
+                </div>
             </Card>
           )}
         </div>
-      </Card>
+      </CardSection>
 
       {/* ═══ DRIVER COMPARISON ═══ */}
       <CardSection title="Driver Comparison" subtitle="Head-to-head lap time comparison" icon={<GitCompare className="h-4 w-4 text-blue-500" />}>
@@ -1347,7 +1372,7 @@ export default function SessionDetailPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left p-1.5 text-muted-foreground">Sample</th>
+                  <th className="text-left p-1.5 text-muted-foreground">Time</th>
                   <th className="text-right p-1.5 text-muted-foreground">Air</th>
                   <th className="text-right p-1.5 text-muted-foreground">Track</th>
                   <th className="text-right p-1.5 text-muted-foreground">Humidity</th>
@@ -1357,7 +1382,7 @@ export default function SessionDetailPage() {
               <tbody>
                 {weather.slice(0, 30).map((w, i) => (
                   <tr key={i} className="border-b border-border">
-                    <td className="p-1.5 text-muted-foreground">#{i + 1}</td>
+                    <td className="p-1.5 text-muted-foreground font-mono text-[10px]">{w.timestamp ? new Date(w.timestamp).toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit' }) : `#${i + 1}`}</td>
                     <td className="p-1.5 text-right">{w.air_temp?.toFixed(1)}°</td>
                     <td className="p-1.5 text-right">{w.track_temp?.toFixed(1)}°</td>
                     <td className="p-1.5 text-right">{w.humidity != null ? `${w.humidity}%` : '-'}</td>

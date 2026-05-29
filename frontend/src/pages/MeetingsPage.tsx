@@ -3,7 +3,17 @@ import { getMeetings, getSessions, type Meeting, type Session } from '@/lib/api'
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { flagEmoji, formatDate } from '@/lib/formatters';
-import { Calendar, Clock, MapPin, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, MapPin, ChevronRight, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+
+function getMeetingStatus(m: Meeting): { label: string; color: string; icon: React.ReactNode } {
+  if (m.is_cancelled) return { label: 'Cancelled', color: 'bg-red-500/10 text-red-500 border-red-500/30', icon: <XCircle className="h-3 w-3" /> };
+  const now = new Date();
+  const start = new Date(m.date_start);
+  const end = m.date_end ? new Date(m.date_end) : null;
+  if (end && end < now) return { label: 'Completed', color: 'bg-green-500/10 text-green-500 border-green-500/30', icon: <CheckCircle className="h-3 w-3" /> };
+  if (start > now) return { label: 'Upcoming', color: 'bg-blue-500/10 text-blue-500 border-blue-500/30', icon: <AlertCircle className="h-3 w-3" /> };
+  return { label: 'Ongoing', color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30', icon: <AlertCircle className="h-3 w-3" /> };
+}
 
 interface MeetingsPageProps {
   onSelectSession: (meetingId: number, sessionId: number) => void;
@@ -84,27 +94,41 @@ export default function MeetingsPage({ onSelectSession }: MeetingsPageProps) {
               }`}
               onClick={() => toggleMeeting(m.id)}
             >
-              <div className="p-4">
-                <div className="flex items-center gap-4">
-                  <div className="text-center flex-shrink-0 w-12">
-                    <div className="text-2xl font-bold text-muted-foreground">{idx + 1}</div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{flagEmoji(m.country_code)}</span>
-                      <h3 className="font-semibold truncate">{m.name}</h3>
+                <div className="p-4">
+                  <div className="flex items-center gap-4">
+                    <div className="text-center flex-shrink-0 w-12">
+                      <div className="text-2xl font-bold text-muted-foreground">{idx + 1}</div>
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {m.circuit_name}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {formatDate(m.date_start)}
-                      </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{flagEmoji(m.country_code)}</span>
+                        <h3 className="font-semibold truncate">{m.name}</h3>
+                        {(() => {
+                          const status = getMeetingStatus(m);
+                          return (
+                            <Badge variant="outline" className={`text-[10px] gap-0.5 ${status.color}`}>
+                              {status.icon}
+                              {status.label}
+                            </Badge>
+                          );
+                        })()}
+                        {m.session_count === 0 && m.date_end && new Date(m.date_end) < new Date() && (
+                          <Badge variant="outline" className="text-[10px] bg-gray-500/10 text-gray-400 border-gray-500/30">
+                            No data
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {m.circuit_name || m.location}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatDate(m.date_start)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
                   <ChevronRight className={`h-5 w-5 text-muted-foreground transition-transform ${
                     expanded === m.id ? 'rotate-90' : ''
                   }`} />
@@ -126,7 +150,10 @@ export default function MeetingsPage({ onSelectSession }: MeetingsPageProps) {
                         </Badge>
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {new Date(s.date_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(s.date_start).toLocaleString('en-GB', {
+                          weekday: 'short', day: 'numeric', month: 'short',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
                       </div>
                     </div>
                   ))}
