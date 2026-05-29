@@ -429,6 +429,9 @@ export default function SessionDetailPage() {
   const selectAllPosDrivers = () => {
     setSelectedPosDrivers(new Set(Object.keys(posDrivers).map(Number)));
   };
+  const clearAllPosDrivers = () => {
+    setSelectedPosDrivers(new Set());
+  };
 
   // ── Gap Timeline driver toggle ──
   const [selectedGapDrivers, setSelectedGapDrivers] = useState<Set<number>>(new Set());
@@ -442,6 +445,9 @@ export default function SessionDetailPage() {
   };
   const selectAllGapDrivers = () => {
     setSelectedGapDrivers(new Set(Object.keys(gapDrivers).map(Number)));
+  };
+  const clearAllGapDrivers = () => {
+    setSelectedGapDrivers(new Set());
   };
   const [overtakeData, setOvertakeData] = useState<any>(null);
   const [overtakeLoading, setOvertakeLoading] = useState(false);
@@ -502,7 +508,14 @@ export default function SessionDetailPage() {
   // ── Tyre Degradation ──
   const [degDrv1, setDegDrv1] = useState(0);
   const [degDrv2, setDegDrv2] = useState(0);
-  const [degData, setDegData] = useState<{ drv1: number; drv2: number; points: { lap: number; drv1: number | null; drv2: number | null }[] } | null>(null);
+  const [degData, setDegData] = useState<{
+    drv1: number; drv2: number;
+    points: { lap: number; drv1: number | null; drv2: number | null }[];
+    stints: {
+      drv1: { stintIndex: number; compound: string; laps: number; startLap: number; endLap: number; avgTime: number; degPerLap: number }[];
+      drv2: { stintIndex: number; compound: string; laps: number; startLap: number; endLap: number; avgTime: number; degPerLap: number }[];
+    };
+  } | null>(null);
   const [degLoading, setDegLoading] = useState(false);
   const [degOpen, setDegOpen] = useState(false);
   const [showAllDrivers, setShowAllDrivers] = useState(false);
@@ -512,17 +525,38 @@ export default function SessionDetailPage() {
     const d2 = degDrv2 || (drivers.length > 1 ? drivers[1]?.driver_number || 0 : 0);
     if (!d1 || !d2) return;
     setDegLoading(true);
-    // Process degradation from laps data — lap time vs tyre age
-    const d1Laps = laps.filter(l => l.driver_number === d1 && l.lap_duration && !l.is_pit_in_lap && !l.is_pit_out_lap).sort((a, b) => a.lap_number - b.lap_number);
-    const d2Laps = laps.filter(l => l.driver_number === d2 && l.lap_duration && !l.is_pit_in_lap && !l.is_pit_out_lap).sort((a, b) => a.lap_number - b.lap_number);
-    // Build lap-time progress
-    const allLaps = new Set([...d1Laps.map(l => l.lap_number), ...d2Laps.map(l => l.lap_number)]);
+    // Group laps by stint for each driver
+    const processDriver = (dn: number) => {
+      const driverLaps = laps
+        .filter(l => l.driver_number === dn && l.lap_duration && !l.is_pit_in_lap && !l.is_pit_out_lap)
+        .sort((a, b) => a.lap_number - b.lap_number);
+      const stints: { stintIndex: number; compound: string; laps: { lap: number; lapTime: number; tyreAge: number }[] }[] = [];
+      let currentStint: typeof stints[0] | null = null;
+      for (const lap of driverLaps) {
+        if (!currentStint || lap.compound !== currentStint.compound || lap.tyre_age === 0) {
+          currentStint = { stintIndex: stints.length + 1, compound: lap.compound, laps: [] };
+          stints.push(currentStint);
+        }
+        currentStint.laps.push({ lap: lap.lap_number, lapTime: lap.lap_duration, tyreAge: lap.tyre_age });
+      }
+      return stints;
+    };
+    const d1Stints = processDriver(d1);
+    const d2Stints = processDriver(d2);
+    // Build chart data: all lap numbers with both driver times
+    const allLaps = new Set<number>();
+    for (const s of [...d1Stints, ...d2Stints]) { for (const l of s.laps) allLaps.add(l.lap); }
     const points = Array.from(allLaps).sort((a, b) => a - b).map(lap => ({
       lap,
-      drv1: d1Laps.find(l => l.lap_number === lap)?.lap_duration || null,
-      drv2: d2Laps.find(l => l.lap_number === lap)?.lap_duration || null,
+      drv1: d1Stints.flatMap(s => s.laps).find(l => l.lap === lap)?.lapTime || null,
+      drv2: d2Stints.flatMap(s => s.laps).find(l => l.lap === lap)?.lapTime || null,
     }));
-    setDegData({ drv1: d1, drv2: d2, points });
+    const stintSummary = (stints: typeof d1Stints) => stints.map(s => {
+      const times = s.laps.map(l => l.lapTime);
+      const deg = times.length > 1 ? (times[times.length - 1] - times[0]) / (times.length - 1) : 0;
+      return { stintIndex: s.stintIndex, compound: s.compound, laps: s.laps.length, startLap: s.laps[0].lap, endLap: s.laps[s.laps.length - 1].lap, avgTime: times.reduce((a, b) => a + b, 0) / times.length, degPerLap: deg };
+    });
+    setDegData({ drv1: d1, drv2: d2, points, stints: { drv1: stintSummary(d1Stints), drv2: stintSummary(d2Stints) } });
     setDegLoading(false);
   }
 
@@ -1044,6 +1078,9 @@ export default function SessionDetailPage() {
                       <button onClick={selectAllPosDrivers} className="text-[10px] text-muted-foreground hover:text-foreground ml-1 underline">
                         Select all
                       </button>
+                      <button onClick={clearAllPosDrivers} className="text-[10px] text-muted-foreground hover:text-foreground ml-2 underline">
+                        Clear all
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1186,6 +1223,9 @@ export default function SessionDetailPage() {
                       <button onClick={selectAllGapDrivers} className="text-[10px] text-muted-foreground hover:text-foreground ml-1 underline">
                         Select all
                       </button>
+                      <button onClick={clearAllGapDrivers} className="text-[10px] text-muted-foreground hover:text-foreground ml-2 underline">
+                        Clear all
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1207,14 +1247,14 @@ export default function SessionDetailPage() {
                 <TrendingUp className="h-4 w-4 text-green-500 shrink-0" />
                 <div>
                   <h3 className="font-semibold text-sm">Tyre Degradation</h3>
-                  <p className="text-xs text-muted-foreground">Lap time vs tyre age</p>
+                  <p className="text-xs text-muted-foreground">Lap time progression per stint (select 2 drivers)</p>
                 </div>
               </div>
               <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${degOpen ? 'rotate-180' : ''}`} />
             </div>
             {degOpen && (
-              <div className="mt-4">
-                <div className="flex flex-wrap gap-2 items-center mb-3">
+              <div className="mt-4 space-y-3">
+                <div className="flex flex-wrap gap-2 items-center">
                   <select className="bg-secondary text-foreground border border-border rounded px-2 py-1 text-xs" value={degDrv1 || drivers[0]?.driver_number || 0}
                     onChange={e => { setDegDrv1(parseInt(e.target.value)); }}>
                     {drivers.map(d => <option key={d.driver_number} value={d.driver_number}>{d.name_acronym}</option>)}
@@ -1225,42 +1265,116 @@ export default function SessionDetailPage() {
                     {drivers.map(d => <option key={d.driver_number} value={d.driver_number}>{d.name_acronym}</option>)}
                   </select>
                   <button onClick={loadDegradation} className="bg-f1-red text-white px-3 py-1 rounded text-xs font-medium hover:opacity-90">
-                    {degLoading ? <><RefreshCw className="h-3 w-3 inline animate-spin" /> Plotting...</> : 'Plot'}
+                    {degLoading ? <><RefreshCw className="h-3 w-3 inline animate-spin" /> Plotting...</> : 'Compare'}
                   </button>
                 </div>
                 {degData?.points?.length ? (
-                  <div className="overflow-x-auto">
-                    <div style={{ minWidth: 400, height: 200 }} className="relative">
-                      <div className="absolute inset-0 flex flex-col">
-                        <div className="flex-1 relative border-b border-border">
-                          {degData.points.map((p, i) => {
-                            const times = degData.points.filter(x => x.drv1 || x.drv2).map(x => Math.min(x.drv1 || 999, x.drv2 || 999));
-                            const minTime = Math.min(...times, 60);
-                            const maxTime = Math.max(...times, 90);
-                            const range = maxTime - minTime || 1;
-                            return (
-                              <div key={i} className="absolute" style={{
-                                left: `${(i / degData.points.length) * 100}%`, bottom: 0,
-                              }}>
-                                {p.drv1 && <div className="absolute w-1.5 h-1.5 rounded-full bg-red-500"
-                                  style={{ bottom: `${((p.drv1 - minTime) / range) * 100}%`, left: 0 }} title={`L${p.lap}: ${p.drv1.toFixed(3)}s`} />}
-                                {p.drv2 && <div className="absolute w-1.5 h-1.5 rounded-full bg-blue-500"
-                                  style={{ bottom: `${((p.drv2 - minTime) / range) * 100}%`, left: 0 }} title={`L${p.lap}: ${p.drv2.toFixed(3)}s`} />}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-                          <span>L{degData.points[0]?.lap || 0}</span>
-                          <span>L{degData.points[degData.points.length - 1]?.lap || 0}</span>
-                        </div>
+                  <>
+                    {/* Chart */}
+                    <div className="overflow-x-auto">
+                      <div style={{ minWidth: 500 }}>
+                        <ResponsiveContainer key={`deg-${degData.drv1}-${degData.drv2}`} width="100%" height={280}>
+                          <LineChart data={degData.points} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                            <XAxis dataKey="lap" tick={{ fontSize: 9 }} stroke="rgba(255,255,255,0.25)"
+                              label={{ value: 'Lap', position: 'insideBottomRight', offset: -5, style: { fontSize: 9, fill: 'rgba(255,255,255,0.3)' } }} />
+                            <YAxis tick={{ fontSize: 9 }} stroke="rgba(255,255,255,0.25)" domain={['auto', 'auto']}
+                              label={{ value: 'Lap Time (s)', angle: -90, position: 'insideLeft', style: { fontSize: 9, fill: 'rgba(255,255,255,0.3)' } }} />
+                            <Tooltip
+                              contentStyle={{ background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }}
+                              formatter={(value: any, name: any) => [`${value?.toFixed(3)}s`, name]} />
+                            <Line type="monotone" dataKey="drv1"
+                              name={driverMap[degData.drv1]?.name_acronym || `#${degData.drv1}`}
+                              stroke={teamColor(driverMap[degData.drv1]?.team_colour)} strokeWidth={2}
+                              dot={false} connectNulls />
+                            <Line type="monotone" dataKey="drv2"
+                              name={driverMap[degData.drv2]?.name_acronym || `#${degData.drv2}`}
+                              stroke={teamColor(driverMap[degData.drv2]?.team_colour)} strokeWidth={2}
+                              strokeDasharray="4 3" dot={false} connectNulls />
+                          </LineChart>
+                        </ResponsiveContainer>
                       </div>
                     </div>
-                    <div className="flex gap-3 text-xs text-muted-foreground mt-2">
-                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> {driverMap[degData.drv1]?.name_acronym}</span>
-                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> {driverMap[degData.drv2]?.name_acronym}</span>
+                    {/* Stint Summary Table */}
+                    <div className="overflow-x-auto">
+                      <h4 className="text-xs font-medium text-muted-foreground mb-2">Stint Comparison</h4>
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left p-1.5 text-muted-foreground">Driver</th>
+                            <th className="text-center p-1.5 text-muted-foreground">Stint</th>
+                            <th className="text-center p-1.5 text-muted-foreground">Compound</th>
+                            <th className="text-center p-1.5 text-muted-foreground">Laps</th>
+                            <th className="text-center p-1.5 text-muted-foreground">Range</th>
+                            <th className="text-right p-1.5 text-muted-foreground">Avg Time</th>
+                            <th className="text-right p-1.5 text-muted-foreground">Deg/Lap</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {degData.stints.drv1.map((s, i) => (
+                            <tr key={`d1-${i}`} className="border-b border-border hover:bg-muted/30">
+                              <td className="p-1.5 font-medium">
+                                <span className="flex items-center gap-1">
+                                  <span className="w-2 h-2 rounded-full" style={{ background: teamColor(driverMap[degData.drv1]?.team_colour) }} />
+                                  {driverMap[degData.drv1]?.name_acronym}
+                                </span>
+                              </td>
+                              <td className="p-1.5 text-center">{s.stintIndex}</td>
+                              <td className="p-1.5 text-center">
+                                <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${tyreBadgeColor(s.compound)}`}>
+                                  {s.compound?.substring(0, 4)}
+                                </span>
+                              </td>
+                              <td className="p-1.5 text-center">{s.laps}</td>
+                              <td className="p-1.5 text-center text-muted-foreground">L{s.startLap}–{s.endLap}</td>
+                              <td className="p-1.5 text-right font-mono">{formatTime(s.avgTime)}</td>
+                              <td className={`p-1.5 text-right font-mono ${s.degPerLap > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                {s.degPerLap > 0 ? `+${s.degPerLap.toFixed(3)}` : s.degPerLap.toFixed(3)}
+                              </td>
+                            </tr>
+                          ))}
+                          {degData.stints.drv2.map((s, i) => (
+                            <tr key={`d2-${i}`} className="border-b border-border hover:bg-muted/30">
+                              <td className="p-1.5 font-medium">
+                                <span className="flex items-center gap-1">
+                                  <span className="w-2 h-2 rounded-full" style={{ background: teamColor(driverMap[degData.drv2]?.team_colour) }} />
+                                  {driverMap[degData.drv2]?.name_acronym}
+                                </span>
+                              </td>
+                              <td className="p-1.5 text-center">{s.stintIndex}</td>
+                              <td className="p-1.5 text-center">
+                                <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${tyreBadgeColor(s.compound)}`}>
+                                  {s.compound?.substring(0, 4)}
+                                </span>
+                              </td>
+                              <td className="p-1.5 text-center">{s.laps}</td>
+                              <td className="p-1.5 text-center text-muted-foreground">L{s.startLap}–{s.endLap}</td>
+                              <td className="p-1.5 text-right font-mono">{formatTime(s.avgTime)}</td>
+                              <td className={`p-1.5 text-right font-mono ${s.degPerLap > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                {s.degPerLap > 0 ? `+${s.degPerLap.toFixed(3)}` : s.degPerLap.toFixed(3)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  </div>
+                    {/* Legend */}
+                    <div className="flex gap-3 text-xs text-muted-foreground flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <span className="w-3 h-0.5 inline-block rounded" style={{ background: teamColor(driverMap[degData.drv1]?.team_colour) }} />
+                        {driverMap[degData.drv1]?.name_acronym}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-3 h-px inline-block border-t-2 border-dashed" style={{ borderColor: teamColor(driverMap[degData.drv2]?.team_colour) }} />
+                        {driverMap[degData.drv2]?.name_acronym}
+                      </span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded" style={{ background: '#e11d48' }} /> Soft</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded" style={{ background: '#eab308' }} /> Medium</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded" style={{ background: '#6b7280' }} /> Hard</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded" style={{ background: '#22c55e' }} /> Inter</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded" style={{ background: '#3b82f6' }} /> Wet</span>
+                    </div>
+                  </>
                 ) : degData && !degData?.points?.length ? (
                   <p className="text-center py-4 text-muted-foreground text-sm">No degradation data for selected drivers</p>
                 ) : null}
