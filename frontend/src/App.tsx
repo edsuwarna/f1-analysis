@@ -59,7 +59,7 @@ const bottomNavItems: NavItem[] = [
   { icon: Info, label: 'About', path: '/about' },
 ];
 
-function AppLayout() {
+function AppLayoutContent() {
   const { theme, toggle } = useTheme();
   const { setOpenMobile } = useSidebar();
   const navigate = useNavigate();
@@ -76,7 +76,7 @@ function AppLayout() {
   };
 
   return (
-    <SidebarProvider>
+    <div className="flex w-full">
       <Sidebar variant="inset" collapsible="icon">
         <SidebarHeader>
           <SidebarMenu>
@@ -197,6 +197,14 @@ function AppLayout() {
           </Routes>
         </main>
       </SidebarInset>
+    </div>
+  );
+}
+
+function AppLayout() {
+  return (
+    <SidebarProvider>
+      <AppLayoutContent />
     </SidebarProvider>
   );
 }
