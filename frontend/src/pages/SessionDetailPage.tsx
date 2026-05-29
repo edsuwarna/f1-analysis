@@ -453,12 +453,17 @@ export default function SessionDetailPage() {
   const [degLoading, setDegLoading] = useState(false);
   const [degLoaded, setDegLoaded] = useState(false);
   const [showAllDrivers, setShowAllDrivers] = useState(false);
+  // Set default degradation drivers once drivers load
+  const effectiveDegDrv1 = degDrv1 || drivers[0]?.driver_number || 0;
+  const effectiveDegDrv2 = degDrv2 || (drivers.length > 1 ? drivers[1]?.driver_number || 0 : 0);
   const loadDegradation = useCallback(() => {
-    if (!degDrv1 || !degDrv2) return;
+    const d1 = degDrv1 || drivers[0]?.driver_number || 0;
+    const d2 = degDrv2 || (drivers.length > 1 ? drivers[1]?.driver_number || 0 : 0);
+    if (!d1 || !d2) return;
     setDegLoading(true);
     // Process degradation from laps data — lap time vs tyre age
-    const d1Laps = laps.filter(l => l.driver_number === degDrv1 && l.lap_duration && !l.is_pit_in_lap && !l.is_pit_out_lap).sort((a, b) => a.lap_number - b.lap_number);
-    const d2Laps = laps.filter(l => l.driver_number === degDrv2 && l.lap_duration && !l.is_pit_in_lap && !l.is_pit_out_lap).sort((a, b) => a.lap_number - b.lap_number);
+    const d1Laps = laps.filter(l => l.driver_number === d1 && l.lap_duration && !l.is_pit_in_lap && !l.is_pit_out_lap).sort((a, b) => a.lap_number - b.lap_number);
+    const d2Laps = laps.filter(l => l.driver_number === d2 && l.lap_duration && !l.is_pit_in_lap && !l.is_pit_out_lap).sort((a, b) => a.lap_number - b.lap_number);
     // Build lap-time progress
     const allLaps = new Set([...d1Laps.map(l => l.lap_number), ...d2Laps.map(l => l.lap_number)]);
     const points = Array.from(allLaps).sort((a, b) => a - b).map(lap => ({
@@ -466,10 +471,10 @@ export default function SessionDetailPage() {
       drv1: d1Laps.find(l => l.lap_number === lap)?.lap_duration || null,
       drv2: d2Laps.find(l => l.lap_number === lap)?.lap_duration || null,
     }));
-    setDegData({ drv1: degDrv1, drv2: degDrv2, points });
+    setDegData({ drv1: d1, drv2: d2, points });
     setDegLoaded(true);
     setDegLoading(false);
-  }, [degDrv1, degDrv2, laps]);
+  }, [drivers, laps]);
 
   if (loading) {
     return <div className="text-center p-12 text-muted-foreground">Loading session...</div>;
@@ -522,7 +527,7 @@ export default function SessionDetailPage() {
       </div>
 
       {/* ═══ DRIVER GRID ═══ */}
-      <CardSection title="Drivers" subtitle={`${drivers.length} drivers — tap to view telemetry`} icon={<Activity className="h-4 w-4 text-blue-500" />} defaultOpen>
+      <CardSection title="Drivers" subtitle={`${drivers.length} drivers — sorted by number — tap to view telemetry`} icon={<Activity className="h-4 w-4 text-blue-500" />}>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
           {(showAllDrivers ? drivers : drivers.slice(0, 10)).map(d => (
             <Card key={d.driver_number} className={`p-2.5 text-center cursor-pointer transition-colors ${selectedDriver === d.driver_number ? 'ring-2 ring-primary' : 'hover:bg-muted/50'}`}
@@ -583,7 +588,7 @@ export default function SessionDetailPage() {
       </CardSection>
 
       {/* ═══ BEST SECTOR TIMES ═══ */}
-      <CardSection title="Best Sector Times" subtitle="Fastest sector 1/2/3 & lap times per driver" icon={<Radar className="h-4 w-4 text-purple-500" />} defaultOpen>
+      <CardSection title="Best Sector Times" subtitle="Fastest sector 1/2/3 & lap times per driver" icon={<Radar className="h-4 w-4 text-purple-500" />}>
         <div className="flex gap-3 mb-2 text-[10px] text-muted-foreground flex-wrap">
           <span><span className="text-purple-400 font-bold">🟣</span> Fastest overall</span>
           <span><span className="text-green-400 font-bold">🟢</span> Top 3</span>
@@ -633,7 +638,7 @@ export default function SessionDetailPage() {
       </CardSection>
 
       {/* ═══ TYRE STRATEGY TIMELINE ═══ */}
-      <CardSection title="Tyre Strategy Timeline" subtitle="Compound usage & stint length per driver" icon={<TrendingUp className="h-4 w-4 text-green-500" />} defaultOpen>
+      <CardSection title="Tyre Strategy Timeline" subtitle="Compound usage & stint length per driver" icon={<TrendingUp className="h-4 w-4 text-green-500" />}>
         {stintsByDriver.size === 0 ? (
           <p className="text-center py-4 text-muted-foreground text-sm">No stint data available</p>
         ) : (
@@ -931,49 +936,47 @@ export default function SessionDetailPage() {
           <LoadableCard title="Position History" subtitle="Lap-by-lap position changes" icon={<BarChart3 className="h-4 w-4 text-blue-500" />}
             loading={posLoading} loaded={posLoaded} onLoad={loadPosHistory} isAvailable={isRaceSprint}>
             {posHistory?.timeline?.length ? (() => {
-              const byDriver: Record<number, { acronym: string; team_colour: string; positions: number[] }> = {};
-              const lineColors = ['#e11d48', '#3b82f6', '#22c55e', '#eab308', '#a855f7', '#f97316', '#06b6d4', '#ec4899', '#14b8a6', '#f59e0b'];
-              for (let lap = 1; lap <= posHistory.max_lap; lap++) {
-                const atLap = posHistory.timeline.filter(e => e.lap === lap).sort((a, b) => a.position - b.position);
-                atLap.forEach(e => {
-                  if (!byDriver[e.driver_number]) byDriver[e.driver_number] = { acronym: e.acronym, team_colour: e.team_colour, positions: [] };
-                });
+              const byDriver: Record<string, { acronym: string; team_colour: string }> = {};
+              const lapSet = new Set<number>();
+              for (const e of posHistory.timeline) {
+                if (!byDriver[e.driver_number]) byDriver[e.driver_number] = { acronym: e.acronym, team_colour: e.team_colour };
+                lapSet.add(e.lap);
               }
-              // Fill positions per driver per lap
-              for (let lap = 1; lap <= posHistory.max_lap; lap++) {
-                const atLap = posHistory.timeline.filter(e => e.lap === lap).sort((a, b) => a.position - b.position);
-                const driversAtLap = new Set(atLap.map(e => e.driver_number));
-                for (const [dn, data] of Object.entries(byDriver)) {
-                  const entry = atLap.find(e => e.driver_number === parseInt(dn));
-                  data.positions.push(entry ? entry.position : (data.positions[data.positions.length - 1] || 20));
+              const allLaps = Array.from(lapSet).sort((a, b) => a - b);
+              const chartData = allLaps.map(lap => {
+                const atLap = posHistory.timeline.filter(e => e.lap === lap);
+                const pt: Record<string, any> = { lap };
+                for (const e of atLap) {
+                  pt[`p_${e.driver_number}`] = e.position;
                 }
-              }
-              const topDrivers = Object.entries(byDriver).slice(0, 10);
+                return pt;
+              });
+              const driverEntries = Object.entries(byDriver);
               return (
                 <div className="overflow-x-auto">
                   <div style={{ minWidth: 500 }}>
-                    <div className="flex items-end gap-0.5" style={{ height: 200 }}>
-                      {Array.from({ length: posHistory.max_lap }, (_, lap) => (
-                        <div key={lap} className="flex-1 flex flex-col-reverse" style={{ height: 200 }}>
-                          {topDrivers.map(([dn, data], di) => {
-                            const pos = data.positions[lap] || 20;
-                            const heightPct = ((20 - pos) / 20) * 100;
-                            return (
-                              <div key={dn} className="w-full transition-all duration-200 border-t border-background"
-                                style={{ height: `${heightPct / 20}%`, background: teamColor(data.team_colour), opacity: 0.8 }}
-                                title={`${data.acronym}: P${pos} (L${lap + 1})`} />
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {topDrivers.map(([dn, data], di) => (
+                    <ResponsiveContainer width="100%" height={280}>
+                      <LineChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                        <XAxis dataKey="lap" tick={{ fontSize: 9 }} stroke="rgba(255,255,255,0.25)" label={{ value: 'Lap', position: 'insideBottomRight', offset: -5, style: { fontSize: 9, fill: 'rgba(255,255,255,0.3)' } }} />
+                        <YAxis reversed tick={{ fontSize: 9 }} stroke="rgba(255,255,255,0.25)" domain={[1, 'auto']} label={{ value: 'Position', angle: -90, position: 'insideLeft', style: { fontSize: 9, fill: 'rgba(255,255,255,0.3)' } }} />
+                        <Tooltip
+                          contentStyle={{ background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }}
+                          formatter={(value: any, name: any) => [`P${value}`, String(name).replace('p_', '')]} />
+                        {driverEntries.map(([dn, info]) => (
+                          <Line key={dn} type="monotone" dataKey={`p_${dn}`} name={info.acronym}
+                            stroke={teamColor(info.team_colour)} strokeWidth={1.5} dot={false} connectNulls />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {driverEntries.slice(0, 22).map(([dn, info]) => (
                         <span key={dn} className="flex items-center gap-1 text-[10px]">
-                          <span className="w-2 h-2 rounded-full inline-block" style={{ background: teamColor(data.team_colour) }} />
-                          {data.acronym}
+                          <span className="w-2 h-2 rounded-full inline-block" style={{ background: teamColor(info.team_colour) }} />
+                          {info.acronym}
                         </span>
                       ))}
+                      {driverEntries.length > 22 && <span className="text-[10px] text-muted-foreground">+{driverEntries.length - 22} more</span>}
                     </div>
                   </div>
                 </div>
@@ -1048,57 +1051,63 @@ export default function SessionDetailPage() {
           {/* Gap Timeline */}
           <LoadableCard title="Gap Timeline" subtitle="Cumulative gap to leader" icon={<Activity className="h-4 w-4 text-blue-500" />}
             loading={gapsLoading} loaded={gapsLoaded} onLoad={loadGaps} isAvailable={isRaceSprint}>
-            {gaps?.timeline?.length ? (
-              <div className="overflow-x-auto">
-                <div style={{ minWidth: 500 }}>
-                  <div className="flex items-end gap-px" style={{ height: 200 }}>
-                    {(() => {
-                      const maxGap = Math.max(...gaps.timeline.map(g => g.gap_to_leader || 0), 1);
-                      const byLap: Record<number, any[]> = {};
-                      const driverMap: Record<string, { acronym: string; team_colour: string; }> = {};
-                      for (const g of gaps.timeline) {
-                        if (!byLap[g.lap]) byLap[g.lap] = [];
-                        byLap[g.lap].push(g);
-                        if (g.driver_number && !driverMap[g.driver_number]) {
-                          driverMap[g.driver_number] = { acronym: g.acronym || `#${g.driver_number}`, team_colour: g.team_colour || '#666' };
-                        }
-                      }
-                      const lapKeys = Object.keys(byLap).map(Number).sort((a, b) => a - b);
-                      const sampleStep = Math.max(1, Math.floor(lapKeys.length / 80));
-                      const sampledLaps = lapKeys.filter((_, i) => i % sampleStep === 0);
-                      // Include leader if available
-                      const topDrivers = gaps.leader
-                        ? [[gaps.leader.driver_number.toString(), { acronym: gaps.leader.acronym, team_colour: gaps.leader.team_colour }] as const, ...Object.entries(driverMap).filter(([k]) => k !== gaps.leader!.driver_number.toString()).slice(0, 9)]
-                        : Object.entries(driverMap).slice(0, 10);
-                      return sampledLaps.map(lap => {
-                        const entries = byLap[lap] || [];
-                        return (
-                          <div key={lap} className="flex-1 flex flex-col-reverse" style={{ height: 200 }}>
-                            {topDrivers.map(([dn, info]) => {
-                              const entry = entries.find((e: any) => e.driver_number === parseInt(dn));
-                              const gap = entry?.gap_to_leader || 0;
-                              const pct = (gap / maxGap) * 100;
-                              return (
-                                <div key={dn} className="w-full transition-all"
-                                  style={{ height: `${100 - pct}%`, background: teamColor(info.team_colour), opacity: 0.7 }} />
-                              );
-                            })}
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {(gaps.leader ? [[gaps.leader.driver_number.toString(), { acronym: gaps.leader.acronym, team_colour: gaps.leader.team_colour }] as const, ...Object.entries(Object.fromEntries(gaps.timeline.map(g => [g.driver_number, { acronym: g.acronym, team_colour: g.team_colour || '#666' }]))).filter(([k]) => k !== gaps.leader!.driver_number.toString()).slice(0, 9)] : Object.entries(Object.fromEntries(gaps.timeline.map(g => [g.driver_number, { acronym: g.acronym, team_colour: g.team_colour || '#666' }]))).slice(0, 10)).map(([dn, info]) => (
-                      <span key={dn} className="flex items-center gap-1 text-[10px]">
-                        <span className="w-2 h-2 rounded-full inline-block" style={{ background: teamColor(info.team_colour) }} />
-                        {info.acronym}
-                      </span>
-                    ))}
+            {gaps?.timeline?.length ? (() => {
+              const byLap: Record<number, any[]> = {};
+              const drvMap: Record<string, { acronym: string; team_colour: string }> = {};
+              for (const g of gaps.timeline) {
+                if (!byLap[g.lap]) byLap[g.lap] = [];
+                byLap[g.lap].push(g);
+                if (g.driver_number && !drvMap[g.driver_number]) {
+                  drvMap[g.driver_number] = { acronym: g.acronym || `#${g.driver_number}`, team_colour: g.team_colour || '#666' };
+                }
+              }
+              const lapKeys = Object.keys(byLap).map(Number).sort((a, b) => a - b);
+              // Sample to ~100 data points max for readability
+              const sampleStep = Math.max(1, Math.floor(lapKeys.length / 100));
+              const sampledLaps = lapKeys.filter((_, i) => i % sampleStep === 0);
+              // Build chart data
+              const drvEntries = gaps.leader
+                ? [[gaps.leader.driver_number.toString(), { acronym: gaps.leader.acronym, team_colour: gaps.leader.team_colour }] as const, ...Object.entries(drvMap).filter(([k]) => k !== gaps.leader!.driver_number.toString())]
+                : Object.entries(drvMap);
+              const chartData = sampledLaps.map(lap => {
+                const entries = byLap[lap] || [];
+                const pt: Record<string, any> = { lap };
+                for (const e of entries) {
+                  pt[`g_${e.driver_number}`] = e.gap_to_leader || 0;
+                }
+                return pt;
+              });
+              const maxGap = Math.max(...gaps.timeline.map(g => g.gap_to_leader || 0), 1);
+              return (
+                <div className="overflow-x-auto">
+                  <div style={{ minWidth: 500 }}>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <LineChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                        <XAxis dataKey="lap" tick={{ fontSize: 9 }} stroke="rgba(255,255,255,0.25)" label={{ value: 'Lap', position: 'insideBottomRight', offset: -5, style: { fontSize: 9, fill: 'rgba(255,255,255,0.3)' } }} />
+                        <YAxis tick={{ fontSize: 9 }} stroke="rgba(255,255,255,0.25)" label={{ value: 'Gap (s)', angle: -90, position: 'insideLeft', style: { fontSize: 9, fill: 'rgba(255,255,255,0.3)' } }} />
+                        <Tooltip
+                          contentStyle={{ background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 11 }}
+                          formatter={(value: any, name: any) => [`${value.toFixed(2)}s`, String(name).replace('g_', '')]} />
+                        {drvEntries.slice(0, 20).map(([dn, info]) => (
+                          <Line key={dn} type="monotone" dataKey={`g_${dn}`} name={info.acronym}
+                            stroke={teamColor(info.team_colour)} strokeWidth={1.5} dot={false} connectNulls />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {drvEntries.slice(0, 22).map(([dn, info]) => (
+                        <span key={dn} className="flex items-center gap-1 text-[10px]">
+                          <span className="w-2 h-2 rounded-full inline-block" style={{ background: teamColor(info.team_colour) }} />
+                          {info.acronym}
+                        </span>
+                      ))}
+                      {drvEntries.length > 22 && <span className="text-[10px] text-muted-foreground">+{drvEntries.length - 22} more</span>}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
+              );
+            })() : (
               <p className="text-center py-4 text-muted-foreground text-sm">No gap data available</p>
             )}
           </LoadableCard>
@@ -1112,12 +1121,12 @@ export default function SessionDetailPage() {
           <LoadableCard title="Tyre Degradation" subtitle="Lap time vs tyre age" icon={<TrendingUp className="h-4 w-4 text-green-500" />}
             loading={degLoading} loaded={degLoaded} onLoad={loadDegradation}>
             <div className="flex flex-wrap gap-2 items-center mb-3">
-              <select className="bg-secondary text-foreground border border-border rounded px-2 py-1 text-xs" value={degDrv1}
+              <select className="bg-secondary text-foreground border border-border rounded px-2 py-1 text-xs" value={effectiveDegDrv1}
                 onChange={e => { setDegDrv1(parseInt(e.target.value)); setDegLoaded(false); }}>
                 {drivers.map(d => <option key={d.driver_number} value={d.driver_number}>{d.name_acronym}</option>)}
               </select>
               <span className="text-muted-foreground text-xs">vs</span>
-              <select className="bg-secondary text-foreground border border-border rounded px-2 py-1 text-xs" value={degDrv2}
+              <select className="bg-secondary text-foreground border border-border rounded px-2 py-1 text-xs" value={effectiveDegDrv2}
                 onChange={e => { setDegDrv2(parseInt(e.target.value)); setDegLoaded(false); }}>
                 {drivers.map(d => <option key={d.driver_number} value={d.driver_number}>{d.name_acronym}</option>)}
               </select>
@@ -1466,7 +1475,7 @@ export default function SessionDetailPage() {
       {/* ═══ TELEMETRY (when driver selected) ═══ */}
       {selectedDriver && (
         <CardSection title={`Telemetry — ${driverMap[selectedDriver]?.name_acronym || `#${selectedDriver}`}`}
-          subtitle="Click a driver card above to change" icon={<Gauge className="h-4 w-4 text-blue-500" />} defaultOpen>
+          subtitle="Click a driver card above to change" icon={<Gauge className="h-4 w-4 text-blue-500" />}>
           {telemetryLoading ? (
             <p className="text-center py-4 text-muted-foreground text-sm">Loading telemetry...</p>
           ) : telemetry.length === 0 ? (

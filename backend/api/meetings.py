@@ -40,10 +40,13 @@ async def list_meetings(year: int | None = None, db: AsyncSession = Depends(get_
             "name": m.name,
             "official_name": m.official_name,
             "location": m.location,
+            "country_code": m.country_code,
             "country_name": m.country_name,
             "circuit_name": m.circuit_name,
+            "circuit_type": m.circuit_type,
             "date_start": str(m.date_start) if m.date_start else None,
             "date_end": str(m.date_end) if m.date_end else None,
+            "is_cancelled": m.is_cancelled or False,
             "session_count": cnt or 0,
         }
         for m, cnt in rows

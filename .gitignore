@@ -23,6 +23,9 @@ cache/
 .DS_Store
 Thumbs.db
 
+# Database
+*.db
+
 # Docker
 docker-compose.override.yml
 
