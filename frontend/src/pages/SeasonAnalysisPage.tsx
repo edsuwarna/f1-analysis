@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { teamColor, formatTime } from '@/lib/formatters';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { BarChart3, LineChartIcon, TrendingUp, Gauge, CheckSquare, Square } from 'lucide-react';
+import { BarChart3, LineChartIcon, TrendingUp, Gauge, CheckSquare, Square, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface DriverInfo {
   driver_number: number;
@@ -57,6 +57,7 @@ export default function SeasonAnalysisPage() {
 
   // Driver Form
   const [driverForms, setDriverForms] = useState<DriverFormEntry[]>([]);
+  const [expandedFormDrivers, setExpandedFormDrivers] = useState<Set<number>>(new Set());
 
   // Pit Stop Championship
   const [pitStopTeams, setPitStopTeams] = useState<PitStopTeam[]>([]);
@@ -320,52 +321,78 @@ export default function SeasonAnalysisPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {driverForms.map(df => {
                 const raceResults = df.results.filter(r => r.session_name === 'Race');
+                const isExpanded = expandedFormDrivers.has(df.driver_number);
                 return (
-                  <Card key={df.acronym} className="p-4 overflow-hidden">
-                    <div className="flex items-center justify-between mb-3">
+                  <Card
+                    key={df.acronym}
+                    className="overflow-hidden"
+                    style={{ borderLeft: `4px solid ${teamColor(df.team_colour)}` }}
+                  >
+                    <button
+                      onClick={() => {
+                        setExpandedFormDrivers(prev => {
+                          const next = new Set(prev);
+                          if (next.has(df.driver_number)) {
+                            next.delete(df.driver_number);
+                          } else {
+                            next.add(df.driver_number);
+                          }
+                          return next;
+                        });
+                      }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors text-left"
+                    >
                       <div className="flex items-center gap-2 min-w-0">
                         <span
                           className="w-3 h-3 rounded-full flex-shrink-0"
                           style={{ background: teamColor(df.team_colour) }}
                         />
-                        <div className="min-w-0">
+                        <div className="min-w-0 text-left">
                           <span className="font-semibold text-sm">{df.acronym}</span>
                           <span className="text-xs text-muted-foreground ml-2 truncate">{df.full_name}</span>
                         </div>
                       </div>
-                      <Badge variant="secondary" className="text-xs flex-shrink-0">
-                        Avg: P{df.avg_finish}
-                      </Badge>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {raceResults.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">No race data</span>
-                      ) : (
-                        raceResults.map((p, idx) => (
-                          <div
-                            key={`${p.meeting_id}-${idx}`}
-                            className={`w-9 h-9 flex items-center justify-center rounded-md text-xs font-mono font-bold border ${
-                              p.dnf
-                                ? 'bg-red-500/20 text-red-400 border-red-500/30'
-                                : positionColor(p.position)
-                            }`}
-                            title={`${p.race_name}: P${p.position}${p.dnf ? ' (DNF)' : ''}`}
-                          >
-                            {p.dnf ? 'DNF' : p.position}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {raceResults.map((p, idx) => (
-                        <span
-                          key={idx}
-                          className="text-[10px] text-muted-foreground truncate max-w-[80px]"
-                        >
-                          {p.race_name?.split(' ').slice(0, 2).join(' ') || `R${idx + 1}`}
-                        </span>
-                      ))}
-                    </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge variant="secondary" className="text-xs">
+                          Avg: P{df.avg_finish}
+                        </Badge>
+                        {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                      </div>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="px-4 pb-4 space-y-2">
+                        <div className="flex flex-wrap gap-1.5">
+                          {raceResults.length === 0 ? (
+                            <span className="text-xs text-muted-foreground">No race data</span>
+                          ) : (
+                            raceResults.map((p, idx) => (
+                              <div
+                                key={`${p.meeting_id}-${idx}`}
+                                className={`w-9 h-9 flex items-center justify-center rounded-md text-xs font-mono font-bold border ${
+                                  p.dnf
+                                    ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                                    : positionColor(p.position)
+                                }`}
+                                title={`${p.race_name}: P${p.position}${p.dnf ? ' (DNF)' : ''}`}
+                              >
+                                {p.dnf ? 'DNF' : p.position}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {raceResults.map((p, idx) => (
+                            <span
+                              key={idx}
+                              className="text-[10px] text-muted-foreground truncate max-w-[80px]"
+                            >
+                              {p.race_name?.split(' ').slice(0, 2).join(' ') || `R${idx + 1}`}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </Card>
                 );
               })}

@@ -51,7 +51,7 @@ export default function TechUpdatesPage() {
       </h1>
 
       {/* Race selector */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1">
         {meetings.map(m => (
           <Badge
             key={m.id}
@@ -74,13 +74,13 @@ export default function TechUpdatesPage() {
 
       {drivers.length > 0 && (
         <Tabs defaultValue="speed">
-          <TabsList className="w-full flex-wrap">
-            <TabsTrigger value="speed"><Gauge className="h-3.5 w-3.5 mr-1" />Speed</TabsTrigger>
-            <TabsTrigger value="gears"><ArrowUpDown className="h-3.5 w-3.5 mr-1" />Gears</TabsTrigger>
-            <TabsTrigger value="throttle"><Sparkles className="h-3.5 w-3.5 mr-1" />Throttle</TabsTrigger>
-            <TabsTrigger value="brake"><RotateCcw className="h-3.5 w-3.5 mr-1" />Brake</TabsTrigger>
-            <TabsTrigger value="rpm"><Zap className="h-3.5 w-3.5 mr-1" />RPM</TabsTrigger>
-            <TabsTrigger value="drs"><BarChart3 className="h-3.5 w-3.5 mr-1" />DRS</TabsTrigger>
+          <TabsList className="overflow-x-auto flex-nowrap w-full justify-start">
+            <TabsTrigger value="speed" className="whitespace-nowrap"><Gauge className="h-3.5 w-3.5 mr-1" />Speed</TabsTrigger>
+            <TabsTrigger value="gears" className="whitespace-nowrap"><ArrowUpDown className="h-3.5 w-3.5 mr-1" />Gears</TabsTrigger>
+            <TabsTrigger value="throttle" className="whitespace-nowrap"><Sparkles className="h-3.5 w-3.5 mr-1" />Throttle</TabsTrigger>
+            <TabsTrigger value="brake" className="whitespace-nowrap"><RotateCcw className="h-3.5 w-3.5 mr-1" />Brake</TabsTrigger>
+            <TabsTrigger value="rpm" className="whitespace-nowrap"><Zap className="h-3.5 w-3.5 mr-1" />RPM</TabsTrigger>
+            <TabsTrigger value="drs" className="whitespace-nowrap"><BarChart3 className="h-3.5 w-3.5 mr-1" />DRS</TabsTrigger>
           </TabsList>
 
           {/* Speed Tab */}

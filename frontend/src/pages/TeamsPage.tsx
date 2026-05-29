@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { teamColor, formatTime } from '@/lib/formatters';
-import { Building2, Users, MapPin, Cog, Wrench, Hash, Trophy, Award, Gauge, UserCog, CircleUser } from 'lucide-react';
+import { ChevronDown, ChevronRight, Building2, Users, MapPin, Cog, Wrench, Hash, Trophy, Award, Gauge, UserCog, CircleUser } from 'lucide-react';
 
 interface DriverInfo {
   driver_number: number;
@@ -43,6 +43,7 @@ interface TeamsApiResponse {
 export default function TeamsPage() {
   const [data, setData] = useState<TeamsApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
 
   const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -106,27 +107,42 @@ export default function TeamsPage() {
         <Card className="p-8 text-center text-muted-foreground">No team data available</Card>
       ) : (
         <div className="grid grid-cols-1 gap-6">
-          {teams.map((team) => (
+          {teams.map((team) => {
+            const isExpanded = expandedTeams.has(team.team_name);
+            return (
             <Card
               key={team.team_name}
               className="overflow-hidden"
               style={{ borderLeft: `4px solid ${teamColor(team.team_colour)}` }}
             >
-              {/* Team Header */}
-              <div className="p-6 pb-4 border-b border-border">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="w-5 h-5 rounded-full flex-shrink-0"
-                      style={{ background: teamColor(team.team_colour) }}
-                    />
-                    <div>
-                      <h2 className="text-xl font-bold">{team.full_name || team.team_name}</h2>
-                      {team.team_name && team.full_name && team.team_name !== team.full_name && (
-                        <p className="text-xs text-muted-foreground">{team.team_name}</p>
-                      )}
-                    </div>
+              {/* Clickable Team Header */}
+              <button
+                onClick={() => {
+                  setExpandedTeams(prev => {
+                    const next = new Set(prev);
+                    if (next.has(team.team_name)) {
+                      next.delete(team.team_name);
+                    } else {
+                      next.add(team.team_name);
+                    }
+                    return next;
+                  });
+                }}
+                className="w-full p-6 flex items-start justify-between hover:bg-muted/10 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className="w-5 h-5 rounded-full flex-shrink-0"
+                    style={{ background: teamColor(team.team_colour) }}
+                  />
+                  <div>
+                    <h2 className="text-xl font-bold text-left">{team.full_name || team.team_name}</h2>
+                    {team.team_name && team.full_name && team.team_name !== team.full_name && (
+                      <p className="text-xs text-muted-foreground">{team.team_name}</p>
+                    )}
                   </div>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
                   <div className="flex items-center gap-2">
                     {team.constructor_position && (
                       <Badge variant="secondary" className="text-sm">
@@ -136,16 +152,18 @@ export default function TeamsPage() {
                     )}
                     {team.constructor_points !== undefined && (
                       <div className="text-right">
-                        <div className="text-2xl font-bold">{team.constructor_points}</div>
-                        <p className="text-xs text-muted-foreground">points</p>
+                        <div className="text-lg font-bold">{team.constructor_points}</div>
+                        <p className="text-xs text-muted-foreground">pts</p>
                       </div>
                     )}
                   </div>
+                  {isExpanded ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronRight className="h-5 w-5 text-muted-foreground" />}
                 </div>
-              </div>
+              </button>
 
+              {isExpanded && (<>
               {/* Info Grid */}
-              <div className="p-6 border-b border-border">
+              <div className="p-6 border-t border-border">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {infoItem('Team Principal', team.team_principal, <UserCog className="h-4 w-4" />)}
                   {infoItem('Technical Director', team.technical_director, <Wrench className="h-4 w-4" />)}
@@ -159,7 +177,7 @@ export default function TeamsPage() {
               </div>
 
               {/* Drivers */}
-              <div className="p-6 border-b border-border">
+              <div className="p-6 border-t border-border">
                 <h3 className="font-semibold text-sm flex items-center gap-1.5 mb-4">
                   <Users className="h-4 w-4" />
                   Drivers
@@ -219,7 +237,7 @@ export default function TeamsPage() {
 
               {/* Pit Stop Info */}
               {(team.pit_stop_rank || team.pit_stop_avg) && (
-                <div className="p-6 border-b border-border">
+                <div className="p-6 border-t border-border">
                   <h3 className="font-semibold text-sm flex items-center gap-1.5 mb-3">
                     <Gauge className="h-4 w-4" />
                     Pit Stop Performance
@@ -263,8 +281,10 @@ export default function TeamsPage() {
                   </div>
                 </div>
               )}
+              </>)}
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

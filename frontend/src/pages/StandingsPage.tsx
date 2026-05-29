@@ -10,8 +10,8 @@ export default function StandingsPage() {
   const [year, setYear] = useState('2026');
   const [drivers, setDrivers] = useState<StandingRow[]>([]);
   const [constructors, setConstructors] = useState<ConstructorStandingRow[]>([]);
-  const [driverOpen, setDriverOpen] = useState(true);
-  const [constructorOpen, setConstructorOpen] = useState(true);
+  const [driverOpen, setDriverOpen] = useState(false);
+  const [constructorOpen, setConstructorOpen] = useState(false);
 
   useEffect(() => {
     async function load() {

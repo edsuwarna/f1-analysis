@@ -131,7 +131,7 @@ export default function PitStopsPage() {
       {pits.length > 0 && (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="p-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <Zap className="h-4 w-4 text-green-500" />
@@ -199,11 +199,11 @@ export default function PitStopsPage() {
           </div>
 
           <Tabs defaultValue="driver-stats">
-            <TabsList>
-              <TabsTrigger value="driver-stats">Per Driver</TabsTrigger>
-              <TabsTrigger value="fastest">Fastest Stops</TabsTrigger>
-              <TabsTrigger value="all">All Stops</TabsTrigger>
-              {teamChampionship && <TabsTrigger value="teams">Team Standings</TabsTrigger>}
+            <TabsList className="overflow-x-auto flex-nowrap w-full justify-start">
+              <TabsTrigger value="driver-stats" className="whitespace-nowrap">Per Driver</TabsTrigger>
+              <TabsTrigger value="fastest" className="whitespace-nowrap">Fastest Stops</TabsTrigger>
+              <TabsTrigger value="all" className="whitespace-nowrap">All Stops</TabsTrigger>
+              {teamChampionship && <TabsTrigger value="teams" className="whitespace-nowrap">Team Standings</TabsTrigger>}
             </TabsList>
 
             {/* Per Driver Stats */}

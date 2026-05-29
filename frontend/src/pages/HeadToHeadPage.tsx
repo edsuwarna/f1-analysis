@@ -42,7 +42,7 @@ export default function HeadToHeadPage() {
       </h1>
 
       {/* Driver Selectors */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="flex flex-col sm:grid sm:grid-cols-2 gap-4">
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">Driver 1</label>
           <select
@@ -77,7 +77,7 @@ export default function HeadToHeadPage() {
       {d1Data && d2Data && (
         <>
           {/* Overview */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <Card className="p-4 text-center">
               <p className="text-xs text-muted-foreground uppercase">Points</p>
               <div className="flex items-center justify-center gap-4 mt-2">

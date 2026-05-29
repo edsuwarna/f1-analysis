@@ -6,6 +6,32 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { teamColor, formatTime, flagEmoji } from '@/lib/formatters';
 import { BarChart3, TrendingUp, Activity, Radar, CircleDot, Gauge } from 'lucide-react';
 
+// 2026 driver headshots from F1 CDN
+const HEADSHOT_MAP: Record<number, string> = {
+  1: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/mclaren/lannor01/2026mclarenlannor01right.webp',
+  3: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/redbullracing/maxver01/2026redbullracingmaxver01right.webp',
+  5: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/audi/gabbor01/2026audigabbor01right.webp',
+  6: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/redbullracing/isahad01/2026redbullracingisahad01right.webp',
+  10: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/alpine/piegas01/2026alpinepiegas01right.webp',
+  11: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/cadillac/serper01/2026cadillacserper01right.webp',
+  12: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/mercedes/andant01/2026mercedesandant01right.webp',
+  14: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/astonmartin/feralo01/2026astonmartinferalo01right.webp',
+  16: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/ferrari/chalec01/2026ferrarichalec01right.webp',
+  18: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/astonmartin/lanstr01/2026astonmartinlanstr01right.webp',
+  23: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/williams/alealb01/2026williamsalealb01right.webp',
+  27: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/audi/nichul01/2026audinichul01right.webp',
+  30: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/racingbulls/lialaw01/2026racingbullslialaw01right.webp',
+  31: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/haasf1team/estoco01/2026haasf1teamestoco01right.webp',
+  41: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/racingbulls/arvlin01/2026racingbullsarvlin01right.webp',
+  43: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/alpine/fracol01/2026alpinefracol01right.webp',
+  44: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/ferrari/lewham01/2026ferrarilewham01right.webp',
+  55: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/williams/carsai01/2026williamscarsai01right.webp',
+  63: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/mercedes/georus01/2026mercedesgeorus01right.webp',
+  77: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/cadillac/valbot01/2026cadillacvalbot01right.webp',
+  81: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/mclaren/oscpia01/2026mclarenoscpia01right.webp',
+  87: 'https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/haasf1team/olibea01/2026haasf1teamolibea01right.webp',
+};
+
 export default function DriverStatsPage() {
   const [drivers, setDrivers] = useState<StandingRow[]>([]);
   const [selectedDriver, setSelectedDriver] = useState<string>('');
@@ -96,9 +122,26 @@ export default function DriverStatsPage() {
           {/* Driver Profile Card */}
           <Card className="p-5 bg-gradient-to-r from-card to-muted/30">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-extrabold text-xl flex-shrink-0"
-                style={{ background: teamColor(driver.team_colour) }}>
-                {driver.name_acronym.charAt(0)}
+              <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 bg-muted flex items-center justify-center">
+                {HEADSHOT_MAP[driver.driver_number] ? (
+                  <img
+                    src={HEADSHOT_MAP[driver.driver_number]}
+                    alt={driver.full_name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      (e.target as HTMLImageElement).parentElement!.innerHTML =
+                        `<div class="w-full h-full flex items-center justify-center text-xl font-bold" style="color:${teamColor(driver.team_colour)}">${driver.name_acronym?.charAt(0) || '?'}</div>`;
+                    }}
+                  />
+                ) : (
+                  <span
+                    className="text-xl font-bold"
+                    style={{ color: teamColor(driver.team_colour) }}
+                  >
+                    {driver.name_acronym?.charAt(0) || '?'}
+                  </span>
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold truncate">{driver.full_name}</h2>
