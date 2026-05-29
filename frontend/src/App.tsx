@@ -36,7 +36,7 @@ function AppLayout() {
   const location = useLocation();
 
   return (
-    <div className="flex h-screen w-full">
+    <SidebarProvider>
       <Sidebar variant="inset" collapsible="icon">
         <SidebarHeader>
           <SidebarMenu>
@@ -133,7 +133,7 @@ function AppLayout() {
           </Routes>
         </main>
       </SidebarInset>
-    </div>
+    </SidebarProvider>
   );
 }
 
