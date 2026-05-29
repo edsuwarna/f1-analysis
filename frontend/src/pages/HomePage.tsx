@@ -2,16 +2,18 @@ import { useEffect, useState } from 'react';
 import { getMeetings, getChampionship, type Meeting, type ConstructorStandingRow, type StandingRow } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { flagEmoji, TEAM_LOGOS, teamColor, formatTime } from '@/lib/formatters';
-import { Calendar, Trophy, Users, Gauge } from 'lucide-react';
+import { flagEmoji, teamColor } from '@/lib/formatters';
+import { Calendar, Trophy, Users, Gauge, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 
 export default function HomePage() {
-  const [drivers, setDrivers] = useState<StandingRow[]>([]);
-  const [constructors, setConstructors] = useState<ConstructorStandingRow[]>([]);
+  const [allDrivers, setAllDrivers] = useState<StandingRow[]>([]);
+  const [allConstructors, setAllConstructors] = useState<ConstructorStandingRow[]>([]);
   const [nextRace, setNextRace] = useState<Meeting | null>(null);
   const [driverWins, setDriverWins] = useState<Record<string, number>>({});
   const [constructorWins, setConstructorWins] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [showAllDrivers, setShowAllDrivers] = useState(false);
+  const [showAllConstructors, setShowAllConstructors] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -22,8 +24,8 @@ export default function HomePage() {
         ]);
         const d = champ.driver_standings;
         const c = champ.constructor_standings;
-        setDrivers(d.slice(0, 5));
-        setConstructors(c.slice(0, 5));
+        setAllDrivers(d);
+        setAllConstructors(c);
 
         // Compute wins from race results
         const dw: Record<string, number> = {};
@@ -53,6 +55,9 @@ export default function HomePage() {
     }
     load();
   }, []);
+
+  const displayedDrivers = showAllDrivers ? allDrivers : allDrivers.slice(0, 5);
+  const displayedConstructors = showAllConstructors ? allConstructors : allConstructors.slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -108,9 +113,9 @@ export default function HomePage() {
               <Trophy className="h-4 w-4" />
               <span className="text-xs font-medium uppercase">Driver Standings</span>
             </div>
-            <p className="text-2xl font-bold">{drivers[0]?.full_name || '-'}</p>
+            <p className="text-2xl font-bold">{allDrivers[0]?.full_name || '-'}</p>
             <p className="text-sm text-muted-foreground">
-              {drivers[0]?.team_name} · {drivers[0]?.points} pts
+              {allDrivers[0]?.team_name} · {allDrivers[0]?.points} pts
             </p>
           </CardContent>
         </Card>
@@ -120,9 +125,9 @@ export default function HomePage() {
               <Users className="h-4 w-4" />
               <span className="text-xs font-medium uppercase">Constructor Standings</span>
             </div>
-            <p className="text-2xl font-bold">{constructors[0]?.team_name || '-'}</p>
+            <p className="text-2xl font-bold">{allConstructors[0]?.team_name || '-'}</p>
             <p className="text-sm text-muted-foreground">
-              {constructors[0]?.points} pts · {constructorWins[constructors[0]?.team_name || ''] || 0} wins
+              {allConstructors[0]?.points} pts · {constructorWins[allConstructors[0]?.team_name || ''] || 0} wins
             </p>
           </CardContent>
         </Card>
@@ -132,7 +137,7 @@ export default function HomePage() {
               <Calendar className="h-4 w-4" />
               <span className="text-xs font-medium uppercase">Races Completed</span>
             </div>
-            <p className="text-2xl font-bold">{drivers.length > 0 ? 5 : '-'}</p>
+            <p className="text-2xl font-bold">{allDrivers.length > 0 ? 5 : '-'}</p>
             <p className="text-sm text-muted-foreground">of 24 rounds in 2026</p>
           </CardContent>
         </Card>
@@ -141,58 +146,90 @@ export default function HomePage() {
       {/* Standings Preview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <Trophy className="h-5 w-5 text-yellow-500" />
               2026 Driver Standings
+              <span className="text-xs font-normal text-muted-foreground ml-auto">
+                {allDrivers.length} drivers
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {drivers.map((d, i) => (
+              {displayedDrivers.map((d, i) => (
                 <div key={d.driver_number} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
                   <span className={`w-6 text-center font-bold text-sm ${i < 3 ? 'text-yellow-500' : 'text-muted-foreground'}`}>
                     {d.position === 1 ? '🥇' : d.position === 2 ? '🥈' : d.position === 3 ? '🥉' : `#${d.position}`}
                   </span>
-                  <div className="flex-1 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full" style={{ background: teamColor(d.team_colour) }} />
-                    <span className="font-medium text-sm">{d.name_acronym}</span>
-                    <span className="text-xs text-muted-foreground">{d.full_name}</span>
+                  <div className="flex-1 flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: teamColor(d.team_colour) }} />
+                    <span className="font-medium text-sm truncate">{d.name_acronym}</span>
+                    <span className="text-xs text-muted-foreground truncate hidden sm:inline">{d.full_name}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{flagEmoji(d.country_code)}</span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs text-muted-foreground hidden sm:inline">{flagEmoji(d.country_code)}</span>
                     <span className="font-bold text-sm">{d.points}</span>
                     {driverWins[d.name_acronym] > 0 && <Badge variant="secondary" className="text-xs">{driverWins[d.name_acronym]}W</Badge>}
                   </div>
                 </div>
               ))}
             </div>
+            {allDrivers.length > 5 && (
+              <button
+                onClick={() => setShowAllDrivers(!showAllDrivers)}
+                className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors border border-border"
+              >
+                {showAllDrivers ? (
+                  <><EyeOff className="h-3.5 w-3.5" /> Show Less</>
+                ) : (
+                  <><Eye className="h-3.5 w-3.5" /> Show All {allDrivers.length} Drivers</>
+                )}
+              </button>
+            )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <Users className="h-5 w-5 text-blue-500" />
               2026 Constructor Standings
+              <span className="text-xs font-normal text-muted-foreground ml-auto">
+                {allConstructors.length} teams
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {constructors.map((c, i) => (
+              {displayedConstructors.map((c, i) => (
                 <div key={c.team_name} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
-                  <span className="w-6 text-center font-bold text-sm text-muted-foreground">{c.position}</span>
-                  <div className="flex-1 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full" style={{ background: teamColor(c.team_colour) }} />
-                    <span className="font-medium text-sm">{c.team_name}</span>
+                  <span className={`w-6 text-center font-bold text-sm ${i < 3 ? 'text-yellow-500' : 'text-muted-foreground'}`}>
+                    {c.position === 1 ? '🥇' : c.position === 2 ? '🥈' : c.position === 3 ? '🥉' : `#${c.position}`}
+                  </span>
+                  <div className="flex-1 flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: teamColor(c.team_colour) }} />
+                    <span className="font-medium text-sm truncate">{c.team_name}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="font-bold text-sm">{c.points}</span>
                     {constructorWins[c.team_name] > 0 && <Badge variant="secondary" className="text-xs">{constructorWins[c.team_name]}W</Badge>}
                   </div>
                 </div>
               ))}
             </div>
+            {allConstructors.length > 5 && (
+              <button
+                onClick={() => setShowAllConstructors(!showAllConstructors)}
+                className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors border border-border"
+              >
+                {showAllConstructors ? (
+                  <><EyeOff className="h-3.5 w-3.5" /> Show Less</>
+                ) : (
+                  <><Eye className="h-3.5 w-3.5" /> Show All {allConstructors.length} Teams</>
+                )}
+              </button>
+            )}
           </CardContent>
         </Card>
       </div>

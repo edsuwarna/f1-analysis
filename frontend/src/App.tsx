@@ -4,8 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
 import { useTheme } from '@/hooks/use-theme';
 import HomePage from '@/pages/HomePage';
-import DriverStandingsPage from '@/pages/DriverStandingsPage';
-import ConstructorStandingsPage from '@/pages/ConstructorStandingsPage';
+import StandingsPage from '@/pages/StandingsPage';
 import MeetingsPage from '@/pages/MeetingsPage';
 import SessionDetailPage from '@/pages/SessionDetailPage';
 import DriverStatsPage from '@/pages/DriverStatsPage';
@@ -40,8 +39,7 @@ const mainNavItems: NavItem[] = [
   { icon: Calendar, label: 'Races', path: '/races' },
   { icon: UserCircle, label: 'Drivers', path: '/drivers' },
   { icon: BarChart3, label: 'Season Analysis', path: '/season' },
-  { icon: Trophy, label: 'Driver Standings', path: '/standings/drivers' },
-  { icon: Building2, label: 'Constructor Standings', path: '/standings/constructors' },
+  { icon: Trophy, label: 'Standings', path: '/standings' },
   { icon: Swords, label: 'Team Battle', path: '/team-battle' },
   { icon: Building2, label: 'Teams', path: '/teams' },
   { icon: Gauge, label: 'Driver Stats', path: '/stats/drivers' },
@@ -96,7 +94,7 @@ function AppLayoutContent() {
           </SidebarMenu>
         </SidebarHeader>
 
-        <SidebarContent>
+        <SidebarContent className="sidebar-scroll-fade">
           <SidebarGroup>
             <SidebarGroupLabel>Menu</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -173,8 +171,7 @@ function AppLayoutContent() {
             <Route path="/races" element={<MeetingsPage onSelectSession={(mId, sId) => navigate(`/session/${mId}/${sId}`)} />} />
             <Route path="/drivers" element={<DriversPage />} />
             <Route path="/session/:meetingId/:sessionId" element={<SessionDetailPage />} />
-            <Route path="/standings/drivers" element={<DriverStandingsPage />} />
-            <Route path="/standings/constructors" element={<ConstructorStandingsPage />} />
+            <Route path="/standings" element={<StandingsPage />} />
             <Route path="/stats/drivers" element={<DriverStatsPage />} />
             <Route path="/head-to-head" element={<HeadToHeadPage />} />
             <Route path="/consistency" element={<ConsistencyPage />} />
@@ -214,8 +211,7 @@ function getPageTitle(pathname: string): string {
     '/': 'Home',
     '/races': 'Races',
     '/drivers': 'Drivers',
-    '/standings/drivers': 'Driver Standings',
-    '/standings/constructors': 'Constructor Standings',
+    '/standings': 'Standings',
     '/stats/drivers': 'Driver Stats',
     '/head-to-head': 'Head to Head',
     '/consistency': 'Consistency',

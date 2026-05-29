@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { teamColor, formatTime } from '@/lib/formatters';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { BarChart3, LineChartIcon, TrendingUp, Gauge } from 'lucide-react';
+import { BarChart3, LineChartIcon, TrendingUp, Gauge, CheckSquare, Square } from 'lucide-react';
 
 interface DriverInfo {
   driver_number: number;
@@ -15,13 +15,23 @@ interface DriverInfo {
   team_colour: string;
 }
 
+interface DriverResult {
+  meeting_id: number;
+  race_name: string;
+  session_name: string;
+  position: number;
+  points: number;
+  dnf: boolean;
+}
+
 interface DriverFormEntry {
+  driver_number: number;
   acronym: string;
   full_name: string;
   team_name: string;
   team_colour: string;
-  positions: { meeting_id: number; race_name: string; position?: number; points?: number }[];
   avg_finish: number;
+  results: DriverResult[];
 }
 
 interface PitStopTeam {
@@ -63,7 +73,6 @@ export default function SeasonAnalysisPage() {
         // Season Progression
         setProgressionData(progression);
         if (progression.rounds?.length > 0) {
-          // Collect unique drivers from all rounds
           const driverMap = new Map<number, DriverInfo>();
           for (const round of progression.rounds) {
             if (round.standings) {
@@ -80,78 +89,13 @@ export default function SeasonAnalysisPage() {
               }
             }
           }
-          const drivers = Array.from(driverMap.values());
-          setAllDrivers(drivers);
+          setAllDrivers(Array.from(driverMap.values()));
         }
 
-        // Driver Form: parse the API response
-        // API returns { year, rounds: DriverFormRow[] } where each row has meeting_id, race_name, date_start, position?, points?
-        // This appears to be round-level data; we need to derive per-driver form from the progression data instead
-        // Use the progression rounds to build driver form data
-        if (progression.rounds?.length > 0) {
-          const driverRoundsMap = new Map<string, {
-            acronym: string;
-            full_name: string;
-            team_name: string;
-            team_colour: string;
-            positions: { meeting_id: number; race_name: string; position?: number; points?: number }[];
-          }>();
-
-          for (const round of progression.rounds) {
-            if (round.standings) {
-              for (const s of round.standings) {
-                const key = s.acronym;
-                if (!driverRoundsMap.has(key)) {
-                  driverRoundsMap.set(key, {
-                    acronym: s.acronym,
-                    full_name: s.full_name || s.acronym,
-                    team_name: s.team_name,
-                    team_colour: s.team_colour,
-                    positions: [],
-                  });
-                }
-                const entry = driverRoundsMap.get(key)!;
-                // Estimate position from race_points ordering within this round
-                entry.positions.push({
-                  meeting_id: round.meeting_id,
-                  race_name: round.race_name,
-                  points: s.race_points || 0,
-                });
-              }
-            }
-          }
-
-          // Compute average finish position based on points ordering per round
-          // For a more accurate form, we need position data which we can infer
-          const forms: DriverFormEntry[] = [];
-          for (const [, driver] of driverRoundsMap) {
-            const positionsWithPoints = driver.positions
-              .filter(p => p.points !== undefined)
-              .map(p => p.points as number);
-
-            // Estimate avg finish from points (higher points = lower finishing position)
-            // This is approximate; real position would come from driver-form endpoint
-            const avgFinish = positionsWithPoints.length > 0
-              ? Math.round((positionsWithPoints.reduce((a, b) => a + b, 0) / positionsWithPoints.length) * 10) / 10
-              : 0;
-
-            forms.push({
-              acronym: driver.acronym,
-              full_name: driver.full_name,
-              team_name: driver.team_name,
-              team_colour: driver.team_colour,
-              positions: driver.positions.map(p => ({
-                meeting_id: p.meeting_id,
-                race_name: p.race_name,
-                points: p.points,
-              })),
-              avg_finish: avgFinish,
-            });
-          }
-          setDriverForms(forms);
-        } else {
-          // Fallback: use form data from API directly
-          setDriverForms([]);
+        // Driver Form — use the API response directly (has drivers array)
+        const formData = form as unknown as { year: number; rounds: any[]; drivers: DriverFormEntry[] };
+        if (formData.drivers && formData.drivers.length > 0) {
+          setDriverForms(formData.drivers);
         }
 
         // Pit Stop Championship
@@ -187,6 +131,17 @@ export default function SeasonAnalysisPage() {
       }
       return next;
     });
+    setShowChart(false);
+  }
+
+  function selectAllDrivers() {
+    setSelectedDrivers(new Set(allDrivers.map(d => d.driver_number)));
+    setShowChart(false);
+  }
+
+  function clearDrivers() {
+    setSelectedDrivers(new Set());
+    setShowChart(false);
   }
 
   function handlePlot() {
@@ -208,10 +163,8 @@ export default function SeasonAnalysisPage() {
     });
   })();
 
-  // Get line colors for selected drivers
   const selectedDriverList = allDrivers.filter(d => selectedDrivers.has(d.driver_number));
 
-  // Determine position color for driver form
   function positionColor(position: number): string {
     if (position <= 3) return 'bg-green-500/20 text-green-400 border-green-500/50';
     if (position <= 10) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50';
@@ -233,16 +186,16 @@ export default function SeasonAnalysisPage() {
       </h1>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="progression" className="flex items-center gap-1.5">
+        <TabsList className="overflow-x-auto flex-nowrap w-full justify-start">
+          <TabsTrigger value="progression" className="flex items-center gap-1.5 whitespace-nowrap">
             <LineChartIcon className="h-4 w-4" />
             Season Progression
           </TabsTrigger>
-          <TabsTrigger value="form" className="flex items-center gap-1.5">
+          <TabsTrigger value="form" className="flex items-center gap-1.5 whitespace-nowrap">
             <TrendingUp className="h-4 w-4" />
             Driver Form
           </TabsTrigger>
-          <TabsTrigger value="pitstop" className="flex items-center gap-1.5">
+          <TabsTrigger value="pitstop" className="flex items-center gap-1.5 whitespace-nowrap">
             <Gauge className="h-4 w-4" />
             Pit Stop Championship
           </TabsTrigger>
@@ -251,7 +204,25 @@ export default function SeasonAnalysisPage() {
         {/* ── Season Progression Tab ── */}
         <TabsContent value="progression" className="space-y-4">
           <Card className="p-5">
-            <h3 className="font-semibold mb-3">Select Drivers</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold">Select Drivers</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={selectAllDrivers}
+                  className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground transition-colors"
+                >
+                  <CheckSquare className="h-3 w-3" />
+                  Select All
+                </button>
+                <button
+                  onClick={clearDrivers}
+                  className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground transition-colors"
+                >
+                  <Square className="h-3 w-3" />
+                  Clear
+                </button>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2 mb-4">
               {allDrivers.map(d => (
                 <button
@@ -282,7 +253,7 @@ export default function SeasonAnalysisPage() {
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <LineChartIcon className="h-4 w-4" />
-              Plot
+              Plot ({selectedDrivers.size} driver{selectedDrivers.size !== 1 ? 's' : ''})
             </button>
           </Card>
 
@@ -347,50 +318,57 @@ export default function SeasonAnalysisPage() {
             <Card className="p-8 text-center text-muted-foreground">No driver form data available</Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {driverForms.map(df => (
-                <Card key={df.acronym} className="p-4 overflow-hidden">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ background: teamColor(df.team_colour) }}
-                      />
-                      <div>
-                        <span className="font-semibold text-sm">{df.acronym}</span>
-                        <span className="text-xs text-muted-foreground ml-2">{df.full_name}</span>
+              {driverForms.map(df => {
+                const raceResults = df.results.filter(r => r.session_name === 'Race');
+                return (
+                  <Card key={df.acronym} className="p-4 overflow-hidden">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ background: teamColor(df.team_colour) }}
+                        />
+                        <div className="min-w-0">
+                          <span className="font-semibold text-sm">{df.acronym}</span>
+                          <span className="text-xs text-muted-foreground ml-2 truncate">{df.full_name}</span>
+                        </div>
                       </div>
+                      <Badge variant="secondary" className="text-xs flex-shrink-0">
+                        Avg: P{df.avg_finish}
+                      </Badge>
                     </div>
-                    <Badge variant="secondary" className="text-xs">
-                      Avg: {df.avg_finish.toFixed(1)} pts
-                    </Badge>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {df.positions.map((p, idx) => (
-                      <div
-                        key={p.meeting_id || idx}
-                        className={`w-9 h-9 flex items-center justify-center rounded-md text-xs font-mono font-bold border ${
-                          p.position !== undefined
-                            ? positionColor(p.position)
-                            : 'bg-muted text-muted-foreground border-border'
-                        }`}
-                        title={`${p.race_name}${p.position !== undefined ? `: P${p.position}` : ''}`}
-                      >
-                        {p.position !== undefined ? p.position : '-'}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {df.positions.map((p, idx) => (
-                      <span
-                        key={idx}
-                        className="text-[10px] text-muted-foreground truncate max-w-[80px]"
-                      >
-                        {p.race_name?.split(' ').slice(0, 2).join(' ') || `R${idx + 1}`}
-                      </span>
-                    ))}
-                  </div>
-                </Card>
-              ))}
+                    <div className="flex flex-wrap gap-1.5">
+                      {raceResults.length === 0 ? (
+                        <span className="text-xs text-muted-foreground">No race data</span>
+                      ) : (
+                        raceResults.map((p, idx) => (
+                          <div
+                            key={`${p.meeting_id}-${idx}`}
+                            className={`w-9 h-9 flex items-center justify-center rounded-md text-xs font-mono font-bold border ${
+                              p.dnf
+                                ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                                : positionColor(p.position)
+                            }`}
+                            title={`${p.race_name}: P${p.position}${p.dnf ? ' (DNF)' : ''}`}
+                          >
+                            {p.dnf ? 'DNF' : p.position}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {raceResults.map((p, idx) => (
+                        <span
+                          key={idx}
+                          className="text-[10px] text-muted-foreground truncate max-w-[80px]"
+                        >
+                          {p.race_name?.split(' ').slice(0, 2).join(' ') || `R${idx + 1}`}
+                        </span>
+                      ))}
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>

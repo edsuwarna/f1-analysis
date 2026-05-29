@@ -153,3 +153,17 @@ body {
 .font-mono {
   font-variant-numeric: tabular-nums;
 }
+
+/* Sidebar scroll fade indicator */
+.sidebar-scroll-fade {
+  mask-image: linear-gradient(to bottom,
+    black 0%,
+    black calc(100% - 48px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(to bottom,
+    black 0%,
+    black calc(100% - 48px),
+    transparent 100%
+  );
+}
