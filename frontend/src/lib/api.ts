@@ -112,6 +112,7 @@ export interface StandingRow {
   points: number;
   wins: number;
   country_code: string;
+  headshot_url?: string;
 }
 
 export interface ConstructorStandingRow {

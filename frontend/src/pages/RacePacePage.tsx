@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { getMeetings, getSessions, getLaps, getStints, getSessionDrivers, type Meeting, type Session, type Lap, type Stint, type SessionDriver } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import CollapsibleCard from '@/components/CollapsibleCard';
 import { teamColor, formatTime } from '@/lib/formatters';
-import { Flame, Gauge, TrendingUp, Layers } from 'lucide-react';
+import { Flame, TrendingUp, Layers } from 'lucide-react';
 
 function TyreBadge({ compound }: { compound: string }) {
   const c = (compound || '').toUpperCase();
@@ -127,106 +127,98 @@ export default function RacePacePage() {
       {loading && <div className="text-center p-12 text-muted-foreground">Loading pace data...</div>}
 
       {driverPace.length > 0 && (
-        <Tabs defaultValue="pace">
-          <TabsList>
-            <TabsTrigger value="pace">Average Pace</TabsTrigger>
-            <TabsTrigger value="consistency">Consistency</TabsTrigger>
-            <TabsTrigger value="stints">Stint Analysis</TabsTrigger>
-          </TabsList>
-
+        <>
           {/* Average Pace Table */}
-          <TabsContent value="pace" className="mt-4">
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                <table className="w-full">
-                  <thead className="sticky top-0 bg-card z-10">
-                    <tr className="border-b border-border">
-                      <th className="text-left p-3 text-xs font-medium text-muted-foreground">Pos</th>
-                      <th className="text-left p-3 text-xs font-medium text-muted-foreground">Driver</th>
-                      <th className="text-right p-3 text-xs font-medium text-muted-foreground">Avg Pace</th>
-                      <th className="text-right p-3 text-xs font-medium text-muted-foreground">Best Lap</th>
-                      <th className="text-right p-3 text-xs font-medium text-muted-foreground">Worst Lap</th>
-                      <th className="text-right p-3 text-xs font-medium text-muted-foreground">Laps</th>
-                      <th className="text-center p-3 text-xs font-medium text-muted-foreground">Gap to Leader</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {driverPace.map((stat, i) => {
-                      const isLeader = i === 0;
-                      const gap = isLeader ? 0 : stat!.avg - driverPace[0]!.avg;
-                      return (
-                        <tr key={stat!.driver.driver_number} className={`border-b border-border hover:bg-muted/30 transition-colors text-sm ${i % 2 === 0 ? 'bg-muted/5' : ''}`}>
-                          <td className="p-3">
-                            <span className={`font-bold ${i < 3 ? 'text-lg' : ''}`}>
-                              {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
-                            </span>
-                          </td>
-                          <td className="p-3">
-                            <span className="flex items-center gap-2">
-                              <span className="w-2.5 h-2.5 rounded-full" style={{ background: teamColor(stat!.driver.team_colour) }} />
-                              <span className="font-medium">{stat!.driver.name_acronym}</span>
-                              <span className="text-xs text-muted-foreground hidden md:inline">{stat!.driver.full_name}</span>
-                            </span>
-                          </td>
-                          <td className="p-3 text-right font-mono font-bold">{formatTime(stat!.avg)}</td>
-                          <td className="p-3 text-right font-mono text-green-400">{formatTime(stat!.best)}</td>
-                          <td className="p-3 text-right font-mono text-red-400">{formatTime(stat!.worst)}</td>
-                          <td className="p-3 text-right">{stat!.count}</td>
-                          <td className="p-3 text-center font-mono">
-                            {isLeader ? (
-                              <span className="text-green-400">—</span>
-                            ) : (
-                              <span className="text-orange-400">+{gap.toFixed(3)}s</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          </TabsContent>
+          <CollapsibleCard title="Average Pace" subtitle="Race lap time averages per driver" icon={<Flame className="h-4 w-4 text-orange-500" />} defaultOpen>
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-card z-10">
+                  <tr className="border-b border-border">
+                    <th className="text-left p-3 text-xs font-medium text-muted-foreground">Pos</th>
+                    <th className="text-left p-3 text-xs font-medium text-muted-foreground">Driver</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Avg Pace</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Best Lap</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Worst Lap</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Laps</th>
+                    <th className="text-center p-3 text-xs font-medium text-muted-foreground">Gap to Leader</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {driverPace.map((stat, i) => {
+                    const isLeader = i === 0;
+                    const gap = isLeader ? 0 : stat!.avg - driverPace[0]!.avg;
+                    return (
+                      <tr key={stat!.driver.driver_number} className={`border-b border-border hover:bg-muted/30 transition-colors text-sm ${i % 2 === 0 ? 'bg-muted/5' : ''}`}>
+                        <td className="p-3">
+                          <span className={`font-bold ${i < 3 ? 'text-lg' : ''}`}>
+                            {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ background: teamColor(stat!.driver.team_colour) }} />
+                            <span className="font-medium">{stat!.driver.name_acronym}</span>
+                            <span className="text-xs text-muted-foreground hidden md:inline">{stat!.driver.full_name}</span>
+                          </span>
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold">{formatTime(stat!.avg)}</td>
+                        <td className="p-3 text-right font-mono text-green-400">{formatTime(stat!.best)}</td>
+                        <td className="p-3 text-right font-mono text-red-400">{formatTime(stat!.worst)}</td>
+                        <td className="p-3 text-right">{stat!.count}</td>
+                        <td className="p-3 text-center font-mono">
+                          {isLeader ? (
+                            <span className="text-green-400">—</span>
+                          ) : (
+                            <span className="text-orange-400">+{gap.toFixed(3)}s</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CollapsibleCard>
 
           {/* Consistency Analysis */}
-          <TabsContent value="consistency" className="mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              {/* Least consistent (highest std dev) */}
-              <Card className="p-5">
-                <h3 className="font-semibold flex items-center gap-2 mb-3">
-                  <TrendingUp className="h-4 w-4 text-red-500" />
-                  Least Consistent
-                </h3>
-                <div className="space-y-2">
-                  {[...driverPace].sort((a, b) => b!.stdDev - a!.stdDev).slice(0, 5).map(stat => (
-                    <div key={stat!.driver.driver_number} className="flex items-center gap-2 text-sm">
-                      <span className="w-2 h-2 rounded-full" style={{ background: teamColor(stat!.driver.team_colour) }} />
-                      <span className="flex-1 font-medium">{stat!.driver.name_acronym}</span>
-                      <span className="font-mono text-red-400">±{stat!.stdDev.toFixed(3)}s</span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-              {/* Most consistent (lowest std dev) */}
-              <Card className="p-5">
-                <h3 className="font-semibold flex items-center gap-2 mb-3">
-                  <TrendingUp className="h-4 w-4 text-green-500" />
-                  Most Consistent
-                </h3>
-                <div className="space-y-2">
-                  {driverPace.slice(0, 5).map(stat => (
-                    <div key={stat!.driver.driver_number} className="flex items-center gap-2 text-sm">
-                      <span className="w-2 h-2 rounded-full" style={{ background: teamColor(stat!.driver.team_colour) }} />
-                      <span className="flex-1 font-medium">{stat!.driver.name_acronym}</span>
-                      <span className="font-mono text-green-400">±{stat!.stdDev.toFixed(3)}s</span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
+          <CollapsibleCard title="Consistency" subtitle="Lap time consistency analysis" icon={<TrendingUp className="h-4 w-4 text-green-500" />}>
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Least consistent */}
+                <Card className="p-5">
+                  <h3 className="font-semibold flex items-center gap-2 mb-3">
+                    <TrendingUp className="h-4 w-4 text-red-500" />
+                    Least Consistent
+                  </h3>
+                  <div className="space-y-2">
+                    {[...driverPace].sort((a, b) => b!.stdDev - a!.stdDev).slice(0, 5).map(stat => (
+                      <div key={stat!.driver.driver_number} className="flex items-center gap-2 text-sm">
+                        <span className="w-2 h-2 rounded-full" style={{ background: teamColor(stat!.driver.team_colour) }} />
+                        <span className="flex-1 font-medium">{stat!.driver.name_acronym}</span>
+                        <span className="font-mono text-red-400">±{stat!.stdDev.toFixed(3)}s</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+                {/* Most consistent */}
+                <Card className="p-5">
+                  <h3 className="font-semibold flex items-center gap-2 mb-3">
+                    <TrendingUp className="h-4 w-4 text-green-500" />
+                    Most Consistent
+                  </h3>
+                  <div className="space-y-2">
+                    {driverPace.slice(0, 5).map(stat => (
+                      <div key={stat!.driver.driver_number} className="flex items-center gap-2 text-sm">
+                        <span className="w-2 h-2 rounded-full" style={{ background: teamColor(stat!.driver.team_colour) }} />
+                        <span className="flex-1 font-medium">{stat!.driver.name_acronym}</span>
+                        <span className="font-mono text-green-400">±{stat!.stdDev.toFixed(3)}s</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </div>
 
-            {/* All consistency table */}
-            <Card className="overflow-hidden">
+              {/* All consistency table */}
               <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                 <table className="w-full">
                   <thead className="sticky top-0 bg-card z-10">
@@ -260,12 +252,12 @@ export default function RacePacePage() {
                   </tbody>
                 </table>
               </div>
-            </Card>
-          </TabsContent>
+            </div>
+          </CollapsibleCard>
 
           {/* Stint Analysis */}
-          <TabsContent value="stints" className="mt-4">
-            <div className="space-y-3">
+          <CollapsibleCard title="Stint Analysis" subtitle="Tyre stint breakdown per driver" icon={<Layers className="h-4 w-4 text-blue-500" />}>
+            <div className="p-4 space-y-3">
               {driverStints.map(({ driver, stints: ds }) => {
                 const totalLaps = ds.reduce((s, st) => s + (st.lap_end - st.lap_start + 1), 0);
                 return (
@@ -312,8 +304,8 @@ export default function RacePacePage() {
                 );
               })}
             </div>
-          </TabsContent>
-        </Tabs>
+          </CollapsibleCard>
+        </>
       )}
     </div>
   );

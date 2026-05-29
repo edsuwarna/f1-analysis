@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { getChampionship, getSeasonProgression, getDriverForm, getSectorTrends, type StandingRow, type SeasonProgressionRound, type DriverFormRow, type SectorTrend } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import CollapsibleCard from '@/components/CollapsibleCard';
 import { teamColor, formatTime, flagEmoji } from '@/lib/formatters';
-import { BarChart3, TrendingUp, Activity, Radar, CircleDot, Gauge } from 'lucide-react';
+import { BarChart3, TrendingUp, Activity, Gauge } from 'lucide-react';
 
 export default function DriverStatsPage() {
   const [drivers, setDrivers] = useState<StandingRow[]>([]);
@@ -97,7 +97,19 @@ export default function DriverStatsPage() {
           <Card className="p-5 bg-gradient-to-r from-card to-muted/30">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 bg-muted flex items-center justify-center" style={{ color: teamColor(driver.team_colour) }}>
-                <span className="text-xl font-bold">{driver.name_acronym?.charAt(0) || '?'}</span>
+                {driver.headshot_url ? (
+                  <img
+                    src={driver.headshot_url}
+                    alt={driver.full_name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      (e.target as HTMLImageElement).parentElement!.innerHTML = `<span class="text-xl font-bold">${driver.name_acronym?.charAt(0) || '?'}</span>`;
+                    }}
+                  />
+                ) : (
+                  <span className="text-xl font-bold">{driver.name_acronym?.charAt(0) || '?'}</span>
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold truncate">{driver.full_name}</h2>
@@ -117,186 +129,156 @@ export default function DriverStatsPage() {
             </div>
           </Card>
 
-          <Tabs defaultValue="season-progress">
-            <TabsList className="overflow-x-auto flex-nowrap w-full justify-start">
-              <TabsTrigger value="season-progress" className="whitespace-nowrap">Season Progress</TabsTrigger>
-              <TabsTrigger value="form" className="whitespace-nowrap">Race Results</TabsTrigger>
-              <TabsTrigger value="sectors" className="whitespace-nowrap">Sector Analysis</TabsTrigger>
-              <TabsTrigger value="overview" className="whitespace-nowrap">Overview</TabsTrigger>
-            </TabsList>
-
-            {/* Season Progress - Points Accumulation Table */}
-            <TabsContent value="season-progress" className="mt-4">
-              <Card>
-                <div className="p-4 border-b border-border">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-green-500" />
-                    Points Progression — 2026 Season
-                  </h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">Round</th>
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">Race</th>
-                        <th className="text-right p-3 text-xs font-medium text-muted-foreground">Race Pts</th>
-                        <th className="text-right p-3 text-xs font-medium text-muted-foreground">Sprint Pts</th>
-                        <th className="text-right p-3 text-xs font-medium text-muted-foreground">Total</th>
-                        <th className="text-right p-3 text-xs font-medium text-muted-foreground">Cumulative</th>
-                        <th className="text-center p-3 text-xs font-medium text-muted-foreground" style={{ width: '30%' }}>Progress</th>
+          <CollapsibleCard title="Season Progress" subtitle="Points accumulation across 2026 rounds" icon={<TrendingUp className="h-4 w-4 text-green-500" />} defaultOpen>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left p-3 text-xs font-medium text-muted-foreground">Round</th>
+                    <th className="text-left p-3 text-xs font-medium text-muted-foreground">Race</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Race Pts</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Sprint Pts</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Total</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Cumulative</th>
+                    <th className="text-center p-3 text-xs font-medium text-muted-foreground" style={{ width: '30%' }}>Progress</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {driverProgress.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                        No progression data available for this driver
+                      </td>
+                    </tr>
+                  ) : (
+                    driverProgress.map((entry, i) => (
+                      <tr key={entry!.round} className="border-b border-border hover:bg-muted/20 text-sm">
+                        <td className="p-3 font-bold text-xs text-muted-foreground">R{entry!.round}</td>
+                        <td className="p-3">{entry!.race_name}</td>
+                        <td className="p-3 text-right font-mono font-semibold">{entry!.race_points}</td>
+                        <td className="p-3 text-right font-mono">{entry!.sprint_points || '-'}</td>
+                        <td className="p-3 text-right font-mono font-semibold">{entry!.round_points}</td>
+                        <td className="p-3 text-right font-mono font-bold text-lg">
+                          {entry!.cumulative_points}
+                        </td>
+                        <td className="p-3">
+                          <div className="w-full bg-secondary rounded-full h-2.5">
+                            <div
+                              className="h-2.5 rounded-full transition-all duration-500"
+                              style={{
+                                width: `${(entry!.cumulative_points / maxPoints) * 100}%`,
+                                background: teamColor(driver.team_colour),
+                                opacity: 0.5 + (i / driverProgress.length) * 0.5,
+                              }}
+                            />
+                          </div>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {driverProgress.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="p-8 text-center text-muted-foreground">
-                            No progression data available for this driver
-                          </td>
-                        </tr>
-                      ) : (
-                        driverProgress.map((entry, i) => (
-                          <tr key={entry!.round} className="border-b border-border hover:bg-muted/20 text-sm">
-                            <td className="p-3 font-bold text-xs text-muted-foreground">R{entry!.round}</td>
-                            <td className="p-3">{entry!.race_name}</td>
-                            <td className="p-3 text-right font-mono font-semibold">{entry!.race_points}</td>
-                            <td className="p-3 text-right font-mono">{entry!.sprint_points || '-'}</td>
-                            <td className="p-3 text-right font-mono font-semibold">{entry!.round_points}</td>
-                            <td className="p-3 text-right font-mono font-bold text-lg">
-                              {entry!.cumulative_points}
-                            </td>
-                            <td className="p-3">
-                              <div className="w-full bg-secondary rounded-full h-2.5">
-                                <div
-                                  className="h-2.5 rounded-full transition-all duration-500"
-                                  style={{
-                                    width: `${(entry!.cumulative_points / maxPoints) * 100}%`,
-                                    background: teamColor(driver.team_colour),
-                                    opacity: 0.5 + (i / driverProgress.length) * 0.5,
-                                  }}
-                                />
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            </TabsContent>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CollapsibleCard>
 
-            {/* Race Results / Form */}
-            <TabsContent value="form" className="mt-4">
-              <Card>
-                <div className="p-4 border-b border-border">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-blue-500" />
-                    Race Results
-                  </h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">Round</th>
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">Race</th>
-                        <th className="text-center p-3 text-xs font-medium text-muted-foreground">Position</th>
-                        <th className="text-right p-3 text-xs font-medium text-muted-foreground">Points</th>
+          {/* Race Results / Form */}
+          <CollapsibleCard title="Race Results" subtitle="Finishing positions per round" icon={<Activity className="h-4 w-4 text-blue-500" />}>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left p-3 text-xs font-medium text-muted-foreground">Round</th>
+                    <th className="text-left p-3 text-xs font-medium text-muted-foreground">Race</th>
+                    <th className="text-center p-3 text-xs font-medium text-muted-foreground">Position</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Points</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {progression.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-muted-foreground">
+                        No race data available
+                      </td>
+                    </tr>
+                  ) : (
+                    progression.map((round, i) => {
+                      const result = round.standings.find(s => s.driver_number === driverNum);
+                      if (!result) return (
+                        <tr key={i} className="border-b border-border text-sm text-muted-foreground">
+                          <td className="p-3 font-bold text-xs">R{round.round}</td>
+                          <td className="p-3">{round.race_name}</td>
+                          <td className="p-3 text-center">—</td>
+                          <td className="p-3 text-right">—</td>
+                        </tr>
+                      );
+                      return (
+                        <tr key={i} className="border-b border-border hover:bg-muted/20 text-sm">
+                          <td className="p-3 font-bold text-xs text-muted-foreground">R{round.round}</td>
+                          <td className="p-3">{round.race_name}</td>
+                          <td className="p-3 text-center">
+                            <Badge variant={result.race_points >= 25 ? 'default' : 'outline'}
+                              className={
+                                result.race_points >= 25 ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' :
+                                result.race_points >= 18 ? 'bg-gray-400/20 text-gray-400 border-gray-400/30' :
+                                result.race_points >= 15 ? 'bg-amber-600/20 text-amber-600 border-amber-600/30' :
+                                result.race_points > 0 ? 'bg-green-500/10 text-green-400 border-green-500/30' :
+                                'bg-red-500/10 text-red-400 border-red-500/30'
+                              }
+                            >
+                              {result.race_points >= 25 ? '🥇 1st' :
+                                result.race_points >= 18 ? '🥈 2nd' :
+                                result.race_points >= 15 ? '🥉 3rd' :
+                                result.race_points > 0 ? `${(() => {
+                                  const sorted = round.standings.sort((a, b) => b.race_points - a.race_points);
+                                  return sorted.findIndex(s => s.driver_number === driverNum) + 1;
+                                })()}th` : 'DNF'}
+                            </Badge>
+                          </td>
+                          <td className="p-3 text-right font-mono font-semibold">{result.race_points}</td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CollapsibleCard>
+
+          {/* Sector Analysis */}
+          <CollapsibleCard title="Sector Analysis" subtitle="Best sector times by race" icon={<Gauge className="h-4 w-4 text-purple-500" />}>
+            {driverSectors.length === 0 ? (
+              <div className="p-6 text-center text-muted-foreground">No sector data available</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left p-2 text-xs font-medium text-muted-foreground">Race</th>
+                      <th className="text-right p-2 text-xs font-medium text-muted-foreground">S1</th>
+                      <th className="text-right p-2 text-xs font-medium text-muted-foreground">S2</th>
+                      <th className="text-right p-2 text-xs font-medium text-muted-foreground">S3</th>
+                      <th className="text-right p-2 text-xs font-medium text-muted-foreground">Best Lap</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {driverSectors.sort((a, b) => a.meeting_id - b.meeting_id).map((s, i) => (
+                      <tr key={i} className="border-b border-border hover:bg-muted/20">
+                        <td className="p-2 text-muted-foreground">{s.race_name}</td>
+                        <td className="p-2 text-right font-mono">{formatTime(s.best_sector_1)}</td>
+                        <td className="p-2 text-right font-mono">{formatTime(s.best_sector_2)}</td>
+                        <td className="p-2 text-right font-mono">{formatTime(s.best_sector_3)}</td>
+                        <td className="p-2 text-right font-mono font-bold text-green-400">{formatTime(s.best_lap)}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {progression.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="p-8 text-center text-muted-foreground">
-                            No race data available
-                          </td>
-                        </tr>
-                      ) : (
-                        progression.map((round, i) => {
-                          const result = round.standings.find(s => s.driver_number === driverNum);
-                          if (!result) return (
-                            <tr key={i} className="border-b border-border text-sm text-muted-foreground">
-                              <td className="p-3 font-bold text-xs">R{round.round}</td>
-                              <td className="p-3">{round.race_name}</td>
-                              <td className="p-3 text-center">—</td>
-                              <td className="p-3 text-right">—</td>
-                            </tr>
-                          );
-                          return (
-                            <tr key={i} className="border-b border-border hover:bg-muted/20 text-sm">
-                              <td className="p-3 font-bold text-xs text-muted-foreground">R{round.round}</td>
-                              <td className="p-3">{round.race_name}</td>
-                              <td className="p-3 text-center">
-                                <Badge variant={result.race_points >= 25 ? 'default' : 'outline'}
-                                  className={
-                                    result.race_points >= 25 ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' :
-                                    result.race_points >= 18 ? 'bg-gray-400/20 text-gray-400 border-gray-400/30' :
-                                    result.race_points >= 15 ? 'bg-amber-600/20 text-amber-600 border-amber-600/30' :
-                                    result.race_points > 0 ? 'bg-green-500/10 text-green-400 border-green-500/30' :
-                                    'bg-red-500/10 text-red-400 border-red-500/30'
-                                  }
-                                >
-                                  {result.race_points >= 25 ? '🥇 1st' :
-                                    result.race_points >= 18 ? '🥈 2nd' :
-                                    result.race_points >= 15 ? '🥉 3rd' :
-                                    result.race_points > 0 ? `${(() => {
-                                      const sorted = round.standings.sort((a, b) => b.race_points - a.race_points);
-                                      return sorted.findIndex(s => s.driver_number === driverNum) + 1;
-                                    })()}th` : 'DNF'}
-                                </Badge>
-                              </td>
-                              <td className="p-3 text-right font-mono font-semibold">{result.race_points}</td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            </TabsContent>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CollapsibleCard>
 
-            {/* Sector Analysis */}
-            <TabsContent value="sectors" className="mt-4">
-              <Card className="p-5">
-                <h3 className="font-semibold mb-4 flex items-center gap-2">
-                  <Radar className="h-4 w-4 text-purple-500" />
-                  Best Sector Times by Race
-                </h3>
-                {driverSectors.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-6">No sector data available</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left p-2 text-xs font-medium text-muted-foreground">Race</th>
-                          <th className="text-right p-2 text-xs font-medium text-muted-foreground">S1</th>
-                          <th className="text-right p-2 text-xs font-medium text-muted-foreground">S2</th>
-                          <th className="text-right p-2 text-xs font-medium text-muted-foreground">S3</th>
-                          <th className="text-right p-2 text-xs font-medium text-muted-foreground">Best Lap</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {driverSectors.sort((a, b) => a.meeting_id - b.meeting_id).map((s, i) => (
-                          <tr key={i} className="border-b border-border hover:bg-muted/20">
-                            <td className="p-2 text-muted-foreground">{s.race_name}</td>
-                            <td className="p-2 text-right font-mono">{formatTime(s.best_sector_1)}</td>
-                            <td className="p-2 text-right font-mono">{formatTime(s.best_sector_2)}</td>
-                            <td className="p-2 text-right font-mono">{formatTime(s.best_sector_3)}</td>
-                            <td className="p-2 text-right font-mono font-bold text-green-400">{formatTime(s.best_lap)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </Card>
-            </TabsContent>
-
-            {/* Overview */}
-            <TabsContent value="overview" className="mt-4">
+          {/* Overview */}
+          <CollapsibleCard title="Overview" subtitle="Quick stats & navigation" icon={<BarChart3 className="h-4 w-4 text-purple-500" />}>
+            <div className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="p-5 text-center">
                   <Gauge className="h-8 w-8 text-green-500 mx-auto mb-2" />
@@ -311,7 +293,7 @@ export default function DriverStatsPage() {
                   </p>
                 </Card>
                 <Card className="p-5 text-center">
-                  <CircleDot className="h-8 w-8 text-blue-500 mx-auto mb-2" />
+                  <TrendingUp className="h-8 w-8 text-blue-500 mx-auto mb-2" />
                   <h3 className="font-semibold">Head to Head</h3>
                   <p className="text-xs text-muted-foreground mt-1">
                     Compare with teammates & rivals
@@ -337,7 +319,7 @@ export default function DriverStatsPage() {
               </div>
 
               {driverProgress.length > 0 && (
-                <Card className="p-5 mt-4">
+                <Card className="p-5">
                   <h3 className="font-semibold mb-3 flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-green-500" />
                     Points Summary
@@ -371,8 +353,8 @@ export default function DriverStatsPage() {
                   </div>
                 </Card>
               )}
-            </TabsContent>
-          </Tabs>
+            </div>
+          </CollapsibleCard>
         </>
       )}
 

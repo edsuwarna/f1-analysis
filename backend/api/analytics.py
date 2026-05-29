@@ -159,7 +159,8 @@ async def championship_standings(
             sd.name_acronym,
             sd.team_name,
             sd.team_colour,
-            sd.country_code AS driver_country_code
+            sd.country_code AS driver_country_code,
+            sd.headshot_url
         FROM meetings m
         JOIN sessions s ON s.meeting_id = m.id
         JOIN laps l ON l.session_id = s.id
@@ -217,6 +218,7 @@ async def championship_standings(
                 "team_colour": team_colour,
                 "country_code": ((r.driver_country_code or "").upper()
                                  or DRIVER_COUNTRIES.get(driver_num, "XX")),
+                "headshot_url": r.headshot_url or "",
             }
 
         race_results[(r.race_name, r.meeting_id)].append({
@@ -276,6 +278,7 @@ async def championship_standings(
             "team_name": info["team_name"],
             "team_colour": info["team_colour"],
             "country_code": info.get("country_code", ""),
+            "headshot_url": info.get("headshot_url", ""),
             "points": pts,
             "wins": driver_wins.get(dn, 0),
         }

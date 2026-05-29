@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getMeetings, getSessions, getPitStops, getSessionDrivers, getPitStopChampionship, type Meeting, type Session, type PitStop, type SessionDriver } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import CollapsibleCard from '@/components/CollapsibleCard';
 import { teamColor } from '@/lib/formatters';
 import { Flag, Timer, Zap, Gauge, Building2 } from 'lucide-react';
 
@@ -198,213 +198,192 @@ export default function PitStopsPage() {
             </Card>
           </div>
 
-          <Tabs defaultValue="driver-stats">
-            <TabsList className="overflow-x-auto flex-nowrap w-full justify-start">
-              <TabsTrigger value="driver-stats" className="whitespace-nowrap">Per Driver</TabsTrigger>
-              <TabsTrigger value="fastest" className="whitespace-nowrap">Fastest Stops</TabsTrigger>
-              <TabsTrigger value="all" className="whitespace-nowrap">All Stops</TabsTrigger>
-              {teamChampionship && <TabsTrigger value="teams" className="whitespace-nowrap">Team Standings</TabsTrigger>}
-            </TabsList>
+          {/* Per Driver Stats */}
+          <CollapsibleCard title="Per Driver" subtitle="Pit stop statistics per driver" icon={<Zap className="h-4 w-4 text-green-500" />} defaultOpen>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left p-3 text-xs font-medium text-muted-foreground">Driver</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Stops</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Fastest</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Average</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Total Pit Time</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Stint</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {driverPitStats.map((stat, i) => (
+                    <tr key={stat!.driver.driver_number} className={`border-b border-border hover:bg-muted/30 transition-colors text-sm ${i % 2 === 0 ? 'bg-muted/10' : ''}`}>
+                      <td className="p-3">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full" style={{ background: teamColor(stat!.driver.team_colour) }} />
+                          <span className="font-medium">{stat!.driver.full_name}</span>
+                          <span className="text-xs text-muted-foreground">({stat!.driver.name_acronym})</span>
+                        </span>
+                      </td>
+                      <td className="p-3 text-right font-semibold">{stat!.stops}</td>
+                      <td className="p-3 text-right font-mono text-green-400">{stat!.fastest.toFixed(1)}s</td>
+                      <td className="p-3 text-right font-mono">{stat!.avg.toFixed(1)}s</td>
+                      <td className="p-3 text-right font-mono">{stat!.total.toFixed(0)}s</td>
+                      <td className="p-3 text-right">
+                        <span className="inline-flex gap-1">
+                          {stat!.laps.map((lap, li) => (
+                            <Badge key={li} variant="outline" className="text-[10px] font-mono">
+                              L{lap}
+                            </Badge>
+                          ))}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CollapsibleCard>
 
-            {/* Per Driver Stats */}
-            <TabsContent value="driver-stats" className="mt-4">
-              <Card className="overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">Driver</th>
-                        <th className="text-right p-3 text-xs font-medium text-muted-foreground">Stops</th>
-                        <th className="text-right p-3 text-xs font-medium text-muted-foreground">Fastest</th>
-                        <th className="text-right p-3 text-xs font-medium text-muted-foreground">Average</th>
-                        <th className="text-right p-3 text-xs font-medium text-muted-foreground">Total Pit Time</th>
-                        <th className="text-right p-3 text-xs font-medium text-muted-foreground">Stint</th>
+          {/* Fastest Stops */}
+          <CollapsibleCard title="Fastest Stops" subtitle="Top 10 quickest pit stops" icon={<Timer className="h-4 w-4 text-blue-500" />}>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left p-3 text-xs font-medium text-muted-foreground">#</th>
+                    <th className="text-left p-3 text-xs font-medium text-muted-foreground">Driver</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Lap</th>
+                    <th className="text-right p-3 text-xs font-medium text-muted-foreground">Duration</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fastestStops.map((p, i) => {
+                    const d = driverMap[p.driver_number];
+                    return (
+                      <tr key={i} className="border-b border-border hover:bg-muted/30 transition-colors text-sm">
+                        <td className="p-3">
+                          <span className={`font-bold ${i === 0 ? 'text-yellow-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                            {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full" style={{ background: teamColor(d?.team_colour) }} />
+                            {d?.name_acronym || p.driver_number}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right font-mono">L{p.lap_number}</td>
+                        <td className="p-3 text-right font-mono font-bold text-green-400">
+                          {p.pit_duration?.toFixed(2)}s
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {driverPitStats.map((stat, i) => (
-                        <tr key={stat!.driver.driver_number} className={`border-b border-border hover:bg-muted/30 transition-colors text-sm ${i % 2 === 0 ? 'bg-muted/10' : ''}`}>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CollapsibleCard>
+
+          {/* All Stops */}
+          <CollapsibleCard title="All Stops" subtitle="Every pit stop in this session" icon={<Flag className="h-4 w-4 text-orange-500" />}>
+            <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-card z-10">
+                  <tr className="border-b border-border">
+                    <th className="text-left p-2 text-xs font-medium text-muted-foreground">Driver</th>
+                    <th className="text-right p-2 text-xs font-medium text-muted-foreground">Lap</th>
+                    <th className="text-right p-2 text-xs font-medium text-muted-foreground">Duration</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pits.sort((a, b) => a.lap_number - b.lap_number).map((p, i) => {
+                    const d = driverMap[p.driver_number];
+                    return (
+                      <tr key={i} className="border-b border-border hover:bg-muted/30 transition-colors text-sm">
+                        <td className="p-2">
+                          <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full" style={{ background: teamColor(d?.team_colour) }} />
+                            {d?.name_acronym || p.driver_number}
+                          </span>
+                        </td>
+                        <td className="p-2 text-right font-mono">L{p.lap_number}</td>
+                        <td className={`p-2 text-right font-mono ${(p.pit_duration || 0) <= 20 ? 'text-green-400 font-bold' : ''}`}>
+                          {p.pit_duration?.toFixed(2)}s
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CollapsibleCard>
+
+          {/* Team Standings */}
+          {teamChampionship && (
+            <CollapsibleCard
+              title="Pit Stop Championship"
+              subtitle={`${teamChampionship.year} — ${teamChampionship.total_stops} total stops across ${teamChampionship.total_teams} teams`}
+              icon={<Building2 className="h-4 w-4 text-blue-500" />}
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left p-3 text-xs font-medium text-muted-foreground">Pos</th>
+                      <th className="text-left p-3 text-xs font-medium text-muted-foreground">Team</th>
+                      <th className="text-right p-3 text-xs font-medium text-muted-foreground">Stops</th>
+                      <th className="text-right p-3 text-xs font-medium text-muted-foreground">Avg</th>
+                      <th className="text-right p-3 text-xs font-medium text-muted-foreground">Fastest</th>
+                      <th className="text-right p-3 text-xs font-medium text-muted-foreground">Slowest</th>
+                      <th className="text-right p-3 text-xs font-medium text-muted-foreground">σ</th>
+                      <th className="text-right p-3 text-xs font-medium text-muted-foreground">Consistency</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(teamChampionship.teams || [])
+                      .sort((a: any, b: any) => a.avg_pit_duration - b.avg_pit_duration)
+                      .map((team: any, i: number) => (
+                        <tr key={team.team_name} className={`border-b border-border text-sm ${i < 3 ? 'bg-green-500/5' : 'hover:bg-muted/30'}`}>
                           <td className="p-3">
-                            <span className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full" style={{ background: teamColor(stat!.driver.team_colour) }} />
-                              <span className="font-medium">{stat!.driver.full_name}</span>
-                              <span className="text-xs text-muted-foreground">({stat!.driver.name_acronym})</span>
+                            <span className={`font-bold ${i === 0 ? 'text-yellow-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                              {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
                             </span>
                           </td>
-                          <td className="p-3 text-right font-semibold">{stat!.stops}</td>
-                          <td className="p-3 text-right font-mono text-green-400">{stat!.fastest.toFixed(1)}s</td>
-                          <td className="p-3 text-right font-mono">{stat!.avg.toFixed(1)}s</td>
-                          <td className="p-3 text-right font-mono">{stat!.total.toFixed(0)}s</td>
-                          <td className="p-3 text-right">
-                            <span className="inline-flex gap-1">
-                              {stat!.laps.map((lap, li) => (
-                                <Badge key={li} variant="outline" className="text-[10px] font-mono">
-                                  L{lap}
-                                </Badge>
-                              ))}
+                          <td className="p-3">
+                            <span className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full" style={{ background: teamColor(team.team_colour) }} />
+                              <span className="font-medium">{team.team_name}</span>
                             </span>
+                          </td>
+                          <td className="p-3 text-right font-semibold">{team.total_stops}</td>
+                          <td className="p-3 text-right font-mono">{team.avg_pit_duration.toFixed(2)}s</td>
+                          <td className="p-3 text-right font-mono text-green-400">{team.fastest_stop.toFixed(1)}s</td>
+                          <td className="p-3 text-right font-mono text-red-400">{team.slowest_stop.toFixed(1)}s</td>
+                          <td className="p-3 text-right font-mono text-muted-foreground">{team.std_dev.toFixed(2)}</td>
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="w-16 bg-secondary rounded-full h-2">
+                                <div className="h-2 rounded-full" style={{
+                                  width: `${Math.max(0, Math.min(100, team.consistency))}%`,
+                                  background: team.consistency >= 85 ? '#22c55e' : team.consistency >= 75 ? '#eab308' : '#ef4444',
+                                }} />
+                              </div>
+                              <span className={`text-xs font-mono ${team.consistency >= 85 ? 'text-green-400' : team.consistency >= 75 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                {team.consistency.toFixed(1)}%
+                              </span>
+                            </div>
                           </td>
                         </tr>
                       ))}
-                    </tbody>
-                  </table>
+                  </tbody>
+                </table>
+              </div>
+              {teamChampionship.overall_fastest_stop && (
+                <div className="p-3 border-t border-border text-xs text-muted-foreground">
+                  🏆 Fastest stop: <span className="font-semibold text-foreground">{teamChampionship.overall_fastest_stop[1]}</span> ({teamChampionship.overall_fastest_stop[0]}s) —
+                  L{teamChampionship.overall_fastest_stop[2]?.lap_number} by {teamChampionship.overall_fastest_stop[2]?.acronym} at {teamChampionship.overall_fastest_stop[2]?.race_name}
                 </div>
-              </Card>
-            </TabsContent>
-
-            {/* Fastest Stops */}
-            <TabsContent value="fastest" className="mt-4">
-              <Card className="overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">#</th>
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">Driver</th>
-                        <th className="text-right p-3 text-xs font-medium text-muted-foreground">Lap</th>
-                        <th className="text-right p-3 text-xs font-medium text-muted-foreground">Duration</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {fastestStops.map((p, i) => {
-                        const d = driverMap[p.driver_number];
-                        return (
-                          <tr key={i} className="border-b border-border hover:bg-muted/30 transition-colors text-sm">
-                            <td className="p-3">
-                              <span className={`font-bold ${i === 0 ? 'text-yellow-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                                {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
-                              </span>
-                            </td>
-                            <td className="p-3">
-                              <span className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full" style={{ background: teamColor(d?.team_colour) }} />
-                                {d?.name_acronym || p.driver_number}
-                              </span>
-                            </td>
-                            <td className="p-3 text-right font-mono">L{p.lap_number}</td>
-                            <td className="p-3 text-right font-mono font-bold text-green-400">
-                              {p.pit_duration?.toFixed(2)}s
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            </TabsContent>
-
-            {/* All Stops */}
-            <TabsContent value="all" className="mt-4">
-              <Card className="overflow-hidden">
-                <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-                  <table className="w-full">
-                    <thead className="sticky top-0 bg-card z-10">
-                      <tr className="border-b border-border">
-                        <th className="text-left p-2 text-xs font-medium text-muted-foreground">Driver</th>
-                        <th className="text-right p-2 text-xs font-medium text-muted-foreground">Lap</th>
-                        <th className="text-right p-2 text-xs font-medium text-muted-foreground">Duration</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pits.sort((a, b) => a.lap_number - b.lap_number).map((p, i) => {
-                        const d = driverMap[p.driver_number];
-                        return (
-                          <tr key={i} className="border-b border-border hover:bg-muted/30 transition-colors text-sm">
-                            <td className="p-2">
-                              <span className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full" style={{ background: teamColor(d?.team_colour) }} />
-                                {d?.name_acronym || p.driver_number}
-                              </span>
-                            </td>
-                            <td className="p-2 text-right font-mono">L{p.lap_number}</td>
-                            <td className={`p-2 text-right font-mono ${(p.pit_duration || 0) <= 20 ? 'text-green-400 font-bold' : ''}`}>
-                              {p.pit_duration?.toFixed(2)}s
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            </TabsContent>
-            {/* Team Standings */}
-            {teamChampionship && (
-              <TabsContent value="teams" className="mt-4">
-                <Card className="overflow-hidden">
-                  <div className="p-4 border-b border-border">
-                    <h3 className="font-semibold flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-blue-500" />
-                      Pit Stop Championship — {teamChampionship.year}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {teamChampionship.total_stops} total pit stops across {teamChampionship.total_teams} teams
-                    </p>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left p-3 text-xs font-medium text-muted-foreground">Pos</th>
-                          <th className="text-left p-3 text-xs font-medium text-muted-foreground">Team</th>
-                          <th className="text-right p-3 text-xs font-medium text-muted-foreground">Stops</th>
-                          <th className="text-right p-3 text-xs font-medium text-muted-foreground">Avg</th>
-                          <th className="text-right p-3 text-xs font-medium text-muted-foreground">Fastest</th>
-                          <th className="text-right p-3 text-xs font-medium text-muted-foreground">Slowest</th>
-                          <th className="text-right p-3 text-xs font-medium text-muted-foreground">σ</th>
-                          <th className="text-right p-3 text-xs font-medium text-muted-foreground">Consistency</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(teamChampionship.teams || [])
-                          .sort((a: any, b: any) => a.avg_pit_duration - b.avg_pit_duration)
-                          .map((team: any, i: number) => (
-                            <tr key={team.team_name} className={`border-b border-border text-sm ${i < 3 ? 'bg-green-500/5' : 'hover:bg-muted/30'}`}>
-                              <td className="p-3">
-                                <span className={`font-bold ${i === 0 ? 'text-yellow-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                                  {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
-                                </span>
-                              </td>
-                              <td className="p-3">
-                                <span className="flex items-center gap-2">
-                                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: teamColor(team.team_colour) }} />
-                                  <span className="font-medium">{team.team_name}</span>
-                                </span>
-                              </td>
-                              <td className="p-3 text-right font-semibold">{team.total_stops}</td>
-                              <td className="p-3 text-right font-mono">{team.avg_pit_duration.toFixed(2)}s</td>
-                              <td className="p-3 text-right font-mono text-green-400">{team.fastest_stop.toFixed(1)}s</td>
-                              <td className="p-3 text-right font-mono text-red-400">{team.slowest_stop.toFixed(1)}s</td>
-                              <td className="p-3 text-right font-mono text-muted-foreground">{team.std_dev.toFixed(2)}</td>
-                              <td className="p-3 text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <div className="w-16 bg-secondary rounded-full h-2">
-                                    <div className="h-2 rounded-full" style={{
-                                      width: `${Math.max(0, Math.min(100, team.consistency))}%`,
-                                      background: team.consistency >= 85 ? '#22c55e' : team.consistency >= 75 ? '#eab308' : '#ef4444',
-                                    }} />
-                                  </div>
-                                  <span className={`text-xs font-mono ${team.consistency >= 85 ? 'text-green-400' : team.consistency >= 75 ? 'text-yellow-400' : 'text-red-400'}`}>
-                                    {team.consistency.toFixed(1)}%
-                                  </span>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {teamChampionship.overall_fastest_stop && (
-                    <div className="p-3 border-t border-border text-xs text-muted-foreground">
-                      🏆 Fastest stop: <span className="font-semibold text-foreground">{teamChampionship.overall_fastest_stop[1]}</span> ({teamChampionship.overall_fastest_stop[0]}s) —
-                      L{teamChampionship.overall_fastest_stop[2]?.lap_number} by {teamChampionship.overall_fastest_stop[2]?.acronym} at {teamChampionship.overall_fastest_stop[2]?.race_name}
-                    </div>
-                  )}
-                </Card>
-              </TabsContent>
-            )}
-          </Tabs>
+              )}
+            </CollapsibleCard>
+          )}
         </>
       )}
     </div>
