@@ -190,6 +190,12 @@ function AppLayoutContent() {
             } />
           </Routes>
         </main>
+
+        {/* Footer: Attribution & Disclaimer */}
+        <footer className="border-t border-border px-6 py-4 text-center text-[11px] text-muted-foreground/60">
+          <span>Data from <a href="https://openf1.org/" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground underline underline-offset-2">OpenF1 API</a>
+          . Fan project — not affiliated with Formula 1 or any team.</span>
+        </footer>
       </SidebarInset>
     </div>
   );

@@ -24,6 +24,7 @@ import {
   ChevronDown, CircuitBoard, Activity, GitCompare,
   Download, ExternalLink, Trophy, RefreshCw,
 } from 'lucide-react';
+import CircuitMap from '@/components/CircuitMap';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
@@ -620,8 +621,15 @@ export default function SessionDetailPage() {
                 <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: teamColor(d.team_colour) }} />
               </div>
               {d.headshot_url ? (
-                <img src={d.headshot_url} alt={d.name_acronym} className="w-8 h-8 rounded-full mx-auto mb-0.5 object-cover" loading="lazy" />
-              ) : null}
+                <img src={d.headshot_url} alt={d.name_acronym} className="w-8 h-8 rounded-full mx-auto mb-0.5 object-cover" loading="lazy" onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                  (e.target as HTMLImageElement).parentElement!.innerHTML = `<span class="font-bold text-xs" style="color:${teamColor(d.team_colour)}">${d.name_acronym?.[0] || '?'}</span>`;
+                }} />
+              ) : (
+                <div className="w-8 h-8 rounded-full mx-auto mb-0.5 bg-muted flex items-center justify-center">
+                  <span className="font-bold text-xs" style={{ color: teamColor(d.team_colour) }}>{d.name_acronym?.[0] || '?'}</span>
+                </div>
+              )}
               <p className="font-bold text-xs">{d.name_acronym}</p>
               <p className="text-[10px] text-muted-foreground truncate">{d.team_name}</p>
               <p className="text-[9px] text-muted-foreground/60 mt-0.5">#{d.driver_number}</p>
@@ -642,13 +650,9 @@ export default function SessionDetailPage() {
           <div className="text-center py-6 text-muted-foreground text-sm">Loading circuit info...</div>
         ) : circuitInfo?.circuit_name ? (
           <div className="flex flex-col lg:flex-row gap-4">
-            {circuitInfo.image_url && (
-              <div className="flex-shrink-0">
-                <img src={circuitInfo.image_url} alt={circuitInfo.circuit_name}
-                  className="w-full max-w-[400px] rounded-lg border border-border"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-              </div>
-            )}
+            <div className="flex-shrink-0 w-full max-w-[400px]">
+              <CircuitMap circuitName={circuitInfo.circuit_name || ''} className="w-full" />
+            </div>
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-base mb-1">{circuitInfo.circuit_name}</h4>
               {circuitInfo.description && <p className="text-sm text-muted-foreground mb-3">{circuitInfo.description}</p>}

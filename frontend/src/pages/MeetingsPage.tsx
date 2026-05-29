@@ -153,7 +153,7 @@ export default function MeetingsPage({ onSelectSession }: MeetingsPageProps) {
                         {s.date_start ? new Date(s.date_start).toLocaleString('en-GB', {
                           weekday: 'short', day: 'numeric', month: 'short',
                           hour: '2-digit', minute: '2-digit',
-                        }) : 'TBC'}
+                        }) : '—'}
                       </div>
                     </div>
                   ))}

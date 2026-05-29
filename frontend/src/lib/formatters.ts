@@ -44,16 +44,16 @@ export function formatTime(seconds: number): string {
 }
 
 export function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return 'TBC';
+  if (!dateStr) return '—';
   const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return 'TBC';
+  if (isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export function formatDateTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return 'TBC';
+  if (!dateStr) return '—';
   const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return 'TBC';
+  if (isNaN(d.getTime())) return '—';
   return d.toLocaleString('en-GB', {
     day: 'numeric', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',

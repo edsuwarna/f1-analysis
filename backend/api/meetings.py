@@ -27,6 +27,7 @@ async def list_meetings(year: int | None = None, db: AsyncSession = Depends(get_
     query = (
         select(Meeting, session_count_q.c.cnt)
         .outerjoin(session_count_q, Meeting.id == session_count_q.c.meeting_id)
+        .where(Meeting.is_cancelled == False)  # noqa: E712
         .order_by(Meeting.date_start.asc())
     )
     if year:

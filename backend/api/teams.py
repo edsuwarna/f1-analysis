@@ -38,33 +38,10 @@ RACE_ENGINEERS = {
     87: "Ronan O'Hare",            # Bearman (Haas)
 }
 
-# ── 2026 Team-Specific Headshots ──
-# Override OpenF1's static headshots with F1's 2026 team-specific media URLs.
-# Ensures each driver shows the correct team race suit, not an old one.
-HEADSHOT_2026 = {
-    1:  "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/mclaren/lannor01/2026mclarenlannor01right.webp",
-    3:  "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/redbullracing/maxver01/2026redbullracingmaxver01right.webp",
-    5:  "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/audi/gabbor01/2026audigabbor01right.webp",
-    6:  "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/redbullracing/isahad01/2026redbullracingisahad01right.webp",
-    10: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/alpine/piegas01/2026alpinepiegas01right.webp",
-    11: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/cadillac/serper01/2026cadillacserper01right.webp",
-    12: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/mercedes/andant01/2026mercedesandant01right.webp",
-    14: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/astonmartin/feralo01/2026astonmartinferalo01right.webp",
-    16: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/ferrari/chalec01/2026ferrarichalec01right.webp",
-    18: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/astonmartin/lanstr01/2026astonmartinlanstr01right.webp",
-    23: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/williams/alealb01/2026williamsalealb01right.webp",
-    27: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/audi/nichul01/2026audinichul01right.webp",
-    30: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/racingbulls/lialaw01/2026racingbullslialaw01right.webp",
-    31: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/haasf1team/estoco01/2026haasf1teamestoco01right.webp",
-    41: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/racingbulls/arvlin01/2026racingbullsarvlin01right.webp",
-    43: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/alpine/fracol01/2026alpinefracol01right.webp",
-    44: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/ferrari/lewham01/2026ferrarilewham01right.webp",
-    55: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/williams/carsai01/2026williamscarsai01right.webp",
-    63: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/mercedes/georus01/2026mercedesgeorus01right.webp",
-    77: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/cadillac/valbot01/2026cadillacvalbot01right.webp",
-    81: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/mclaren/oscpia01/2026mclarenoscpia01right.webp",
-    87: "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/v1740000001/common/f1/2026/haasf1team/olibea01/2026haasf1teamolibea01right.webp",
-}
+# ── 2026 Team-Specific Headshots (DISABLED) ──
+# Previously hardcoded F1 CDN URLs — removed to avoid DMCA/copyright risks.
+# Falls back to OpenF1 headshots or initials+team-color avatars in the frontend.
+HEADSHOT_2026 = {}
 
 # ── Reserve Drivers (2026 season) ──
 # Per team, usually 1-2 drivers shared across the garage.
@@ -83,17 +60,9 @@ RESERVE_DRIVERS = {
     "Williams": "Luke Browning (Reserve) · Victor Martins (Test/Development)",
 }
 
-# ── Reserve Driver Headshots ──
-# Only drivers with existing F1-media CDN headshots.
-# Others will show the 🔄 icon as fallback.
-RESERVE_HEADSHOTS = {
-    "Yuki Tsunoda": "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/common/f1/2026/racingbulls/yuktsu01/2026racingbullsyuktsu01right.webp",
-    "Frederik Vesti": "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/common/f1/2026/mercedes/freves01/2026mercedesfreves01right.webp",
-    "Jak Crawford": "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/common/f1/2026/astonmartin/jakcra01/2026astonmartinjakcra01right.webp",
-    "Luke Browning": "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/common/f1/2026/williams/lukbro01/2026williamslukbro01right.webp",
-    "Ryo Hirakawa": "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/common/f1/2026/haasf1team/ryohir01/2026haasf1teamryohir01right.webp",
-    "Jack Doohan": "https://media.formula1.com/image/upload/c_lfill,g_north,w_128,h_160/q_auto/common/f1/2025/alpine/jacdoo01/2025alpinejacdoo01right.webp",
-}
+# ── Reserve Driver Headshots (DISABLED) ──
+# Previously hardcoded F1 CDN URLs — removed for copyright safety.
+RESERVE_HEADSHOTS = {}
 
 # ── Helper: split reserve driver string into array ──
 def _split_reserve(raw: str) -> list:
