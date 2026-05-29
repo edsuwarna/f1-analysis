@@ -448,3 +448,174 @@ export interface TechUpdatesData {
 
 export const getTechUpdates = (meetingId: number) =>
   request<TechUpdatesData>(`/tech-updates/${meetingId}`);
+
+// ── Position History (timeline) ──
+export interface PositionTimelineEntry {
+  lap: number;
+  driver_number: number;
+  acronym: string;
+  full_name: string;
+  team_name: string;
+  team_colour: string;
+  position: number;
+}
+
+export interface PositionHistoryData {
+  max_lap: number;
+  timeline: PositionTimelineEntry[];
+}
+
+export const getPositionHistory = (sessionId: number) =>
+  request<PositionHistoryData>(`/sessions/${sessionId}/positions`);
+
+// ── Gap Timeline ──
+export interface GapEntry {
+  lap: number;
+  driver_number: number;
+  cumulative_time: number;
+  gap_to_leader: number | null;
+  gap_to_reference: number | null;
+}
+
+export interface GapTimelineDriver {
+  driver_number: number;
+  full_name: string;
+  name_acronym: string;
+  team_name: string;
+  team_colour: string;
+}
+
+export interface GapTimelineData {
+  leader: number | null;
+  reference: number | null;
+  drivers: Record<string, GapTimelineDriver>;
+  timeline: GapEntry[];
+}
+
+export const getSessionGaps = (sessionId: number, reference?: number) =>
+  request<GapTimelineData>(`/sessions/${sessionId}/gaps${reference ? `?reference=${reference}` : ''}`);
+
+// ── Meeting Circuit Info ──
+export interface CircuitInfoData {
+  meeting_id: number;
+  meeting_name: string;
+  circuit_name: string;
+  location: string;
+  country: string;
+  country_code: string;
+  description?: string;
+  fun_fact?: string;
+  image_url?: string;
+  map_url?: string;
+  length_km?: number;
+  turns?: number;
+  drs_zones?: number;
+  lap_record?: string;
+  lap_record_driver?: string;
+  opened?: number;
+}
+
+export const getMeetingCircuit = (meetingId: number) =>
+  request<CircuitInfoData>(`/meetings/${meetingId}/circuit`);
+
+// ── Speed Traps ──
+export interface SpeedTrapDriver {
+  driver_number: number;
+  full_name: string;
+  acronym: string;
+  team_name: string;
+  team_colour: string;
+  max_speed: number;
+  avg_speed: number;
+  p95_speed: number;
+  data_points: number;
+}
+
+export interface SpeedTrapData {
+  session_id: number;
+  drivers: SpeedTrapDriver[];
+}
+
+export const getSpeedTraps = (sessionId: number) =>
+  request<SpeedTrapData>(`/analytics/sessions/${sessionId}/speed-traps`);
+
+// ── Braking Analysis ──
+export interface BrakingEvent {
+  lap: number;
+  entry_speed: number;
+  peak_brake: number;
+  brake_duration: number;
+  speed_drop: number;
+  corner_label?: string;
+}
+
+export interface BrakingDriver {
+  driver_number: number;
+  acronym: string;
+  full_name: string;
+  team_name: string;
+  team_colour: string;
+  braking_events: BrakingEvent[];
+  avg_brake_pressure: number;
+  max_brake_pressure: number;
+  total_braking_events: number;
+  late_braking_index: number;
+  aggression_score: number;
+}
+
+export interface BrakingData {
+  session_id: number;
+  braking: boolean;
+  message?: string;
+  drivers: BrakingDriver[];
+}
+
+export const getBrakingAnalysis = (sessionId: number) =>
+  request<BrakingData>(`/analytics/sessions/${sessionId}/braking`);
+
+// ── Corner Performance ──
+export interface CornerData {
+  session_id: number;
+  corners: boolean;
+  message?: string;
+  drivers: Array<{
+    driver_number: number;
+    acronym: string;
+    full_name: string;
+    team_name: string;
+    team_colour: string;
+    corners_detected: number;
+    avg_min_speed: number;
+    avg_exit_speed: number;
+    avg_entry_brake: number;
+    best_corner_min_speed: number;
+  }>;
+}
+
+export const getCornerAnalysis = (sessionId: number) =>
+  request<CornerData>(`/analytics/sessions/${sessionId}/corner-analysis`);
+
+// ── Gear & RPM Analysis ──
+export interface GearData {
+  session_id: number;
+  gears: boolean;
+  message?: string;
+  drivers: Array<{
+    driver_number: number;
+    acronym: string;
+    full_name: string;
+    team_name: string;
+    team_colour: string;
+    has_gear_data: boolean;
+    gear_distribution?: Record<string, number>;
+    avg_rpm_per_gear?: Record<string, number>;
+    avg_speed_per_gear?: Record<string, number>;
+    avg_rpm: number;
+    max_rpm: number;
+    high_rpm_pct: number;
+    most_used_gear: number;
+  }>;
+}
+
+export const getGearAnalysis = (sessionId: number) =>
+  request<GearData>(`/analytics/sessions/${sessionId}/gear-analysis`);
