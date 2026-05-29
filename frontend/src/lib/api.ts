@@ -224,8 +224,15 @@ export const getTelemetry = (sessionId: number, driver: number) =>
   request<TelemetrySample[]>(`/sessions/${sessionId}/telemetry?driver=${driver}`);
 
 // ── Standings ──
-export const getChampionship = (year?: number) =>
-  request<ChampionshipData>(`/analytics/championship${year ? `?year=${year}` : ''}`);
+export const getChampionship = async (year?: number): Promise<ChampionshipData> => {
+  const data = await request<ChampionshipData>(`/analytics/championship${year ? `?year=${year}` : ''}`);
+  // API returns 'acronym' but code expects 'name_acronym'
+  data.driver_standings = data.driver_standings.map(d => ({
+    ...d,
+    name_acronym: (d as any).acronym || d.name_acronym || d.full_name?.substring(0, 3)?.toUpperCase() || '',
+  }));
+  return data;
+};
 
 export const getDriverStandings = async (year?: number): Promise<StandingRow[]> => {
   const data = await getChampionship(year);

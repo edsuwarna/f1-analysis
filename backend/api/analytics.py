@@ -253,6 +253,19 @@ async def championship_standings(
             "results": results,
         })
 
+    # Count wins (position=1 in Race sessions)
+    driver_wins: dict[int, int] = {}
+    constructor_wins: dict[str, int] = {}
+    for (rname, mid), results in race_results.items():
+        for res in results:
+            if res.get("session_name") not in ("Race",) and res.get("session_type") != "Race":
+                continue
+            if res["position"] == 1:
+                dn = res["driver_number"]
+                team_name = res["team_name"]
+                driver_wins[dn] = driver_wins.get(dn, 0) + 1
+                constructor_wins[team_name] = constructor_wins.get(team_name, 0) + 1
+
     # Driver standings
     driver_standings = [
         {
@@ -264,6 +277,7 @@ async def championship_standings(
             "team_colour": info["team_colour"],
             "country_code": info.get("country_code", ""),
             "points": pts,
+            "wins": driver_wins.get(dn, 0),
         }
         for i, (dn, pts) in enumerate(
             sorted(driver_points.items(), key=lambda x: -x[1])
@@ -292,6 +306,7 @@ async def championship_standings(
             "points": pts,
             "team_colour": team_colours.get(team, ""),
             "country_code": team_countries.get(team, ""),
+            "wins": constructor_wins.get(team, 0),
         }
         for i, (team, pts) in enumerate(
             sorted(constructor_points.items(), key=lambda x: -x[1])
