@@ -37,7 +37,8 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    mem_limit: 1g
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 2
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 15s
@@ -51,8 +52,6 @@ services:
       dockerfile: docker/ingestion.Dockerfile
     container_name: f1-ingestion
     volumes:
-      - ./backend:/app/backend
-      - ./migrations:/app/migrations
       - f1_cache:/app/cache
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-f1_user}:${POSTGRES_PASSWORD:-f1_pass_secret}@postgres:5432/${POSTGRES_DB:-f1_analysis}
