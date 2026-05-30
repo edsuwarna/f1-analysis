@@ -2306,3 +2306,134 @@ async def team_h2h(
         },
         "rounds": rounds_output,
     }
+
+
+@router.get("/constructor-progression")
+async def constructor_progression(
+    year: int = Query(2026),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cumulative points per constructor across race rounds — line chart data.
+
+    Returns rounds in chronological order with per-team points and cumulative
+    totals. Separate Race and Sprint points. All constructors included.
+    """
+    RACE_POINTS = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10,
+                   6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
+    SPRINT_POINTS = {1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1}
+
+    query = text("""
+        SELECT
+            m.id AS meeting_id,
+            m.name AS race_name,
+            m.date_start,
+            s.session_name,
+            l.driver_number,
+            l.position,
+            sd.team_name,
+            sd.team_colour
+        FROM meetings m
+        JOIN sessions s ON s.meeting_id = m.id
+        JOIN laps l ON l.session_id = s.id
+        LEFT JOIN session_drivers sd
+            ON sd.session_id = s.id AND sd.driver_number = l.driver_number
+        WHERE m.year = :year
+          AND s.session_name IN ('Race', 'Sprint')
+          AND l.position IS NOT NULL AND l.position > 0
+          AND l.position <= 20
+          AND l.lap_number = (
+              SELECT MAX(l2.lap_number)
+              FROM laps l2
+              WHERE l2.session_id = l.session_id
+                AND l2.driver_number = l.driver_number
+          )
+        ORDER BY m.date_start, l.position
+    """)
+    result = await db.execute(query, {"year": year})
+    rows = result.fetchall()
+
+    if not rows:
+        return {"year": year, "rounds": []}
+
+    from collections import defaultdict, OrderedDict
+
+    # Track all teams and their colours
+    all_teams = {}
+    rounds_data = OrderedDict()
+
+    for r in rows:
+        mid = r.meeting_id
+        rname = r.race_name
+        date = str(r.date_start) if r.date_start else ""
+        session_name = r.session_name
+        pos = r.position
+        team = r.team_name or "Unknown"
+        colour = r.team_colour or ""
+
+        if team not in all_teams:
+            all_teams[team] = {
+                "name": team,
+                "colour": colour,
+            }
+
+        key = (mid, rname)
+        if key not in rounds_data:
+            rounds_data[key] = {
+                "meeting_id": mid,
+                "race_name": rname,
+                "date": date,
+                "teams": defaultdict(lambda: {"race_pts": 0, "sprint_pts": 0}),
+            }
+
+        pts = 0
+        if session_name == "Sprint":
+            pts = SPRINT_POINTS.get(pos, 0)
+            rounds_data[key]["teams"][team]["sprint_pts"] += pts
+        else:  # Race
+            pts = RACE_POINTS.get(pos, 0)
+            rounds_data[key]["teams"][team]["race_pts"] += pts
+
+    # Sort rounds chronologically
+    sorted_rounds = sorted(rounds_data.values(), key=lambda x: x["date"])
+
+    # Compute cumulative points per team per round
+    cumulative = defaultdict(int)
+    rounds_output = []
+
+    for rnd_num, rd in enumerate(sorted_rounds, 1):
+        team_list = []
+        for team, info in all_teams.items():
+            t = rd["teams"].get(team, {"race_pts": 0, "sprint_pts": 0})
+            total = t["race_pts"] + t["sprint_pts"]
+            cumulative[team] += total
+            team_list.append({
+                "team_name": team,
+                "colour": info["colour"],
+                "race_points": t["race_pts"],
+                "sprint_points": t["sprint_pts"],
+                "round_points": total,
+                "cumulative_points": cumulative[team],
+            })
+
+        # Sort by cumulative points descending
+        team_list.sort(key=lambda x: -x["cumulative_points"])
+
+        rounds_output.append({
+            "round": rnd_num,
+            "race_name": rd["race_name"],
+            "meeting_id": rd["meeting_id"],
+            "standings": team_list,
+        })
+
+    # Also return team info for consistent coloring
+    team_info_list = [
+        {"team_name": team, "colour": info["colour"], "total_points": cumulative[team]}
+        for team, info in sorted(all_teams.items(), key=lambda x: -cumulative[x[0]])
+    ]
+
+    return {
+        "year": year,
+        "rounds": rounds_output,
+        "teams": team_info_list,
+        "total_rounds": len(rounds_output),
+    }

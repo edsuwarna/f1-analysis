@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { getDriverStandings, getConstructorStandings, getSectorTrends, type StandingRow, type ConstructorStandingRow, type RaceResult, type SectorTrend } from '@/lib/api';
+import { getDriverStandings, getConstructorStandings, getSectorTrends, getConstructorProgression, type StandingRow, type ConstructorStandingRow, type RaceResult, type SectorTrend, type ConstructorProgressionRound } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { flagEmoji, teamColor, formatTime } from '@/lib/formatters';
-import { Trophy, Users, ChevronDown, ChevronRight, Table2, BarChart3 } from 'lucide-react';
+import { Trophy, Users, ChevronDown, ChevronRight, Table2, BarChart3, TrendingUp } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface RaceResultEntry {
   meeting_id: number;
@@ -38,8 +39,15 @@ export default function StandingsPage() {
   const [constructorOpen, setConstructorOpen] = useState(false);
   const [ppwOpen, setPpwOpen] = useState(false);
   const [conPpwOpen, setConPpwOpen] = useState(false);
+  const [conProgOpen, setConProgOpen] = useState(false);
   const [selectedDrivers, setSelectedDrivers] = useState<Set<number>>(new Set());
   const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set());
+
+  // Constructor Progression
+  const [conProgression, setConProgression] = useState<ConstructorProgressionRound[]>([]);
+  const [allProgTeams, setAllProgTeams] = useState<Array<{team_name: string; colour: string; total_points: number}>>([]);
+  const [selectedProgTeams, setSelectedProgTeams] = useState<Set<string>>(new Set());
+  const [showConProg, setShowConProg] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -54,6 +62,16 @@ export default function StandingsPage() {
           name_acronym: (d as any).acronym || d.name_acronym || d.full_name?.substring(0, 3)?.toUpperCase() || '',
         }));
         setChampionship(data);
+        // Load constructor progression
+        try {
+          const progData = await getConstructorProgression(parseInt(year));
+          if (progData?.rounds) {
+            setConProgression(progData.rounds);
+            setAllProgTeams(progData.teams || []);
+          }
+        } catch (e) {
+          console.error('Constructor progression load error:', e);
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -157,6 +175,23 @@ export default function StandingsPage() {
       return next;
     });
   }
+  function toggleProgTeam(tn: string) {
+    setSelectedProgTeams(prev => {
+      const next = new Set(prev);
+      if (next.has(tn)) next.delete(tn);
+      else next.add(tn);
+      return next;
+    });
+    setShowConProg(false);
+  }
+  function selectAllProgTeams() {
+    setSelectedProgTeams(new Set(allProgTeams.map(t => t.team_name)));
+    setShowConProg(false);
+  }
+  function clearProgTeams() {
+    setSelectedProgTeams(new Set());
+    setShowConProg(false);
+  }
 
   // Default: first 10 selected
   if (selectedDrivers.size === 0 && ppwDriverList.length > 0) {
@@ -165,9 +200,28 @@ export default function StandingsPage() {
   if (selectedTeams.size === 0 && ppwConList.length > 0) {
     setSelectedTeams(new Set(ppwConList.slice(0, 10)));
   }
+  if (selectedProgTeams.size === 0 && allProgTeams.length > 0) {
+    setSelectedProgTeams(new Set(allProgTeams.slice(0, 10).map(t => t.team_name)));
+  }
 
   const cellW = Math.max(48, Math.min(72, Math.max(600 / ppwRaceNames.length, 44)));
   const cellH = 34;
+
+  // ── Constructor Progression Chart Data ──
+  const conProgChartData = (() => {
+    if (!conProgression || selectedProgTeams.size === 0) return [];
+    return conProgression.map(round => {
+      const point: Record<string, any> = { round: round.round, race_name: round.race_name };
+      for (const s of round.standings || []) {
+        if (selectedProgTeams.has(s.team_name)) {
+          point[s.team_name] = s.cumulative_points;
+          point[`${s.team_name}_colour`] = s.colour;
+        }
+      }
+      return point;
+    });
+  })();
+  const selectedProgTeamList = allProgTeams.filter(t => selectedProgTeams.has(t.team_name));
 
   return (
     <div className="space-y-6">
@@ -567,6 +621,125 @@ export default function StandingsPage() {
                       })}
                     </div>
                   </div>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* ── Constructor Standings Progression ── */}
+          {allProgTeams.length > 0 && conProgression.length > 0 && (
+            <Card className="overflow-hidden">
+              <button
+                onClick={() => setConProgOpen(!conProgOpen)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left border-b border-border"
+              >
+                {conProgOpen ? <ChevronDown className="h-4 w-4 text-blue-500" /> : <ChevronRight className="h-4 w-4 text-blue-500" />}
+                <TrendingUp className="h-4 w-4 text-blue-500" />
+                <span className="text-sm font-medium">Constructor Standings Progression</span>
+                <Badge variant="outline" className="text-xs ml-auto">{conProgression.length} rounds</Badge>
+                <Badge variant="secondary" className="text-xs">{allProgTeams.length} teams</Badge>
+              </button>
+
+              {conProgOpen && (
+                <div className="p-4 space-y-4">
+                  {/* Team Picker */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-muted-foreground">Select teams to plot:</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={selectAllProgTeams}
+                          className="text-[11px] px-2 py-1 rounded-md text-muted-foreground hover:text-foreground border border-border/50"
+                        >
+                          All
+                        </button>
+                        <button
+                          onClick={clearProgTeams}
+                          className="text-[11px] px-2 py-1 rounded-md text-muted-foreground hover:text-foreground border border-border/50"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {allProgTeams.map(t => {
+                        const colour = t.colour ? teamColor(t.colour) : '#666';
+                        const isChecked = selectedProgTeams.has(t.team_name);
+                        const short = t.team_name.replace(/Team|Racing|Racing Bulls/g, '').trim() || t.team_name;
+                        return (
+                          <button
+                            key={t.team_name}
+                            onClick={() => toggleProgTeam(t.team_name)}
+                            className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md transition-all border ${
+                              isChecked ? 'border-border font-medium' : 'border-transparent opacity-40 hover:opacity-60'
+                            }`}
+                            style={isChecked ? { background: `${colour}20`, borderColor: `${colour}60`, color: colour } : {}}
+                          >
+                            <span className="w-2 h-2 rounded-full" style={{ background: colour }} />
+                            {short}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Plot Button */}
+                  <button
+                    onClick={() => setShowConProg(true)}
+                    disabled={selectedProgTeams.size === 0}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <TrendingUp className="h-4 w-4" />
+                    Plot ({selectedProgTeams.size} team{selectedProgTeams.size !== 1 ? 's' : ''})
+                  </button>
+
+                  {/* Chart */}
+                  {showConProg && conProgChartData.length > 0 && (
+                    <div className="pt-2">
+                      <ResponsiveContainer width="100%" height={400}>
+                        <LineChart data={conProgChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis
+                            dataKey="round"
+                            stroke="hsl(var(--muted-foreground))"
+                            tick={{ fontSize: 12 }}
+                            label={{ value: 'Round', position: 'insideBottomRight', offset: -5, style: { fill: 'hsl(var(--muted-foreground))', fontSize: 12 } }}
+                          />
+                          <YAxis
+                            stroke="hsl(var(--muted-foreground))"
+                            tick={{ fontSize: 12 }}
+                            label={{ value: 'Cumulative Points', angle: -90, position: 'insideLeft', style: { fill: 'hsl(var(--muted-foreground))', fontSize: 12 } }}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: 'hsl(var(--card))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px',
+                              color: 'hsl(var(--card-foreground))',
+                            }}
+                            labelFormatter={(label) => `Round ${label}`}
+                          />
+                          <Legend />
+                          {selectedProgTeamList.map(t => {
+                            const colour = t.colour ? teamColor(t.colour) : '#666';
+                            return (
+                              <Line
+                                key={t.team_name}
+                                type="monotone"
+                                dataKey={t.team_name}
+                                name={t.team_name.replace(/Team|Racing|Racing Bulls/g, '').trim() || t.team_name}
+                                stroke={colour}
+                                strokeWidth={2}
+                                dot={{ r: 3, fill: colour }}
+                                activeDot={{ r: 5, fill: colour }}
+                                connectNulls
+                              />
+                            );
+                          })}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </div>
               )}
             </Card>

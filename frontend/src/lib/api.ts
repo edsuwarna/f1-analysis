@@ -83,6 +83,11 @@ export interface RaceControl {
   flag: string;
   lap_number: number;
   time: string;
+  category?: string;
+  scope?: string;
+  sector?: number;
+  driver_number?: number;
+  timestamp?: string;
 }
 
 export interface TelemetrySample {
@@ -641,3 +646,32 @@ export interface GearData {
 
 export const getGearAnalysis = (sessionId: number) =>
   request<GearData>(`/analytics/sessions/${sessionId}/gear-analysis`);
+
+// ── Constructor Progression ──
+export interface ConstructorProgressionRound {
+  round: number;
+  race_name: string;
+  meeting_id: number;
+  standings: Array<{
+    team_name: string;
+    colour: string;
+    race_points: number;
+    sprint_points: number;
+    round_points: number;
+    cumulative_points: number;
+  }>;
+}
+
+export interface ConstructorProgressionData {
+  year: number;
+  rounds: ConstructorProgressionRound[];
+  teams: Array<{
+    team_name: string;
+    colour: string;
+    total_points: number;
+  }>;
+  total_rounds: number;
+}
+
+export const getConstructorProgression = (year?: number) =>
+  request<ConstructorProgressionData>(`/analytics/constructor-progression${year ? `?year=${year}` : ''}`);

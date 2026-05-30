@@ -1849,38 +1849,192 @@ export default function SessionDetailPage() {
 
       {/* ═══ RACE DIRECTOR ═══ */}
       {raceControl.length > 0 && (
-        <CardSection title="Race Director Timeline" subtitle="Flags, SC, VSC, penalties & incidents"
-          summary={raceControl.length > 0 ? `${raceControl.length} entr${raceControl.length !== 1 ? 'ies' : 'y'}` : undefined}
+        <CardSection title="Race Timeline" subtitle="Flags, SC/VSC periods, penalties & incidents"
+          summary={raceControl.length > 0 ? `${raceControl.length} events` : undefined}
           icon={<Flag className="h-4 w-4 text-red-500" />}>
-          <div className="overflow-x-auto max-h-80 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border sticky top-0 bg-card z-10">
-                  <th className="text-left p-2 text-xs font-medium text-muted-foreground">Lap</th>
-                  <th className="text-left p-2 text-xs font-medium text-muted-foreground">Flag</th>
-                  <th className="text-left p-2 text-xs font-medium text-muted-foreground">Message</th>
-                </tr>
-              </thead>
-              <tbody>
-                {raceControl.slice(0, 50).map((rc, i) => (
-                  <tr key={i} className="border-b border-border text-sm">
-                    <td className="p-2 text-muted-foreground">{rc.lap_number ? `L${rc.lap_number}` : '-'}</td>
-                    <td className="p-2">
-                      <Badge variant="outline" className={`text-xs ${
-                        rc.flag === 'GREEN' ? 'bg-green-500/10 text-green-500' :
-                        rc.flag === 'YELLOW' ? 'bg-yellow-500/10 text-yellow-500' :
-                        rc.flag === 'RED' ? 'bg-red-500/10 text-red-500' :
-                        rc.flag === 'CHEQUERED' ? 'bg-purple-500/10 text-purple-500' :
-                        rc.flag === 'SC' ? 'bg-orange-500/10 text-orange-500' :
-                        rc.flag === 'VSC' ? 'bg-blue-500/10 text-blue-500' : ''
-                      }`}>{rc.flag}</Badge>
-                    </td>
-                    <td className="p-2">{rc.message}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {(() => {
+            // Categorize events
+            const categories: Record<string, { label: string; icon: string; events: typeof raceControl }> = {
+              SC: { label: 'Safety Car', icon: '🚗', events: [] },
+              VSC: { label: 'Virtual SC', icon: '🔵', events: [] },
+              RED: { label: 'Red Flag', icon: '🔴', events: [] },
+              YELLOW: { label: 'Yellow Flag', icon: '🟡', events: [] },
+              GREEN: { label: 'Green Flag', icon: '🟢', events: [] },
+              CHEQUERED: { label: 'Chequered', icon: '🏁', events: [] },
+              PENALTY: { label: 'Penalties', icon: '⛔', events: [] },
+              INCIDENT: { label: 'Incidents', icon: '💥', events: [] },
+              OTHER: { label: 'Other', icon: '📋', events: [] },
+            };
+
+            // Classify each event
+            for (const rc of raceControl) {
+              const msg = (rc.message || '').toLowerCase();
+              const flag = (rc.flag || '').toUpperCase();
+
+              if (flag === 'SC' || msg.includes('safety car') || msg.includes('sc deployed')) {
+                categories.SC.events.push(rc);
+              } else if (flag === 'VSC' || msg.includes('vsc') || msg.includes('virtual safety')) {
+                categories.VSC.events.push(rc);
+              } else if (flag === 'RED' || msg.includes('red flag') || msg.includes('session stopped')) {
+                categories.RED.events.push(rc);
+              } else if (flag === 'YELLOW' || msg.includes('yellow')) {
+                categories.YELLOW.events.push(rc);
+              } else if (flag === 'GREEN' || msg.includes('green') || msg.includes('track clear')) {
+                categories.GREEN.events.push(rc);
+              } else if (flag === 'CHEQUERED' || msg.includes('chequered') || msg.includes('finish')) {
+                categories.CHEQUERED.events.push(rc);
+              } else if (msg.includes('penalty') || msg.includes('time penalty') || msg.includes('drive through') || msg.includes('stop/go')) {
+                categories.PENALTY.events.push(rc);
+              } else if (msg.includes('incident') || msg.includes('crash') || msg.includes('collision') || msg.includes('spun') || msg.includes('off track') || msg.includes('contact')) {
+                categories.INCIDENT.events.push(rc);
+              } else {
+                categories.OTHER.events.push(rc);
+              }
+            }
+
+            // Filter out empty categories
+            const activeCats = Object.entries(categories).filter(([_, v]) => v.events.length > 0);
+
+            // Build SC/VSC timeline segments
+            const maxLap = Math.max(...raceControl.map(r => r.lap_number || 0), 1);
+            const scPeriods: { start: number; end: number; type: string }[] = [];
+            let currentSC: { lap: number; type: string } | null = null;
+
+            const sortedSC = [...categories.SC.events, ...categories.VSC.events]
+              .sort((a, b) => (a.lap_number || 0) - (b.lap_number || 0));
+
+            for (const ev of sortedSC) {
+              const msg = (ev.message || '').toLowerCase();
+              if (msg.includes('deployed') || msg.includes('entered') || !currentSC) {
+                if (currentSC) scPeriods.push({ start: currentSC.lap, end: ev.lap_number || currentSC.lap, type: currentSC.type });
+                currentSC = { lap: ev.lap_number || 1, type: ev.flag === 'VSC' ? 'VSC' : 'SC' };
+              } else if (msg.includes('ended') || msg.includes('withdrawn') || msg.includes('status clear')) {
+                if (currentSC) {
+                  scPeriods.push({ start: currentSC.lap, end: ev.lap_number || currentSC.lap, type: currentSC.type });
+                  currentSC = null;
+                }
+              }
+            }
+            if (currentSC) scPeriods.push({ start: currentSC.lap, end: maxLap, type: currentSC.type });
+
+            const flagColor = (flag: string) => {
+              switch (flag.toUpperCase()) {
+                case 'GREEN': return 'bg-green-500/10 text-green-500 border-green-500/30';
+                case 'YELLOW': return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30';
+                case 'RED': return 'bg-red-500/10 text-red-500 border-red-500/30';
+                case 'CHEQUERED': return 'bg-purple-500/10 text-purple-500 border-purple-500/30';
+                case 'SC': return 'bg-orange-500/10 text-orange-500 border-orange-500/30';
+                case 'VSC': return 'bg-blue-500/10 text-blue-500 border-blue-500/30';
+                default: return 'bg-gray-500/10 text-gray-400 border-gray-500/30';
+              }
+            };
+
+            const FLAG_EMOJI: Record<string, string> = {
+              GREEN: '🟢', YELLOW: '🟡', RED: '🔴', CHEQUERED: '🏁',
+              SC: '🚗', VSC: '🔵', BLUE: '🔷', BLACK: '⬛', ORANGE: '🟠', WHITE: '⬜',
+            };
+
+            return (
+              <div className="space-y-3">
+                {/* SC/VSC Timeline Bar */}
+                {scPeriods.length > 0 && (
+                  <div className="bg-secondary/30 rounded-lg p-3 border border-border/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-semibold text-muted-foreground">Safety Car Periods</span>
+                      <span className="text-[10px] text-muted-foreground">— Lap {1} – L{maxLap}</span>
+                    </div>
+                    <div className="relative h-6 bg-secondary rounded-full overflow-hidden">
+                      {scPeriods.map((p, i) => {
+                        const leftPct = ((p.start - 1) / maxLap) * 100;
+                        const widthPct = ((p.end - p.start + 1) / maxLap) * 100;
+                        return (
+                          <div key={i}
+                            className={`absolute top-0 h-full ${p.type === 'VSC' ? 'bg-blue-500/50' : 'bg-orange-500/50'} border-r border-white/20`}
+                            style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+                            title={`${p.type}: L${p.start}–L${p.end}`}
+                          >
+                            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white/80">
+                              {p.type}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {/* Lap markers */}
+                      {Array.from({ length: Math.min(maxLap, 30) }).map((_, i) => {
+                        const lap = Math.round((i / Math.min(maxLap - 1, 29)) * (maxLap - 1)) + 1;
+                        const pct = ((lap - 1) / maxLap) * 100;
+                        return (
+                          <div key={i}
+                            className="absolute top-0 w-px h-full bg-white/10"
+                            style={{ left: `${pct}%` }}
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
+                      <span>L1</span>
+                      <span>L{Math.round(maxLap / 2)}</span>
+                      <span>L{maxLap}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Summary badges */}
+                <div className="flex flex-wrap gap-1.5">
+                  {activeCats.slice(0, 8).map(([key, cat]) => (
+                    <Badge key={key} variant="outline" className={`text-[10px] ${flagColor(key)}`}>
+                      {cat.icon} {cat.label}: {cat.events.length}
+                    </Badge>
+                  ))}
+                </div>
+
+                {/* Full events list */}
+                <div className="space-y-2 mt-3">
+                  {/* Category filter buttons */}
+                  {true && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      <span className="text-[10px] text-muted-foreground mr-1">Events:</span>
+                      {activeCats.map(([key, cat]) => (
+                        <span key={key} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] ${flagColor(key)}`}>
+                          {cat.icon} {cat.events.length}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="overflow-x-auto max-h-96 overflow-y-auto rounded-lg border border-border/50">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/30 sticky top-0 z-10">
+                          <th className="text-left p-2 font-medium text-muted-foreground w-12">Lap</th>
+                          <th className="text-left p-2 font-medium text-muted-foreground w-16">Flag</th>
+                          <th className="text-left p-2 font-medium text-muted-foreground">Message</th>
+                          <th className="text-left p-2 font-medium text-muted-foreground hidden sm:table-cell w-16">Driver</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {raceControl.map((rc, i) => (
+                          <tr key={i} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                            <td className="p-2 font-mono text-muted-foreground">
+                              {rc.lap_number ? `L${rc.lap_number}` : '-'}
+                            </td>
+                            <td className="p-2">
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${flagColor(rc.flag || '')}`}>
+                                {FLAG_EMOJI[rc.flag?.toUpperCase() || ''] || ''} {rc.flag || '-'}
+                              </span>
+                            </td>
+                            <td className="p-2">{rc.message}</td>
+                            <td className="p-2 font-mono text-muted-foreground hidden sm:table-cell">
+                              {rc.driver_number ? `#${rc.driver_number}` : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </CardSection>
       )}
 
