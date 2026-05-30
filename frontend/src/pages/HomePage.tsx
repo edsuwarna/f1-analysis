@@ -1,14 +1,34 @@
 import { useEffect, useState } from 'react';
-import { getMeetings, getChampionship, type Meeting, type ConstructorStandingRow, type StandingRow, type RaceResultDriver } from '@/lib/api';
+import {
+  getMeetings, getChampionship, getSeasonProgression,
+  type Meeting, type ConstructorStandingRow, type StandingRow, type RaceResultDriver,
+} from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { flagEmoji, teamColor } from '@/lib/formatters';
-import { Calendar, Trophy, Users, Gauge, Eye, EyeOff, Medal } from 'lucide-react';
+import { Calendar, Trophy, Users, Gauge, Eye, EyeOff, Medal, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
 
 interface PodiumDriver extends RaceResultDriver {
   full_name: string;
   headshot_url?: string;
+}
+
+interface ProgressionRound {
+  round: number;
+  race_name: string;
+  meeting_id: number;
+  standings: Array<{
+    driver_number: number;
+    acronym: string;
+    full_name?: string;
+    team_name: string;
+    team_colour: string;
+    cumulative_points: number;
+  }>;
 }
 
 export default function HomePage() {
@@ -18,29 +38,45 @@ export default function HomePage() {
   const [podium, setPodium] = useState<PodiumDriver[]>([]);
   const [lastRaceName, setLastRaceName] = useState('');
   const [racesCompleted, setRacesCompleted] = useState(0);
+  const [nextRound, setNextRound] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showAllDrivers, setShowAllDrivers] = useState(false);
   const [showAllConstructors, setShowAllConstructors] = useState(false);
+  const [progression, setProgression] = useState<ProgressionRound[]>([]);
+  const [showProgression, setShowProgression] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     async function load() {
       try {
-        const [champ, meetings] = await Promise.all([
+        const [champ, meetings, prog] = await Promise.all([
           getChampionship(2026),
           getMeetings(2026),
+          getSeasonProgression(2026),
         ]);
+
         const d = champ.driver_standings;
         const c = champ.constructor_standings;
         setAllDrivers(d);
         setAllConstructors(c);
         setRacesCompleted(champ.races_completed || 0);
 
-        // Last race podium
+        // ── Season Progression ──
+        if (prog?.rounds?.length > 0) {
+          setProgression(prog.rounds);
+          setShowProgression(true);
+        }
+
+        // ── Last Race Podium (fix: races[0] = latest, API sorts DESC) ──
         if (champ.races.length > 0) {
-          const lastRace = champ.races[champ.races.length - 1];
+          const lastRace = champ.races[0];
           setLastRaceName(lastRace.race_name);
-          const top3 = (lastRace.results || []).slice(0, 3).map(r => {
+
+          // Filter only Race (not Sprint) results for podium
+          const raceOnly = (lastRace.results || []).filter(
+            r => r.session_name !== 'Sprint'
+          );
+          const top3 = raceOnly.slice(0, 3).map(r => {
             const driver = d.find(sd => sd.name_acronym === r.acronym);
             return {
               ...r,
@@ -51,10 +87,25 @@ export default function HomePage() {
           setPodium(top3);
         }
 
-        // Find next race
+        // ── Compute correct round number (accounting for skipped/cancelled races) ──
         const now = new Date();
-        const upcoming = meetings
-          .filter(m => !m.is_cancelled && new Date(m.date_start) > now)
+        const sortedMeetings = [...meetings]
+          .filter(m => !m.is_cancelled)
+          .sort((a, b) => new Date(a.date_start).getTime() - new Date(b.date_start).getTime());
+
+        // Count how many race weekends have passed (regardless of data availability)
+        const pastRaces = sortedMeetings.filter(
+          m => new Date(m.date_start) < now
+        );
+        setRacesCompleted(pastRaces.length);
+
+        // Next round number
+        const nextRoundNum = pastRaces.length + 1;
+        setNextRound(nextRoundNum);
+
+        // ── Find next race ──
+        const upcoming = sortedMeetings
+          .filter(m => new Date(m.date_start) >= now)
           .sort((a, b) => new Date(a.date_start).getTime() - new Date(b.date_start).getTime());
         if (upcoming.length > 0) setNextRace(upcoming[0]);
       } catch (e) {
@@ -76,8 +127,27 @@ export default function HomePage() {
   const champTotal = leader && second ? leader.points + second.points : 1;
   const leaderPct = (leader?.points || 0) / champTotal * 100;
 
-  // Races completed
-  const racesDone = allDrivers.length > 0 ? allDrivers.reduce((max, d) => Math.max(max, d.wins || 0), 0) > 0 ? '?' : '?' : '?';
+  // ── Progression chart data: top 5 drivers ──
+  const topDriverKeys = allDrivers.slice(0, 5).map(d => d.name_acronym);
+  const chartData = progression.map(round => {
+    const point: Record<string, any> = { round: round.round, race_name: round.race_name };
+    for (const s of round.standings || []) {
+      if (topDriverKeys.includes(s.acronym)) {
+        point[s.acronym] = s.cumulative_points;
+        point[`${s.acronym}_colour`] = s.team_colour;
+      }
+    }
+    return point;
+  });
+
+  const driverColors: Record<string, string> = {};
+  for (const round of progression) {
+    for (const s of round.standings || []) {
+      if (topDriverKeys.includes(s.acronym) && !driverColors[s.acronym]) {
+        driverColors[s.acronym] = teamColor(s.team_colour);
+      }
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -110,7 +180,7 @@ export default function HomePage() {
               </div>
               <div className="text-right flex flex-col items-end gap-1">
                 <div className="text-4xl md:text-5xl font-extrabold text-white leading-none">
-                  R{racesCompleted + 1 || '?'}
+                  R{nextRound || '?'}
                 </div>
                 <p className="text-xs text-red-100/70 font-medium uppercase tracking-wider">
                   {nextRace?.location || ''}
@@ -137,12 +207,11 @@ export default function HomePage() {
                       {leader.headshot_url ? (
                         <img src={leader.headshot_url} alt={leader.name_acronym}
                           className="w-full h-full object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-xs font-bold bg-muted">
-                          {leader.name_acronym}
-                        </div>
-                      )}
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }} />
+                      ) : <div />}
+                      <div className={`w-full h-full flex items-center justify-center text-xs font-bold bg-muted ${leader.headshot_url ? 'hidden' : ''}`}>
+                        {leader.name_acronym}
+                      </div>
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold truncate">{leader.name_acronym}</p>
@@ -175,12 +244,11 @@ export default function HomePage() {
                       {second.headshot_url ? (
                         <img src={second.headshot_url} alt={second.name_acronym}
                           className="w-full h-full object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-xs font-bold bg-muted">
-                          {second.name_acronym}
-                        </div>
-                      )}
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }} />
+                      ) : <div />}
+                      <div className={`w-full h-full flex items-center justify-center text-xs font-bold bg-muted ${second.headshot_url ? 'hidden' : ''}`}>
+                        {second.name_acronym}
+                      </div>
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold truncate">{second.name_acronym}</p>
@@ -202,14 +270,17 @@ export default function HomePage() {
 
       {/* ── Row 2: Last Race Podium ── */}
       {podium.length === 3 && (
-        <Card className="overflow-hidden border-0 bg-gradient-to-b from-background to-muted/30">
+        <Card
+          className="overflow-hidden border-0 bg-gradient-to-b from-background to-muted/30 cursor-pointer hover:from-background hover:to-muted/50 transition-colors"
+          onClick={() => navigate('/races')}
+        >
           <CardHeader className="pb-2 border-b border-border/50">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <Medal className="h-4 w-4 text-yellow-500" />
                 <span>Last Race: <span className="font-bold">{lastRaceName}</span></span>
               </CardTitle>
-              <span className="text-xs text-muted-foreground">Podium</span>
+              <span className="text-xs text-muted-foreground">Podium · Click for details →</span>
             </div>
           </CardHeader>
           <CardContent className="p-4">
@@ -268,7 +339,67 @@ export default function HomePage() {
         />
       </div>
 
-      {/* ── Row 4: Standings ── */}
+      {/* ── Row 4: Season Progression (top 5 drivers) ── */}
+      {showProgression && chartData.length > 0 && (
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-3 border-b border-border/50">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-blue-500" />
+                <span>Season Progression</span>
+              </CardTitle>
+              <span className="text-xs text-muted-foreground">Top {topDriverKeys.length} drivers</span>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="w-full" style={{ height: 280 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis
+                    dataKey="race_name"
+                    stroke="hsl(var(--muted-foreground))"
+                    tick={{ fontSize: 10 }}
+                    tickFormatter={(val) => val.split(' ')[0]}
+                  />
+                  <YAxis
+                    stroke="hsl(var(--muted-foreground))"
+                    tick={{ fontSize: 11 }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                      color: 'hsl(var(--card-foreground))',
+                      fontSize: 12,
+                    }}
+                    labelFormatter={(label) => label}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                  />
+                  {topDriverKeys.map(key => (
+                    <Line
+                      key={key}
+                      type="monotone"
+                      dataKey={key}
+                      name={key}
+                      stroke={driverColors[key] || '#666'}
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: driverColors[key] || '#666' }}
+                      activeDot={{ r: 5, fill: driverColors[key] || '#666' }}
+                      connectNulls
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Row 5: Standings ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Driver Standings */}
@@ -300,22 +431,14 @@ export default function HomePage() {
                       {d.position}
                     </span>
 
-                    {/* Headshot */}
-                    <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-muted ring-2 ring-offset-1 ring-offset-background"
+                    {/* Headshot with fallback */}
+                    <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-muted ring-2 ring-offset-1 ring-offset-background relative"
                       style={{ boxShadow: `0 0 0 2px ${teamColor(d.team_colour)}, 0 0 0 4px var(--tw-ring-offset-color, hsl(var(--background)))` }}>
-                      {d.headshot_url ? (
-                        <img
-                          src={d.headshot_url}
-                          alt={d.name_acronym}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-muted-foreground">
-                          {d.name_acronym}
-                        </div>
-                      )}
+                      <HeadshotWithFallback
+                        url={d.headshot_url}
+                        alt={d.name_acronym}
+                        acronym={d.name_acronym}
+                      />
                     </div>
 
                     {/* Name & Team */}
@@ -423,6 +546,28 @@ export default function HomePage() {
 
 // ── Sub-components ──
 
+function HeadshotWithFallback({ url, alt, acronym }: { url?: string; alt: string; acronym: string }) {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  if (!url || imgFailed) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-muted-foreground">
+        {acronym}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={url}
+      alt={alt}
+      className="w-full h-full object-cover"
+      loading="lazy"
+      onError={() => setImgFailed(true)}
+    />
+  );
+}
+
 function PodiumCard({ driver, position, accentColor, isWinner }: {
   driver: PodiumDriver;
   position: number;
@@ -443,18 +588,11 @@ function PodiumCard({ driver, position, accentColor, isWinner }: {
       <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full overflow-hidden mb-2 ring-2 flex-shrink-0 ${
         isWinner ? 'ring-yellow-500 shadow-lg shadow-yellow-500/20' : 'ring-border'
       }`}>
-        {driver.headshot_url ? (
-          <img
-            src={driver.headshot_url}
-            alt={driver.acronym}
-            className="w-full h-full object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-sm font-bold bg-muted">
-            {driver.acronym}
-          </div>
-        )}
+        <HeadshotWithFallback
+          url={driver.headshot_url}
+          alt={driver.acronym}
+          acronym={driver.acronym}
+        />
       </div>
 
       {/* Medal & Name */}

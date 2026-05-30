@@ -238,6 +238,16 @@ CIRCUITS: dict[str, CircuitInfo] = {
         "The pit lane exit tunnel goes underneath the track. The circuit features one of the most "
         "impressive pit complexes in motorsport, with a glass-walled paddock overlooking the marina.",
     ),
+    "Suzuka": _circuit(
+        "Suzuka International Racing Course", "Suzuka", "Japan", "jp",
+        5.807, 18, 2, "1:30.983", "Lewis Hamilton", 2019, 1962,
+        "A legendary figure-8 circuit in the Mie Prefecture. The only track on the F1 calendar that crosses "
+        "over itself, featuring the iconic high-speed 'S' Curves, the demanding Spoon Curve, "
+        "and the famous 130R — one of the most thrilling corners in motorsport.",
+        "Suzuka is the only figure-8 circuit in F1, where the track crosses over itself via a bridge. "
+        "The circuit was originally built as a Honda test track in 1962 and has hosted the Japanese Grand Prix "
+        "since 1987. Its unique layout makes it a true driver's circuit.",
+    ),
     "Portimão": _circuit(
         "Autódromo Internacional do Algarve", "Portimão", "Portugal", "pt",
         4.653, 15, 3, "1:18.348", "Valtteri Bottas", 2021, 2008,

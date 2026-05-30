@@ -280,7 +280,7 @@ export default function StandingsPage() {
               >
                 {ppwOpen ? <ChevronDown className="h-4 w-4 text-primary" /> : <ChevronRight className="h-4 w-4 text-primary" />}
                 <BarChart3 className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Points Per Weekend</span>
+                <span className="text-sm font-medium">Driver Points Per Weekend</span>
                 <Badge variant="outline" className="text-xs ml-auto">{ppwRaceNames.length} races</Badge>
                 <Badge variant="secondary" className="text-xs">{ppwDriverList.length} drivers</Badge>
               </button>
