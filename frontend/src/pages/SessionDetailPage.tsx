@@ -52,8 +52,8 @@ const SESSION_EMOJIS: Record<string, string> = {
 };
 
 // ── Collapsible Card Component ──
-function CardSection({ title, subtitle, icon, defaultOpen = false, children, className = '' }: {
-  title: string; subtitle?: string; icon?: React.ReactNode;
+function CardSection({ title, subtitle, summary, icon, defaultOpen = false, children, className = '' }: {
+  title: string; subtitle?: string; summary?: React.ReactNode; icon?: React.ReactNode;
   defaultOpen?: boolean; children: React.ReactNode; className?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -66,7 +66,11 @@ function CardSection({ title, subtitle, icon, defaultOpen = false, children, cla
             <h3 className="font-semibold text-sm flex items-center gap-2 truncate">
               {title}
             </h3>
-            {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
+            {!open && summary ? (
+              <p className="text-xs text-muted-foreground/80 truncate">{summary}</p>
+            ) : subtitle ? (
+              <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
+            ) : null}
           </div>
         </div>
         <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
@@ -77,8 +81,8 @@ function CardSection({ title, subtitle, icon, defaultOpen = false, children, cla
 }
 
 // ── Load-On-Demand Card ──
-function LoadableCard({ title, subtitle, icon, loading, loaded, onLoad, children, isAvailable = true }: {
-  title: string; subtitle?: string; icon?: React.ReactNode;
+function LoadableCard({ title, subtitle, summary, icon, loading, loaded, onLoad, children, isAvailable = true }: {
+  title: string; subtitle?: string; summary?: React.ReactNode; icon?: React.ReactNode;
   loading: boolean; loaded: boolean; onLoad: () => void;
   children: React.ReactNode; isAvailable?: boolean;
 }) {
@@ -90,7 +94,11 @@ function LoadableCard({ title, subtitle, icon, loading, loaded, onLoad, children
           {icon && <span className="shrink-0">{icon}</span>}
           <div>
             <h3 className="font-semibold text-sm">{title}</h3>
-            {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+            {!open && summary ? (
+              <p className="text-xs text-muted-foreground/80">{summary}</p>
+            ) : subtitle ? (
+              <p className="text-xs text-muted-foreground">{subtitle}</p>
+            ) : null}
           </div>
         </div>
         <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
@@ -645,7 +653,9 @@ export default function SessionDetailPage() {
       </CardSection>
 
       {/* ═══ CIRCUIT DETAIL ═══ */}
-      <CardSection title="Circuit Detail" subtitle="Track info, specs & fun facts" icon={<CircuitBoard className="h-4 w-4 text-blue-500" />}>
+      <CardSection title="Circuit Detail" subtitle="Track info, specs & fun facts"
+        summary={circuitInfo?.circuit_name ? `${circuitInfo.length_km ? circuitInfo.length_km + 'km' : ''}${circuitInfo.length_km && circuitInfo.turns ? ' · ' : ''}${circuitInfo.turns ? circuitInfo.turns + ' turns' : ''}` : undefined}
+        icon={<CircuitBoard className="h-4 w-4 text-blue-500" />}>
         {circuitLoading && circuitLoadingTrigger && !circuitLoaded ? (
           <div className="text-center py-6 text-muted-foreground text-sm">Loading circuit info...</div>
         ) : circuitInfo?.circuit_name ? (
@@ -677,7 +687,12 @@ export default function SessionDetailPage() {
       </CardSection>
 
       {/* ═══ BEST SECTOR TIMES ═══ */}
-      <CardSection title="Best Sector Times" subtitle="Fastest sector 1/2/3 & lap times per driver" icon={<Radar className="h-4 w-4 text-purple-500" />}>
+      <CardSection title="Best Sector Times" subtitle="Fastest sector 1/2/3 & lap times per driver"
+        summary={(() => {
+          const sorted = [...sectors].filter(s => s.best_lap).sort((a, b) => (a.best_lap || 999) - (b.best_lap || 999));
+          return sorted.length > 0 ? `${sorted[0].acronym} · ${formatTime(sorted[0].best_lap)}` : undefined;
+        })()}
+        icon={<Radar className="h-4 w-4 text-purple-500" />}>
         <div className="flex gap-3 mb-2 text-[10px] text-muted-foreground flex-wrap">
           <span><span className="text-purple-400 font-bold">🟣</span> Fastest overall</span>
           <span><span className="text-green-400 font-bold">🟢</span> Top 3</span>
@@ -727,7 +742,12 @@ export default function SessionDetailPage() {
       </CardSection>
 
       {/* ═══ TYRE STRATEGY TIMELINE ═══ */}
-      <CardSection title="Tyre Strategy Timeline" subtitle="Compound usage & stint length per driver" icon={<TrendingUp className="h-4 w-4 text-green-500" />}>
+      <CardSection title="Tyre Strategy Timeline" subtitle="Compound usage & stint length per driver"
+        summary={(() => {
+          const compounds = [...new Set(stints.map(s => s.compound).filter(Boolean))];
+          return compounds.length > 0 ? `${compounds.length} compound${compounds.length > 1 ? 's' : ''} · ${stints.length} stint${stints.length !== 1 ? 's' : ''}` : undefined;
+        })()}
+        icon={<TrendingUp className="h-4 w-4 text-green-500" />}>
         {stintsByDriver.size === 0 ? (
           <p className="text-center py-4 text-muted-foreground text-sm">No stint data available</p>
         ) : (
@@ -809,7 +829,9 @@ export default function SessionDetailPage() {
       </CardSection>
 
       {/* ═══ PIT STOP ANALYSIS ═══ */}
-      <CardSection title="Pit Stop Analysis" subtitle="Stop times, compound changes & crew performance" icon={<Gauge className="h-4 w-4 text-orange-500" />}>
+      <CardSection title="Pit Stop Analysis" subtitle="Stop times, compound changes & crew performance"
+        summary={pits.length > 0 ? `${pits.length} stop${pits.length !== 1 ? 's' : ''}` : undefined}
+        icon={<Gauge className="h-4 w-4 text-orange-500" />}>
         {pits.length === 0 ? (
           <p className="text-center py-4 text-muted-foreground text-sm">No pit stop data available</p>
         ) : (
@@ -1495,7 +1517,9 @@ export default function SessionDetailPage() {
       </CardSection>
 
       {/* ═══ DRIVER COMPARISON ═══ */}
-      <CardSection title="Driver Comparison" subtitle="Head-to-head lap time comparison" icon={<GitCompare className="h-4 w-4 text-blue-500" />}>
+      <CardSection title="Driver Comparison" subtitle="Head-to-head lap time comparison"
+        summary={compDrv1 && compDrv2 ? `${driverMap[compDrv1]?.name_acronym || '#'+compDrv1} vs ${driverMap[compDrv2]?.name_acronym || '#'+compDrv2}` : undefined}
+        icon={<GitCompare className="h-4 w-4 text-blue-500" />}>
         <div className="space-y-4">
           {/* Select + Compare */}
           <div className="flex flex-wrap gap-2 items-center">
@@ -1619,7 +1643,9 @@ export default function SessionDetailPage() {
 
       {/* ═══ WEATHER ═══ */}
       {weather.length > 0 && (
-        <CardSection title="Weather Impact" subtitle="Track & air conditions during session" icon={<Thermometer className="h-4 w-4 text-orange-500" />}>
+        <CardSection title="Weather Impact" subtitle="Track & air conditions during session"
+          summary={weather.length > 0 ? `${avgAir}°C air · ${avgTrack}°C track` : undefined}
+          icon={<Thermometer className="h-4 w-4 text-orange-500" />}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4 text-xs">
             <SummaryCard label="Air Temp Range" value={`${Math.min(...weather.filter(w => w.air_temp != null).map(w => w.air_temp)).toFixed(1)}° - ${Math.max(...weather.filter(w => w.air_temp != null).map(w => w.air_temp)).toFixed(1)}°`} />
             <SummaryCard label="Track Temp Range" value={`${Math.min(...weather.filter(w => w.track_temp != null).map(w => w.track_temp)).toFixed(1)}° - ${Math.max(...weather.filter(w => w.track_temp != null).map(w => w.track_temp)).toFixed(1)}°`} />
@@ -1655,7 +1681,9 @@ export default function SessionDetailPage() {
 
       {/* ═══ RACE DIRECTOR ═══ */}
       {raceControl.length > 0 && (
-        <CardSection title="Race Director Timeline" subtitle="Flags, SC, VSC, penalties & incidents" icon={<Flag className="h-4 w-4 text-red-500" />}>
+        <CardSection title="Race Director Timeline" subtitle="Flags, SC, VSC, penalties & incidents"
+          summary={raceControl.length > 0 ? `${raceControl.length} entr${raceControl.length !== 1 ? 'ies' : 'y'}` : undefined}
+          icon={<Flag className="h-4 w-4 text-red-500" />}>
           <div className="overflow-x-auto max-h-80 overflow-y-auto">
             <table className="w-full text-sm">
               <thead>
