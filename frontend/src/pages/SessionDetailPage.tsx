@@ -1533,7 +1533,7 @@ export default function SessionDetailPage() {
                   <span className="text-muted-foreground/50">·</span>
                   <span>Avg brake: {(braking.drivers.reduce((s, d) => s + d.avg_brake_pressure, 0) / braking.drivers.length).toFixed(0)}%</span>
                   <span className="text-muted-foreground/50">·</span>
-                  <span>Events: {braking.drivers[0]?.total_braking_events || '-'}</span>
+                  <span>Events: {braking.drivers[0]?.braking_events || '-'}</span>
                 </div>
               </div>
             ) : (

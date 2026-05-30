@@ -567,12 +567,15 @@ export interface BrakingDriver {
   full_name: string;
   team_name: string;
   team_colour: string;
-  braking_events: BrakingEvent[];
+  braking_events: number;
+  braking_freq_per_min: number;
   avg_brake_pressure: number;
   max_brake_pressure: number;
-  total_braking_events: number;
+  avg_brake_onset_speed: number;
+  avg_brake_duration: number;
   late_braking_index: number;
   aggression_score: number;
+  avg_speed_lost_per_brake: number;
 }
 
 export interface BrakingData {
