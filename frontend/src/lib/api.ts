@@ -517,6 +517,8 @@ export interface CircuitInfoData {
   fun_fact?: string;
   image_url?: string;
   map_url?: string;
+  circuit_image?: string;
+  country_flag?: string;
   length_km?: number;
   turns?: number;
   drs_zones?: number;

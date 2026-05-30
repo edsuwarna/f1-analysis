@@ -132,19 +132,25 @@ export default function DriversPage() {
                   {/* Driver Header: headshot, name, number, team */}
                   <div className="p-4 pb-3 border-b border-border">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-muted flex items-center justify-center" style={{ color: teamColor(driver.team_colour) }}>
+                      <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-muted"
+                        style={{ boxShadow: `inset 0 0 0 2px ${teamColor(driver.team_colour)}` }}>
                         {driver.headshot_url ? (
                           <img
                             src={driver.headshot_url}
                             alt={driver.full_name}
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                              (e.target as HTMLImageElement).parentElement!.textContent = driver.name_acronym?.[0] || '?';
+                              const el = e.target as HTMLImageElement;
+                              el.style.display = 'none';
+                              const p = el.parentElement!;
+                              p.innerHTML = `<span class="text-lg font-bold" style="color:${teamColor(driver.team_colour)}">${driver.name_acronym?.[0] || '?'}</span>`;
                             }}
                           />
                         ) : (
-                          <span className="text-lg font-bold">{driver.name_acronym?.[0] || '?'}</span>
+                          <div className="w-full h-full flex items-center justify-center"
+                            style={{ backgroundColor: `${teamColor(driver.team_colour)}20`, color: teamColor(driver.team_colour) }}>
+                            <span className="text-lg font-bold">{driver.name_acronym?.[0] || '?'}</span>
+                          </div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">

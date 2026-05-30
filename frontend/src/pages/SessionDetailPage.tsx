@@ -661,7 +661,16 @@ export default function SessionDetailPage() {
         ) : circuitInfo?.circuit_name ? (
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-shrink-0 w-full max-w-[400px]">
-              <CircuitMap circuitName={circuitInfo.circuit_name || ''} className="w-full" />
+              {circuitInfo.circuit_image ? (
+                <img
+                  src={circuitInfo.circuit_image}
+                  alt={`${circuitInfo.circuit_name} circuit`}
+                  className="w-full h-auto rounded-md border border-border/50 bg-muted/30 object-contain"
+                  loading="lazy"
+                />
+              ) : (
+                <CircuitMap circuitName={circuitInfo.circuit_name || ''} className="w-full" />
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-base mb-1">{circuitInfo.circuit_name}</h4>

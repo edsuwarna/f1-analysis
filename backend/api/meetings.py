@@ -120,6 +120,8 @@ async def get_meeting_circuit(meeting_id: int, db: AsyncSession = Depends(get_db
         "location": meeting.location or "",
         "country": meeting.country_name or "",
         "country_code": meeting.country_code or "",
+        "circuit_image": meeting.circuit_image or "",
+        "country_flag": meeting.country_flag or "",
     }
 
     if info:
