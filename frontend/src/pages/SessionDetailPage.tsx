@@ -1158,6 +1158,14 @@ export default function SessionDetailPage() {
                     )}
                   </div>
                 ))}
+                {/* Legend */}
+                <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground border-t border-border/30 pt-2 mt-2">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#22c55e' }} /> Near best</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#eab308' }} /> Moderate</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#e11d48' }} /> Slow lap</span>
+                  <span className="text-muted-foreground/50">·</span>
+                  <span>Consistency: <span className="text-green-400">≥80%</span> · <span className="text-yellow-400">50–79%</span> · <span className="text-red-400">&lt;50%</span></span>
+                </div>
               </div>
             ) : (
               <p className="text-center py-4 text-muted-foreground text-sm">No lap distribution data available</p>
@@ -1169,18 +1177,58 @@ export default function SessionDetailPage() {
             loading={overtakeLoading} loaded={overtakeLoaded} onLoad={loadOvertakeAnalysis} isAvailable={isRaceSprint}>
             {overtakeData && Object.keys(overtakeData).length > 0 ? (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3 text-xs">
-                  <SummaryCard label="Total Gained" value={Object.values(overtakeData).reduce((s: number, d: any) => s + d.gained, 0).toString()} />
+                <div className="grid grid-cols-3 gap-2 mb-3 text-xs">
+                  <SummaryCard label="Total Gained" value={'+' + Object.values(overtakeData).reduce((s: number, d: any) => s + d.gained, 0).toString()} />
                   <SummaryCard label="Total Lost" value={Object.values(overtakeData).reduce((s: number, d: any) => s + d.lost, 0).toString()} />
-                  <SummaryCard label="Net" value={`+${Object.values(overtakeData).reduce((s: number, d: any) => s + d.net, 0)}`} />
+                  <SummaryCard label="Net" value={(Object.values(overtakeData).reduce((s: number, d: any) => s + d.net, 0) >= 0 ? '+' : '') + Object.values(overtakeData).reduce((s: number, d: any) => s + d.net, 0)} />
                 </div>
-                <BarChart
-                  data={Object.entries(overtakeData)
+                {/* Legend */}
+                <div className="flex gap-3 text-[10px] text-muted-foreground mb-2">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#22c55e' }} /> Gained</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#e11d48' }} /> Lost</span>
+                </div>
+                {/* Gained/Lost per driver */}
+                <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                  {Object.entries(overtakeData)
                     .sort((a: any, b: any) => b[1].net - a[1].net)
-                    .map(([dn, d]: any) => ({ key: d.acronym, value: Math.max(d.net, 0) }))}
-                  maxValue={Math.max(...Object.values(overtakeData).map((d: any) => d.net), 1)}
-                  color={(v) => v > 0 ? '#22c55e' : '#e11d48'} height={22}
-                  label="Net overtakes (top 10)" />
+                    .slice(0, 10)
+                    .map(([dn, d]: any) => {
+                      const maxVal = Math.max(
+                        ...Object.values(overtakeData).map((x: any) => Math.max(x.gained, x.lost)),
+                        1
+                      );
+                      return (
+                        <div key={dn} className="text-xs">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="w-12 text-right text-muted-foreground shrink-0">{d.acronym}</span>
+                            <span className="font-mono text-[10px] w-6 text-right shrink-0">
+                              <span className={d.net >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                {d.net >= 0 ? '+' : ''}{d.net}
+                              </span>
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 pl-14">
+                            {/* Gained bar */}
+                            <div className="flex-1 flex gap-px" style={{ direction: 'rtl' }}>
+                              <div className="h-3 rounded-l-sm transition-all" style={{
+                                width: `${Math.max((d.gained / maxVal) * 100, 2)}%`,
+                                background: '#22c55e'
+                              }} />
+                            </div>
+                            <span className="text-[10px] text-green-400 w-6 text-right shrink-0">+{d.gained}</span>
+                            {/* Lost bar */}
+                            <div className="flex-1 flex gap-px">
+                              <div className="h-3 rounded-r-sm transition-all" style={{
+                                width: `${Math.max((d.lost / maxVal) * 100, 2)}%`,
+                                background: '#e11d48'
+                              }} />
+                            </div>
+                            <span className="text-[10px] text-red-400 w-6 text-left shrink-0">{d.lost}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
               </>
             ) : (
               <p className="text-center py-4 text-muted-foreground text-sm">No overtake data</p>
@@ -1421,12 +1469,30 @@ export default function SessionDetailPage() {
           <LoadableCard title="Speed Trap" subtitle="Top speed & average speed per driver" icon={<Zap className="h-4 w-4 text-yellow-500" />}
             loading={speedsLoading} loaded={speedsLoaded} onLoad={loadSpeeds}>
             {speeds?.drivers?.length ? (
-              <BarChart
-                data={speeds.drivers.map(d => ({ key: d.acronym, value: Math.round(d.max_speed) }))}
-                maxValue={Math.max(...speeds.drivers.map(d => d.max_speed), 1)}
-                color={(v) => v > 330 ? '#22c55e' : v > 310 ? '#eab308' : '#e11d48'}
-                height={22}
-                label="Max Speed (km/h)" />
+              <div className="space-y-3">
+                <BarChart
+                  data={speeds.drivers.map(d => ({ key: d.acronym, value: Math.round(d.max_speed) }))}
+                  maxValue={Math.max(...speeds.drivers.map(d => d.max_speed), 1)}
+                  color={(v) => v > 330 ? '#22c55e' : v > 310 ? '#eab308' : '#e11d48'}
+                  height={20}
+                  label="Max Speed (km/h)" />
+                <div className="flex gap-3 text-[10px] text-muted-foreground -mt-1">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#22c55e' }} /> &gt;330</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#eab308' }} /> 310–330</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#e11d48' }} /> &lt;310</span>
+                </div>
+                <BarChart
+                  data={speeds.drivers.map(d => ({ key: d.acronym, value: Math.round(d.avg_speed) }))}
+                  maxValue={Math.max(...speeds.drivers.map(d => d.avg_speed), 1)}
+                  color={'#6366f1'}
+                  height={20}
+                  label="Avg Speed (km/h)" />
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground -mt-1">
+                  <span>P95: {speeds.drivers.sort((a, b) => b.p95_speed - a.p95_speed)[0]?.p95_speed.toFixed(0) || '-'} km/h</span>
+                  <span className="text-muted-foreground/50">·</span>
+                  <span>Data points: {speeds.drivers[0]?.data_points?.toLocaleString() || '-'}</span>
+                </div>
+              </div>
             ) : (
               <p className="text-center py-4 text-muted-foreground text-sm">No speed trap data</p>
             )}
@@ -1436,14 +1502,40 @@ export default function SessionDetailPage() {
           <LoadableCard title="Braking Analysis" subtitle="Late braking index & aggression" icon={<Gauge className="h-4 w-4 text-red-500" />}
             loading={brakingLoading} loaded={brakingLoaded} onLoad={loadBraking}>
             {braking?.drivers?.length ? (
-              <div className="max-h-[400px] overflow-y-auto">
-              <BarChart
-                data={braking.drivers.map(d => ({ key: d.acronym, value: Math.round(d.late_braking_index) }))}
-                maxValue={Math.max(...braking.drivers.map(d => d.late_braking_index), 1)}
-                color={(v) => v > 70 ? '#e11d48' : v > 40 ? '#eab308' : '#22c55e'}
-                height={20}
-                label="Late Braking Index (higher = later braking)" />
+              <div className="space-y-3">
+                {/* Late Braking Index */}
+                <BarChart
+                  data={braking.drivers.map(d => ({ key: d.acronym, value: Math.round(d.late_braking_index) }))}
+                  maxValue={Math.max(...braking.drivers.map(d => d.late_braking_index), 1)}
+                  color={(v) => v > 70 ? '#e11d48' : v > 40 ? '#eab308' : '#22c55e'}
+                  height={18}
+                  label="Late Braking Index (higher = later braking)" />
+                <div className="flex gap-3 text-[10px] text-muted-foreground -mt-1">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#e11d48' }} /> Aggressive</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#eab308' }} /> Moderate</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#22c55e' }} /> Conservative</span>
                 </div>
+
+                {/* Aggression Score */}
+                <BarChart
+                  data={braking.drivers.map(d => ({ key: d.acronym, value: Math.round(d.aggression_score * 100) }))}
+                  maxValue={Math.max(...braking.drivers.map(d => Math.round(d.aggression_score * 100)), 1)}
+                  color={'#f97316'}
+                  height={18}
+                  label="Aggression Score (speed lost / sec)" />
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground -mt-1">
+                  {braking.drivers.sort((a, b) => b.aggression_score - a.aggression_score).slice(0, 2).map(d => (
+                    <span key={d.driver_number} className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: d.team_colour || '#666' }} />
+                      <strong>{d.acronym}</strong> {d.aggression_score.toFixed(2)}
+                    </span>
+                  ))}
+                  <span className="text-muted-foreground/50">·</span>
+                  <span>Avg brake: {(braking.drivers.reduce((s, d) => s + d.avg_brake_pressure, 0) / braking.drivers.length).toFixed(0)}%</span>
+                  <span className="text-muted-foreground/50">·</span>
+                  <span>Events: {braking.drivers[0]?.total_braking_events || '-'}</span>
+                </div>
+              </div>
             ) : (
               <p className="text-center py-4 text-muted-foreground text-sm">No braking data</p>
             )}
@@ -1536,6 +1628,11 @@ export default function SessionDetailPage() {
                   color={(v) => v > 10000 ? '#e11d48' : v > 8000 ? '#eab308' : '#22c55e'}
                   height={20}
                   label="Avg RPM" />
+                <div className="flex gap-3 text-[10px] text-muted-foreground -mt-1">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#e11d48' }} /> &gt;10k</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#eab308' }} /> 8–10k</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#22c55e' }} /> &lt;8k</span>
+                </div>
                 {/* High RPM % bar chart */}
                 <BarChart
                   data={gear.drivers.map(d => ({ key: d.acronym, value: Math.round(d.high_rpm_percentage || d.high_rpm_pct) }))}
@@ -1543,6 +1640,11 @@ export default function SessionDetailPage() {
                   color={(v) => v > 60 ? '#e11d48' : v > 30 ? '#eab308' : '#22c55e'}
                   height={18}
                   label="High RPM % (>10k RPM)" />
+                <div className="flex gap-3 text-[10px] text-muted-foreground -mt-1">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#e11d48' }} /> &gt;60%</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#eab308' }} /> 30–60%</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#22c55e' }} /> &lt;30%</span>
+                </div>
                 {/* Max RPM + Stats */}
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                   <span>Max RPM: </span>
@@ -1571,6 +1673,11 @@ export default function SessionDetailPage() {
                 color={(v) => v > 50 ? '#22c55e' : v > 20 ? '#eab308' : '#3b82f6'}
                 height={18}
                 label="OM Activation %" />
+                <div className="flex gap-3 text-[10px] text-muted-foreground -mt-1">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#22c55e' }} /> &gt;50%</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#eab308' }} /> 20–50%</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#3b82f6' }} /> &lt;20%</span>
+                </div>
                 </div>
             </Card>
           )}
