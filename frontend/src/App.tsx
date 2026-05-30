@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarFooter, SidebarInset, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
@@ -8,7 +8,6 @@ import StandingsPage from '@/pages/StandingsPage';
 import MeetingsPage from '@/pages/MeetingsPage';
 import SessionDetailPage from '@/pages/SessionDetailPage';
 import DriverStatsPage from '@/pages/DriverStatsPage';
-import HeadToHeadPage from '@/pages/HeadToHeadPage';
 import PitStopsPage from '@/pages/PitStopsPage';
 import RacePacePage from '@/pages/RacePacePage';
 import SeasonAnalysisPage from '@/pages/SeasonAnalysisPage';
@@ -44,7 +43,6 @@ const mainNavItems: NavItem[] = [
   { icon: Gauge, label: 'Driver Stats', path: '/stats/drivers' },
   { icon: Activity, label: 'Consistency', path: '/consistency' },
   { icon: Flame, label: 'Race Pace', path: '/race-pace' },
-  { icon: Swords, label: 'Head to Head', path: '/head-to-head' },
   { icon: Flag, label: 'Pit Stops', path: '/pit-stops' },
   { icon: Newspaper, label: 'News', path: '/news' },
 ];
@@ -171,7 +169,7 @@ function AppLayoutContent() {
             <Route path="/session/:meetingId/:sessionId" element={<SessionDetailPage />} />
             <Route path="/standings" element={<StandingsPage />} />
             <Route path="/stats/drivers" element={<DriverStatsPage />} />
-            <Route path="/head-to-head" element={<HeadToHeadPage />} />
+            <Route path="/head-to-head" element={<Navigate to="/team-battle" replace />} />
             <Route path="/consistency" element={<ConsistencyPage />} />
             <Route path="/race-pace" element={<RacePacePage />} />
             <Route path="/pit-stops" element={<PitStopsPage />} />
@@ -216,7 +214,6 @@ function getPageTitle(pathname: string): string {
     '/drivers': 'Drivers',
     '/standings': 'Standings',
     '/stats/drivers': 'Driver Stats',
-    '/head-to-head': 'Head to Head',
     '/consistency': 'Consistency',
     '/race-pace': 'Race Pace',
     '/pit-stops': 'Pit Stops',

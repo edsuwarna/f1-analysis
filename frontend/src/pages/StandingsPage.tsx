@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { getDriverStandings, getConstructorStandings, type StandingRow, type ConstructorStandingRow } from '@/lib/api';
+import { getDriverStandings, getConstructorStandings, getSectorTrends, type StandingRow, type ConstructorStandingRow, type RaceResult, type SectorTrend } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { flagEmoji, teamColor } from '@/lib/formatters';
-import { Trophy, Users, ChevronDown, ChevronRight, Table2 } from 'lucide-react';
+import { flagEmoji, teamColor, formatTime } from '@/lib/formatters';
+import { Trophy, Users, ChevronDown, ChevronRight, Table2, BarChart3 } from 'lucide-react';
 
 interface RaceResultEntry {
   meeting_id: number;
@@ -36,7 +36,10 @@ export default function StandingsPage() {
   const [championship, setChampionship] = useState<ChampionshipData | null>(null);
   const [driverOpen, setDriverOpen] = useState(true);
   const [constructorOpen, setConstructorOpen] = useState(false);
-  const [raceBreakdownOpen, setRaceBreakdownOpen] = useState(false);
+  const [ppwOpen, setPpwOpen] = useState(false);
+  const [conPpwOpen, setConPpwOpen] = useState(false);
+  const [selectedDrivers, setSelectedDrivers] = useState<Set<number>>(new Set());
+  const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function load() {
@@ -64,33 +67,107 @@ export default function StandingsPage() {
   const constructors = championship?.constructor_standings || [];
   const races = championship?.races || [];
 
-  // Build per-driver race matrix: for each driver, map race index to result
-  const driverRaceMatrix = drivers.map(d => {
-    const raceResults: { raceIdx: number; position: number; points: number; session_name?: string }[] = [];
-    races.forEach((race, raceIdx) => {
-      // Find all results for this driver in this race (sprint + race)
-      const driverResults = race.results.filter(r => r.driver_number === d.driver_number);
-      driverResults.forEach(rr => {
-        raceResults.push({
-          raceIdx,
-          position: rr.position,
-          points: rr.points,
-          session_name: rr.session_name,
-        });
-      });
-    });
-    return { driver: d, raceResults };
+  // ── Points Per Week (PPW) heatmap data ──
+  const ppwRaces = [...races].reverse(); // chronological order
+  const ppwRaceNames = ppwRaces.map(r => r.race_name);
+  const ppwCountryCodes = ppwRaces.map(r => r.country_code || r.race_name.slice(0, 3).toUpperCase());
+
+  // Build per-driver ppw data: { raceName: { driverNumber: { race: pts, sprint: pts } } }
+  const ppwData: Record<string, Record<number, { race: number; sprint: number }>> = {};
+  const allPpwDrivers = new Set<number>();
+  for (const race of ppwRaces) {
+    const driverPts: Record<number, { race: number; sprint: number }> = {};
+    for (const r of race.results) {
+      const dn = r.driver_number;
+      allPpwDrivers.add(dn);
+      if (!driverPts[dn]) driverPts[dn] = { race: 0, sprint: 0 };
+      if (r.session_name === 'Sprint') {
+        driverPts[dn].sprint += r.points || 0;
+      } else {
+        driverPts[dn].race += r.points || 0;
+      }
+    }
+    ppwData[race.race_name] = driverPts;
+  }
+
+  // Sort drivers by total points
+  const ppwDriverList = [...allPpwDrivers].sort((a, b) => {
+    const aPts = drivers.find(d => d.driver_number === a)?.points || 0;
+    const bPts = drivers.find(d => d.driver_number === b)?.points || 0;
+    return bPts - aPts;
   });
 
-  const maxPos = Math.max(...races.flatMap(r => r.results.map(x => x.position)), 25);
-
-  function posColor(pos: number): string {
-    if (pos === 1) return 'bg-yellow-500/30 text-yellow-400 font-bold';
-    if (pos === 2) return 'bg-gray-400/20 text-gray-300 font-bold';
-    if (pos === 3) return 'bg-amber-600/20 text-amber-500 font-bold';
-    if (pos <= 10) return 'bg-green-500/10 text-green-400';
-    return 'bg-muted/30 text-muted-foreground';
+  // Max race pts for normalization
+  let maxRacePts = 0;
+  for (const rn of ppwRaceNames) {
+    for (const dn of ppwDriverList) {
+      const p = ppwData[rn]?.[dn];
+      if (p) maxRacePts = Math.max(maxRacePts, p.race);
+    }
   }
+  maxRacePts = Math.max(maxRacePts, 1);
+
+  // ── Constructor PPW ──
+  const ppwConData: Record<string, Record<string, { race: number; sprint: number }>> = {};
+  const allPpwCons = new Set<string>();
+  for (const race of ppwRaces) {
+    const teamPts: Record<string, { race: number; sprint: number }> = {};
+    for (const r of race.results) {
+      const team = r.team_name || 'Unknown';
+      allPpwCons.add(team);
+      if (!teamPts[team]) teamPts[team] = { race: 0, sprint: 0 };
+      if (r.session_name === 'Sprint') {
+        teamPts[team].sprint += r.points || 0;
+      } else {
+        teamPts[team].race += r.points || 0;
+      }
+    }
+    ppwConData[race.race_name] = teamPts;
+  }
+
+  const ppwConList = [...allPpwCons].sort((a, b) => {
+    const aPts = constructors.find(c => c.team_name === a)?.points || 0;
+    const bPts = constructors.find(c => c.team_name === b)?.points || 0;
+    return bPts - aPts;
+  });
+
+  let maxConRacePts = 0;
+  for (const rn of ppwRaceNames) {
+    for (const tn of ppwConList) {
+      const p = ppwConData[rn]?.[tn];
+      if (p) maxConRacePts = Math.max(maxConRacePts, p.race);
+    }
+  }
+  maxConRacePts = Math.max(maxConRacePts, 1);
+
+  // ── Toggle helper ──
+  function toggleDriver(dn: number) {
+    setSelectedDrivers(prev => {
+      const next = new Set(prev);
+      if (next.has(dn)) next.delete(dn);
+      else next.add(dn);
+      return next;
+    });
+  }
+  function toggleTeam(tn: string) {
+    setSelectedTeams(prev => {
+      const next = new Set(prev);
+      if (next.has(tn)) next.delete(tn);
+      else next.add(tn);
+      return next;
+    });
+  }
+
+  // Default: first 10 selected
+  if (selectedDrivers.size === 0 && ppwDriverList.length > 0) {
+    setSelectedDrivers(new Set(ppwDriverList.slice(0, 10)));
+  }
+  if (selectedTeams.size === 0 && ppwConList.length > 0) {
+    setSelectedTeams(new Set(ppwConList.slice(0, 10)));
+  }
+
+  const cellW = Math.max(48, Math.min(72, Math.max(600 / ppwRaceNames.length, 44)));
+  const cellH = 34;
 
   return (
     <div className="space-y-6">
@@ -153,9 +230,7 @@ export default function StandingsPage() {
                       <tr><td colSpan={6} className="text-center p-8 text-muted-foreground">No data available</td></tr>
                     ) : (
                       drivers.map((d, i) => {
-                        const avgFinish = races.length > 0
-                          ? (d.points / races.length).toFixed(1)
-                          : '-';
+                        const avgFinish = races.length > 0 ? (d.points / races.length).toFixed(1) : '-';
                         return (
                           <tr key={d.driver_number} className="border-b border-border hover:bg-muted/30 transition-colors">
                             <td className="p-3">
@@ -194,78 +269,308 @@ export default function StandingsPage() {
                 </table>
               </div>
             )}
-
-            {/* ── Per-Race Breakdown Toggle ── */}
-            {drivers.length > 0 && races.length > 0 && (
-              <>
-                <button
-                  onClick={() => setRaceBreakdownOpen(!raceBreakdownOpen)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left border-t border-border/50"
-                >
-                  {raceBreakdownOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                  <Table2 className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">Per-Race Breakdown</span>
-                  <Badge variant="outline" className="text-xs ml-auto">{races.length} races</Badge>
-                </button>
-
-                {raceBreakdownOpen && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-border bg-muted/30">
-                          <th className="sticky left-0 bg-muted/30 z-10 p-2 text-left font-medium text-muted-foreground">Driver</th>
-                          {races.map((r, idx) => (
-                            <th key={r.meeting_id} className="p-2 text-center font-medium text-muted-foreground min-w-[50px]">
-                              <div title={r.race_name}>
-                                <span className="text-[10px] uppercase">{r.country_code}</span>
-                                <span className="block text-[9px] opacity-60">R{idx + 1}</span>
-                              </div>
-                            </th>
-                          ))}
-                          <th className="p-2 text-right font-medium text-muted-foreground">Pts</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {driverRaceMatrix.map(({ driver: d, raceResults }) => (
-                          <tr key={d.driver_number} className="border-b border-border/50 hover:bg-muted/20">
-                            <td className="sticky left-0 bg-card z-10 p-2 font-semibold flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: teamColor(d.team_colour) }} />
-                              <span>{d.name_acronym}</span>
-                            </td>
-                            {races.map((race, raceIdx) => {
-                              const driverAtRace = raceResults.filter(r => r.raceIdx === raceIdx && !r.session_name);
-                              const driverSprint = raceResults.filter(r => r.raceIdx === raceIdx && r.session_name === 'Sprint');
-                              const dr = driverAtRace[0];
-                              const ds = driverSprint[0];
-                              return (
-                                <td key={race.meeting_id} className="p-1.5 text-center">
-                                  <div className="flex items-center justify-center gap-0.5">
-                                    {ds && (
-                                      <span className={`text-[9px] px-1 rounded ${posColor(ds.position)}`}>
-                                        S{ds.position}
-                                      </span>
-                                    )}
-                                    {dr ? (
-                                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${posColor(dr.position)}`}>
-                                        P{dr.position}
-                                      </span>
-                                    ) : (
-                                      <span className="text-[10px] text-muted-foreground/40">-</span>
-                                    )}
-                                  </div>
-                                </td>
-                              );
-                            })}
-                            <td className="p-2 text-right font-bold">{d.points}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </>
-            )}
           </Card>
+
+          {/* ── Points Per Weekend: Driver Heatmap ── */}
+          {drivers.length > 0 && races.length > 0 && (
+            <Card className="overflow-hidden">
+              <button
+                onClick={() => setPpwOpen(!ppwOpen)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left border-b border-border"
+              >
+                {ppwOpen ? <ChevronDown className="h-4 w-4 text-primary" /> : <ChevronRight className="h-4 w-4 text-primary" />}
+                <BarChart3 className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Points Per Weekend</span>
+                <Badge variant="outline" className="text-xs ml-auto">{ppwRaceNames.length} races</Badge>
+                <Badge variant="secondary" className="text-xs">{ppwDriverList.length} drivers</Badge>
+              </button>
+
+              {ppwOpen && (
+                <div className="p-4">
+                  {/* Driver Checkboxes */}
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    {ppwDriverList.map(dn => {
+                      const d = drivers.find(x => x.driver_number === dn);
+                      const acronym = d?.name_acronym || `#${dn}`;
+                      const colour = d?.team_colour ? teamColor(d.team_colour) : '#666';
+                      const isChecked = selectedDrivers.has(dn);
+                      return (
+                        <button
+                          key={dn}
+                          onClick={() => toggleDriver(dn)}
+                          className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md transition-all border ${
+                            isChecked ? 'border-border font-medium' : 'border-transparent opacity-40 hover:opacity-60'
+                          }`}
+                          style={isChecked ? { background: `${colour}20`, borderColor: `${colour}60`, color: colour } : {}}
+                        >
+                          <span className="w-2 h-2 rounded-full" style={{ background: colour }} />
+                          {acronym}
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={() => setSelectedDrivers(new Set(ppwDriverList))}
+                      className="text-[11px] px-2 py-1 rounded-md text-muted-foreground hover:text-foreground border border-border/50"
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => setSelectedDrivers(new Set())}
+                      className="text-[11px] px-2 py-1 rounded-md text-muted-foreground hover:text-foreground border border-border/50"
+                    >
+                      Clear
+                    </button>
+                  </div>
+
+                  {/* Legend */}
+                  <div className="flex items-center gap-4 mb-3 text-[10px] text-muted-foreground">
+                    <span>🏁 Main = Race pts</span>
+                    <span>⚡ Small below = Sprint pts</span>
+                  </div>
+
+                  {/* Heatmap Grid */}
+                  <div className="overflow-x-auto overflow-y-auto max-h-[600px]">
+                    <div style={{ minWidth: `${48 + ppwRaceNames.length * cellW + 36}px` }}>
+                      {/* Header Row */}
+                      <div className="flex gap-0.5 mb-1" style={{ paddingLeft: 48 }}>
+                        {ppwRaceNames.map((rn, ci) => (
+                          <div
+                            key={ci}
+                            className="text-[9px] font-bold text-muted-foreground text-center truncate"
+                            style={{ width: cellW }}
+                            title={rn}
+                          >
+                            {ppwCountryCodes[ci]}
+                          </div>
+                        ))}
+                        <div className="text-[9px] font-bold text-muted-foreground text-center" style={{ width: 36 }}>Tot</div>
+                      </div>
+
+                      {/* Driver Rows */}
+                      {ppwDriverList.filter(dn => selectedDrivers.has(dn)).map(dn => {
+                        const d = drivers.find(x => x.driver_number === dn);
+                        const acronym = d?.name_acronym || `#${dn}`;
+                        const baseColor = d?.team_colour ? teamColor(d.team_colour) : '#666';
+                        const rgb = baseColor.replace('#', '');
+                        const r = parseInt(rgb.slice(0,2), 16);
+                        const g = parseInt(rgb.slice(2,4), 16);
+                        const b = parseInt(rgb.slice(4,6), 16);
+
+                        let rowTotal = 0;
+                        const cells = ppwRaceNames.map(rn => {
+                          const p = ppwData[rn]?.[dn];
+                          const racePts = p?.race || 0;
+                          const sprintPts = p?.sprint || 0;
+                          const pts = racePts + sprintPts;
+                          rowTotal += pts;
+
+                          if (pts === 0) {
+                            return (
+                              <div
+                                key={rn}
+                                className="flex items-center justify-center text-[9px] text-muted-foreground/30 rounded"
+                                style={{ width: cellW, height: cellH, background: 'var(--secondary)' }}
+                              >
+                                0
+                              </div>
+                            );
+                          }
+
+                          const intensity = Math.min(1, racePts / maxRacePts);
+                          const alpha = 0.15 + intensity * 0.85;
+                          const cellBg = `rgba(${r},${g},${b},${alpha})`;
+                          const textBrightness = (r*0.299 + g*0.587 + b*0.114) * alpha;
+                          const cellTextColor = textBrightness > 80 ? '#000' : '#fff';
+
+                          return (
+                            <div
+                              key={rn}
+                              className="rounded flex flex-col items-center justify-center leading-tight"
+                              style={{ width: cellW, height: cellH, background: cellBg, color: cellTextColor }}
+                              title={`${acronym} - ${rn}: Race ${racePts} + Sprint ${sprintPts} = ${pts} pts`}
+                            >
+                              {sprintPts > 0 ? (
+                                <>
+                                  <span style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.2 }}>{racePts}</span>
+                                  <span style={{ fontSize: 7, opacity: 0.85, lineHeight: 1.1 }}>+{sprintPts}</span>
+                                </>
+                              ) : (
+                                <span style={{ fontSize: 10, fontWeight: 700 }}>{racePts}</span>
+                              )}
+                            </div>
+                          );
+                        });
+
+                        return (
+                          <div key={dn} className="flex items-center gap-0.5 mb-[1px]">
+                            <div
+                              className="text-[9px] font-semibold text-right pr-1.5 truncate"
+                              style={{ width: 48, color: baseColor }}
+                            >
+                              {acronym}
+                            </div>
+                            {cells}
+                            <div className="flex items-center justify-center text-[10px] font-bold" style={{ width: 36, color: baseColor }}>
+                              {rowTotal}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* ── Constructor PPW Heatmap ── */}
+          {constructors.length > 0 && races.length > 0 && (
+            <Card className="overflow-hidden">
+              <button
+                onClick={() => setConPpwOpen(!conPpwOpen)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left border-b border-border"
+              >
+                {conPpwOpen ? <ChevronDown className="h-4 w-4 text-blue-500" /> : <ChevronRight className="h-4 w-4 text-blue-500" />}
+                <BarChart3 className="h-4 w-4 text-blue-500" />
+                <span className="text-sm font-medium">Constructor Points Per Weekend</span>
+                <Badge variant="outline" className="text-xs ml-auto">{ppwRaceNames.length} races</Badge>
+                <Badge variant="secondary" className="text-xs">{ppwConList.length} teams</Badge>
+              </button>
+
+              {conPpwOpen && (
+                <div className="p-4">
+                  {/* Team Checkboxes */}
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    {ppwConList.map(tn => {
+                      const c = constructors.find(x => x.team_name === tn);
+                      const colour = c?.team_colour ? teamColor(c.team_colour) : '#666';
+                      const short = tn.replace(/Team|Racing|Racing Bulls/g, '').trim() || tn;
+                      const isChecked = selectedTeams.has(tn);
+                      return (
+                        <button
+                          key={tn}
+                          onClick={() => toggleTeam(tn)}
+                          className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md transition-all border ${
+                            isChecked ? 'border-border font-medium' : 'border-transparent opacity-40 hover:opacity-60'
+                          }`}
+                          style={isChecked ? { background: `${colour}20`, borderColor: `${colour}60`, color: colour } : {}}
+                        >
+                          <span className="w-2 h-2 rounded-full" style={{ background: colour }} />
+                          {short}
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={() => setSelectedTeams(new Set(ppwConList))}
+                      className="text-[11px] px-2 py-1 rounded-md text-muted-foreground hover:text-foreground border border-border/50"
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => setSelectedTeams(new Set())}
+                      className="text-[11px] px-2 py-1 rounded-md text-muted-foreground hover:text-foreground border border-border/50"
+                    >
+                      Clear
+                    </button>
+                  </div>
+
+                  {/* Legend */}
+                  <div className="flex items-center gap-4 mb-3 text-[10px] text-muted-foreground">
+                    <span>🏁 Main = Race pts</span>
+                    <span>⚡ Small below = Sprint pts</span>
+                  </div>
+
+                  {/* Heatmap Grid */}
+                  <div className="overflow-x-auto overflow-y-auto max-h-[500px]">
+                    <div style={{ minWidth: `${64 + ppwRaceNames.length * cellW + 36}px` }}>
+                      {/* Header Row */}
+                      <div className="flex gap-0.5 mb-1" style={{ paddingLeft: 64 }}>
+                        {ppwRaceNames.map((rn, ci) => (
+                          <div
+                            key={ci}
+                            className="text-[9px] font-bold text-muted-foreground text-center truncate"
+                            style={{ width: cellW }}
+                            title={rn}
+                          >
+                            {ppwCountryCodes[ci]}
+                          </div>
+                        ))}
+                        <div className="text-[9px] font-bold text-muted-foreground text-center" style={{ width: 36 }}>Tot</div>
+                      </div>
+
+                      {/* Team Rows */}
+                      {ppwConList.filter(tn => selectedTeams.has(tn)).map(tn => {
+                        const c = constructors.find(x => x.team_name === tn);
+                        const colour = c?.team_colour ? teamColor(c.team_colour) : '#666';
+                        const short = tn.replace(/Team|Racing|Racing Bulls/g, '').trim() || tn;
+                        const rgb = colour.replace('#', '');
+                        const r = parseInt(rgb.slice(0,2), 16);
+                        const g = parseInt(rgb.slice(2,4), 16);
+                        const b = parseInt(rgb.slice(4,6), 16);
+
+                        let rowTotal = 0;
+                        const cells = ppwRaceNames.map(rn => {
+                          const p = ppwConData[rn]?.[tn];
+                          const racePts = p?.race || 0;
+                          const sprintPts = p?.sprint || 0;
+                          const pts = racePts + sprintPts;
+                          rowTotal += pts;
+
+                          if (pts === 0) {
+                            return (
+                              <div
+                                key={rn}
+                                className="flex items-center justify-center text-[9px] text-muted-foreground/30 rounded"
+                                style={{ width: cellW, height: cellH, background: 'var(--secondary)' }}
+                              >
+                                0
+                              </div>
+                            );
+                          }
+
+                          const intensity = Math.min(1, racePts / maxConRacePts);
+                          const alpha = 0.15 + intensity * 0.85;
+                          const cellBg = `rgba(${r},${g},${b},${alpha})`;
+                          const textBrightness = (r*0.299 + g*0.587 + b*0.114) * alpha;
+                          const cellTextColor = textBrightness > 80 ? '#000' : '#fff';
+
+                          return (
+                            <div
+                              key={rn}
+                              className="rounded flex flex-col items-center justify-center leading-tight"
+                              style={{ width: cellW, height: cellH, background: cellBg, color: cellTextColor }}
+                              title={`${short} - ${rn}: Race ${racePts} + Sprint ${sprintPts} = ${pts} pts`}
+                            >
+                              {sprintPts > 0 ? (
+                                <>
+                                  <span style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.2 }}>{racePts}</span>
+                                  <span style={{ fontSize: 7, opacity: 0.85, lineHeight: 1.1 }}>+{sprintPts}</span>
+                                </>
+                              ) : (
+                                <span style={{ fontSize: 10, fontWeight: 700 }}>{racePts}</span>
+                              )}
+                            </div>
+                          );
+                        });
+
+                        return (
+                          <div key={tn} className="flex items-center gap-0.5 mb-[1px]">
+                            <div className="text-[9px] font-semibold text-right pr-1.5 truncate" style={{ width: 64, color: colour }}>
+                              {short}
+                            </div>
+                            {cells}
+                            <div className="flex items-center justify-center text-[10px] font-bold" style={{ width: 36, color: colour }}>
+                              {rowTotal}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Card>
+          )}
 
           {/* ── Constructor Standings ── */}
           <Card className="overflow-hidden">
