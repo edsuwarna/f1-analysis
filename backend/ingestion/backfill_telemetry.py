@@ -33,7 +33,11 @@ CHECKPOINT_FILE = "/app/backend/ingestion/.backfill_checkpoint.json"
 
 
 def backfill_sessions(engine, limit=0, resume_from=0):
-    """Backfill telemetry for sessions without it.
+    """Backfill telemetry for sessions with missing or incomplete telemetry.
+    
+    Catches both:
+    - Sessions with zero telemetry rows
+    - Sessions where some drivers lack telemetry (partial)
     
     Args:
         engine: SQLAlchemy engine
@@ -45,26 +49,44 @@ def backfill_sessions(engine, limit=0, resume_from=0):
     """
     with engine.begin() as conn:
         rows = conn.execute(text("""
-            SELECT s.id, s.session_key, s.session_name
-            FROM sessions s
-            WHERE NOT EXISTS (
-                SELECT 1 FROM telemetry t WHERE t.session_id = s.id
+            WITH driver_counts AS (
+                SELECT session_id, COUNT(*)::int AS total_drivers
+                FROM session_drivers
+                GROUP BY session_id
+            ),
+            telemetry_driver_counts AS (
+                SELECT session_id, COUNT(DISTINCT driver_number)::int AS tel_drivers
+                FROM telemetry
+                GROUP BY session_id
             )
+            SELECT s.id, s.session_key, s.session_name,
+                   COALESCE(dc.total_drivers, 0) AS total_drivers,
+                   COALESCE(tdc.tel_drivers, 0) AS tel_drivers
+            FROM sessions s
+            LEFT JOIN driver_counts dc ON dc.session_id = s.id
+            LEFT JOIN telemetry_driver_counts tdc ON tdc.session_id = s.id
+            WHERE COALESCE(tdc.tel_drivers, 0) < COALESCE(dc.total_drivers, 0)
+               OR (dc.total_drivers IS NULL AND tdc.tel_drivers IS NULL)
             ORDER BY s.meeting_id, s.id
         """)).fetchall()
 
     if resume_from:
         rows = [r for r in rows if r[0] > resume_from]
 
-    if limit > 0:
-        rows = rows[:limit]
-
     if not rows:
         return 0
 
+    log.info(f"🎯 Found {len(rows)} session(s) with missing/incomplete telemetry")
+    for r in rows:
+        log.info(f"    Session {r[0]}: {r[2]} — {r[4]}/{r[3]} drivers have telemetry")
+
+    total = len(rows)
+    if limit > 0:
+        rows = rows[:limit]
+
     completed = 0
-    for sid, skey, sname in rows:
-        log.info(f"  📡 Session {sid}: {sname}...")
+    for sid, skey, sname, *_ in rows:
+        log.info(f"  📡 [{completed+1}/{total}] Session {sid}: {sname}...")
         try:
             _store_telemetry(engine, skey, sid)
             completed += 1
@@ -75,6 +97,7 @@ def backfill_sessions(engine, limit=0, resume_from=0):
         except Exception as e:
             log.warning(f"  ⚠️ Error on session {sid}: {e}")
             time.sleep(REQUEST_DELAY * 3)
+
 
     return completed
 
@@ -144,8 +167,21 @@ def main():
     if os.path.exists(CHECKPOINT_FILE):
         with engine.begin() as conn:
             remaining = conn.execute(text("""
+                WITH driver_counts AS (
+                    SELECT session_id, COUNT(*)::int AS total_drivers
+                    FROM session_drivers
+                    GROUP BY session_id
+                ),
+                telemetry_driver_counts AS (
+                    SELECT session_id, COUNT(DISTINCT driver_number)::int AS tel_drivers
+                    FROM telemetry
+                    GROUP BY session_id
+                )
                 SELECT COUNT(*) FROM sessions s
-                WHERE NOT EXISTS (SELECT 1 FROM telemetry t WHERE t.session_id = s.id)
+                LEFT JOIN driver_counts dc ON dc.session_id = s.id
+                LEFT JOIN telemetry_driver_counts tdc ON tdc.session_id = s.id
+                WHERE COALESCE(tdc.tel_drivers, 0) < COALESCE(dc.total_drivers, 0)
+                   OR (dc.total_drivers IS NULL AND tdc.tel_drivers IS NULL)
             """)).scalar()
         if remaining == 0:
             os.remove(CHECKPOINT_FILE)

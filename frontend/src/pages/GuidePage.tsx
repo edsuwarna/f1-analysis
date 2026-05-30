@@ -41,9 +41,9 @@ const GUIDE_DATA: GuideCategory[] = [
         lookFor: 'Steep upward slopes = strong recovery drives. Downward slopes = dropping through the field due to strategy or pace loss. Flat lines = processional race.',
       },
       {
-        title: 'Track Position Map',
-        description: 'Real-time-style plot of each driver\'s lateral position on track over time, useful for seeing defensive/offensive moves and track limits.',
-        lookFor: 'Sudden lateral movements = overtakes or defensive moves. Repeated wide excursions = possible track limits issues.',
+        title: 'Circuit Detail',
+        description: 'Track info panel showing circuit layout image or map, length, number of turns, and location details. Load-on-demand to keep page snappy.',
+        lookFor: 'Circuit characteristics directly influence race strategy — high-downforce tracks (many slow corners) vs power tracks (long straights) favour different car strengths.',
       },
       {
         title: 'Pit Strategy Battle',
@@ -56,14 +56,14 @@ const GUIDE_DATA: GuideCategory[] = [
         lookFor: 'Drivers on offset strategies (e.g. longer first stint) trying to gain track position. Also look for extremely long stints with heavy degradation.',
       },
       {
-        title: 'Weather Timeline',
-        description: 'Shows ambient and track temperature, humidity, wind speed, and rain probability across the session duration. Critical for understanding tyre window and setup shifts.',
-        lookFor: 'Rapid temperature drops or rain probability spikes just before a strategic pit window. Track temperature directly affects tyre behaviour.',
+        title: 'Weather Impact',
+        description: 'Shows ambient and track temperature, humidity, and rainfall status throughout the session duration. Critical for understanding tyre window and setup shifts.',
+        lookFor: 'Rapid temperature drops or rain just before a strategic pit window. Track temperature directly affects tyre behaviour — cooler = more grip but harder to warm up.',
       },
       {
-        title: 'Race Control',
-        description: 'Timeline of all flags, safety car periods, virtual safety car (VSC) deployments, and investigations during a session. Each event includes the lap and duration.',
-        lookFor: 'Safety car periods are the single biggest strategy differentiator — they compress the field and create free pit stop opportunities.',
+        title: 'Race Timeline',
+        description: 'Timeline of all flags, safety car periods, virtual safety car (VSC) deployments, and penalties during a session, categorised by type. Each event includes the lap and duration.',
+        lookFor: 'Safety car periods are the single biggest strategy differentiator — they compress the field and create free pit stop opportunities. Penalty patterns can reveal track limit hotspots.',
       },
       {
         title: 'Overtake Mode Analysis',
@@ -87,9 +87,9 @@ const GUIDE_DATA: GuideCategory[] = [
     icon: '📊',
     sections: [
       {
-        title: 'Season Overview',
-        description: 'Top-level stats including races completed, total drivers, different winners, and constructor standings snapshot. A heatmap shows which drivers have scored podiums across rounds.',
-        lookFor: 'Consistency trends — drivers who score points nearly every race vs those with high-variance boom-or-bust results.',
+        title: 'Pit Stop Championship',
+        description: 'A ranking of teams by pit stop performance across the season. Shows average pit duration, fastest and slowest stop, consistency percentage, and total stops.',
+        lookFor: 'Consistency matters more than single fast stops — teams with the lowest variance often outscore teams with occasional lightning-fast but inconsistent stops. Track how a team improves mid-season.',
       },
       {
         title: 'Driver Form Chart',
@@ -108,24 +108,19 @@ const GUIDE_DATA: GuideCategory[] = [
     icon: '🥊',
     sections: [
       {
-        title: 'Constructor vs Constructor',
-        description: 'Select any two constructors and compare their full season performance. Total points, average finish, podium count, wins, and a round-by-round breakdown showing who won each race weekend.',
-        lookFor: 'Which team is more consistent? Which team peaks at specific circuits? Head-to-head qualifying pace tells you who has the fastest car over one lap.',
+        title: 'Team Head to Head',
+        description: 'Select any two teams and compare head-to-head across the season. Total points, average finish, podium count, wins, and a round-by-round breakdown of who won each race weekend.',
+        lookFor: 'Which team is more consistent? Which team peaks at specific circuits? Qualifying pace comparison tells you who has the fastest car over one lap.',
       },
       {
-        title: 'Teammate Battle',
+        title: 'Teammate Head to Head',
         description: 'Compares teammates within each team. Points gap, qualifying head-to-head, race head-to-head, average finish position, and retirement rates.',
         lookFor: 'A lopsided intra-team battle suggests one driver is outperforming the car — or the other is underperforming.',
       },
       {
-        title: 'Driver vs Driver',
+        title: 'Driver Head to Head',
         description: 'Select any two drivers and compare their full season stats: total points, average finish, qualifying gap, race pace, sector strengths, and head-to-head win/loss record.',
         lookFor: 'The qualifying gap tells you the raw pace difference. The race pace gap tells you who manages tyres and traffic better.',
-      },
-      {
-        title: 'Sector Strength Comparison',
-        description: 'Compare each driver\'s sector performance across the season. Highlights which driver is faster in each sector type — S1 (top speed), S2 (downforce), S3 (traction).',
-        lookFor: 'A driver consistently faster in S3 (usually traction-dependent) vs S1 (usually top-speed dependent) reveals driving style bias.',
       },
     ],
   },
@@ -137,11 +132,6 @@ const GUIDE_DATA: GuideCategory[] = [
         title: 'Team Overview',
         description: 'Profile card for each constructor with their driver lineup, engine supplier, base location, and 2026 season stats including points, wins, podiums, and DNFs.',
         lookFor: 'Which teams score most points at which circuit types (street, power, high-downforce). Useful for betting on upcoming races.',
-      },
-      {
-        title: 'Technical Development',
-        description: 'Teams bring upgrades throughout the season. This section logs when upgrades were introduced and how track performance changed afterwards.',
-        lookFor: 'Correlation between upgrade packages and performance jumps. Some teams\' upgrades work immediately, others take a race or two to optimise.',
       },
     ],
   },

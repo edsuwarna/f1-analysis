@@ -14,5 +14,6 @@ RUN pip install --no-cache-dir -r requirements-ingestion.txt
 
 COPY backend/ /app/backend/
 COPY scripts/ /app/scripts/
+COPY migrations/ /app/migrations/
 
 CMD ["tail", "-f", "/dev/null"]
