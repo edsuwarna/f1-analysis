@@ -24,7 +24,7 @@ import {
   ChevronDown, CircuitBoard, Activity, GitCompare,
   Download, ExternalLink, Trophy, RefreshCw,
 } from 'lucide-react';
-import CircuitMap from '@/components/CircuitMap';
+import InteractiveCircuitMap from '@/components/InteractiveCircuitMap';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
@@ -661,16 +661,11 @@ export default function SessionDetailPage() {
         ) : circuitInfo?.circuit_name ? (
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-shrink-0 w-full max-w-[400px]">
-              {circuitInfo.circuit_image ? (
-                <img
-                  src={circuitInfo.circuit_image}
-                  alt={`${circuitInfo.circuit_name} circuit`}
-                  className="w-full h-auto rounded-md border border-border/50 bg-muted/30 object-contain"
-                  loading="lazy"
-                />
-              ) : (
-                <CircuitMap circuitName={circuitInfo.circuit_name || ''} className="w-full" />
-              )}
+              <InteractiveCircuitMap
+                circuitName={circuitInfo.circuit_name || ''}
+                circuitImage={circuitInfo.circuit_image || undefined}
+                className="w-full"
+              />
             </div>
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-base mb-1">{circuitInfo.circuit_name}</h4>
@@ -678,7 +673,6 @@ export default function SessionDetailPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
                 {circuitInfo.length_km != null && <SpecBox label="Length (km)" value={circuitInfo.length_km.toString()} />}
                 {circuitInfo.turns != null && <SpecBox label="Turns" value={circuitInfo.turns.toString()} />}
-                {circuitInfo.drs_zones != null && <SpecBox label="DRS Zones" value={circuitInfo.drs_zones.toString()} />}
                 {circuitInfo.opened != null && <SpecBox label="Opened" value={circuitInfo.opened.toString()} />}
                 {circuitInfo.lap_record && <SpecBox label={`Lap Record${circuitInfo.lap_record_driver ? ' (' + circuitInfo.lap_record_driver + ')' : ''}`} value={circuitInfo.lap_record} className="col-span-2 sm:col-span-1" />}
               </div>
