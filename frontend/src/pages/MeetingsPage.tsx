@@ -129,36 +129,11 @@ export default function MeetingsPage({ onSelectSession }: MeetingsPageProps) {
                         </span>
                       </div>
                     </div>
-                    {/* Circuit thumbnail */}
-                    {m.circuit_image ? (
-                      <div className="flex-shrink-0 w-20 h-14 rounded-md overflow-hidden border border-border/50 bg-white/10 shadow-inner">
-                        <img
-                          src={m.circuit_image}
-                          alt={`${m.circuit_name} circuit`}
-                          className="w-full h-full object-contain brightness-[1.15] contrast-[1.1]"
-                          loading="lazy"
-                        />
-                      </div>
-                    ) : null}
                   <ChevronRight className={`h-5 w-5 text-muted-foreground transition-transform ${
                     expanded === m.id ? 'rotate-90' : ''
                   }`} />
                 </div>
               </div>
-
-              {/* Expanded: Circuit image banner */}
-              {expanded === m.id && m.circuit_image && (
-                <div className="border-t border-border px-4 py-3 bg-white/5">
-                  <img
-                    src={m.circuit_image}
-                    alt={`${m.circuit_name || m.name} circuit map`}
-                    className="w-full max-h-48 object-contain rounded-md brightness-[1.15] contrast-[1.1]"
-                  />
-                  <p className="text-xs text-muted-foreground/60 text-center mt-1.5">
-                    {m.circuit_name} · {m.circuit_type || 'Permanent'}
-                  </p>
-                </div>
-              )}
 
               {/* Sessions */}
               {expanded === m.id && sessions[m.id] && (
