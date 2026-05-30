@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDateTime } from '@/lib/formatters';
-import { ExternalLink, Newspaper } from 'lucide-react';
+import { ExternalLink, Newspaper, Loader2 } from 'lucide-react';
 
 interface Article {
   title: string;
@@ -13,6 +13,8 @@ interface Article {
   source: string;
   source_icon: string | null;
 }
+
+const ITEMS_PER_PAGE = 10;
 
 const SOURCE_COLORS: Record<string, string> = {
   'Motorsport': '#e10600',
@@ -36,11 +38,23 @@ function getSourceBadgeClass(source: string): string {
   return SOURCE_BADGE_COLORS[source] || 'bg-muted/50 text-muted-foreground border-border';
 }
 
+/** Check if a string is an emoji-only or emoji+text (not a URL) */
+function isEmojiIcon(val: string | null | undefined): boolean {
+  if (!val) return false;
+  // If it contains a URL scheme or looks like a path, treat as image URL
+  if (val.startsWith('http://') || val.startsWith('https://') || val.startsWith('/') || val.startsWith('./')) {
+    return false;
+  }
+  // Emojis are short strings with no URL structure
+  return val.length < 10;
+}
+
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 export default function NewsPage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
 
   useEffect(() => {
     async function load() {
@@ -58,6 +72,9 @@ export default function NewsPage() {
     load();
   }, []);
 
+  const visibleArticles = articles.slice(0, displayCount);
+  const hasMore = displayCount < articles.length;
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -65,7 +82,10 @@ export default function NewsPage() {
           <Newspaper className="h-6 w-6 text-red-500" />
           F1 News
         </h1>
-        <div className="text-center p-12 text-muted-foreground">Loading articles...</div>
+        <div className="flex items-center justify-center p-12 text-muted-foreground gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading articles...
+        </div>
       </div>
     );
   }
@@ -89,20 +109,22 @@ export default function NewsPage() {
           <Newspaper className="h-6 w-6 text-red-500" />
           F1 News
         </h1>
-        <Badge variant="secondary" className="text-xs">
-          {articles.length} {articles.length === 1 ? 'article' : 'articles'}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="text-xs">
+            {articles.length} {articles.length === 1 ? 'article' : 'articles'}
+          </Badge>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {articles.map((article, index) => (
+        {visibleArticles.map((article, index) => (
           <Card
             key={index}
             className="overflow-hidden border-l-4"
             style={{ borderLeftColor: getSourceColor(article.source) }}
           >
             <div className="flex flex-row">
-              {article.thumbnail && (
+              {article.thumbnail ? (
                 <div className="w-28 sm:w-36 shrink-0">
                   <img
                     src={article.thumbnail}
@@ -111,8 +133,11 @@ export default function NewsPage() {
                     loading="lazy"
                   />
                 </div>
-              )}
-              {!article.thumbnail && article.source_icon && (
+              ) : article.source_icon && isEmojiIcon(article.source_icon) ? (
+                <div className="w-14 shrink-0 flex items-center justify-center bg-muted/30">
+                  <span className="text-2xl">{article.source_icon}</span>
+                </div>
+              ) : article.source_icon ? (
                 <div className="w-14 shrink-0 flex items-center justify-center bg-muted/30">
                   <img
                     src={article.source_icon}
@@ -121,7 +146,7 @@ export default function NewsPage() {
                     loading="lazy"
                   />
                 </div>
-              )}
+              ) : null}
               <CardContent className="p-4 flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <Badge
@@ -155,6 +180,24 @@ export default function NewsPage() {
           </Card>
         ))}
       </div>
+
+      {/* Load More Button */}
+      {hasMore && (
+        <div className="flex justify-center pt-2">
+          <button
+            onClick={() => setDisplayCount(prev => prev + ITEMS_PER_PAGE)}
+            className="px-6 py-2.5 bg-secondary hover:bg-secondary/80 text-foreground rounded-lg text-sm font-medium transition-colors border border-border"
+          >
+            Load More ({articles.length - displayCount} remaining)
+          </button>
+        </div>
+      )}
+
+      {!hasMore && articles.length > ITEMS_PER_PAGE && (
+        <p className="text-center text-xs text-muted-foreground py-2">
+          Showing all {articles.length} articles
+        </p>
+      )}
     </div>
   );
 }

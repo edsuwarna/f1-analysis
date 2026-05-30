@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { teamColor } from '@/lib/formatters';
-import { Swords, Users, TrendingUp, Zap } from 'lucide-react';
+import { Swords, Users, TrendingUp, Zap, Trophy, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface TeamBattle {
   team_name: string;
   team_colour: string;
-  drivers: string[];  // API returns acronym strings, not objects
+  drivers: string[];
   race_wins: Record<string, number>;
   qual_wins: Record<string, number>;
 }
@@ -17,20 +17,38 @@ interface TeamBattleData {
   battles: TeamBattle[];
 }
 
+interface DriverPoints {
+  name_acronym: string;
+  points: number;
+}
+
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
 export default function TeamBattlePage() {
   const [data, setData] = useState<TeamBattleData | null>(null);
+  const [pointsMap, setPointsMap] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selectedTeam, setSelectedTeam] = useState<string>('');
-
-  const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`${API_BASE}/analytics/teammate-battle?year=2026`);
-        if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
-        const json = await res.json();
-        setData(json);
+        const [battleRes, driversRes] = await Promise.all([
+          fetch(`${API_BASE}/analytics/teammate-battle?year=2026`),
+          fetch(`${API_BASE}/drivers?year=2026`),
+        ]);
+        if (!battleRes.ok) throw new Error(`Battle API ${battleRes.status}`);
+        const battleJson = await battleRes.json();
+        setData(battleJson);
+
+        if (driversRes.ok) {
+          const driversJson = await driversRes.json();
+          const map = new Map<string, number>();
+          (driversJson.drivers || []).forEach((d: DriverPoints) => {
+            map.set(d.name_acronym, d.points);
+          });
+          setPointsMap(map);
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -54,7 +72,6 @@ export default function TeamBattlePage() {
 
   const { battles } = data;
 
-  // Compute qualifying and race win totals for percentage bars
   function getDriverStats(battle: TeamBattle, d: string) {
     const qWins = battle.qual_wins?.[d] || 0;
     const rWins = battle.race_wins?.[d] || 0;
@@ -67,7 +84,12 @@ export default function TeamBattlePage() {
       racePercent: Math.round((rWins / rTotal) * 100),
       totalQual: qTotal,
       totalRace: rTotal,
+      points: pointsMap.get(d) || 0,
     };
+  }
+
+  function getOtherDriver(battle: TeamBattle, d: string): string {
+    return battle.drivers.find(x => x !== d) || '';
   }
 
   return (
@@ -120,7 +142,7 @@ export default function TeamBattlePage() {
           >
             <div className="p-5">
               {/* Team Header */}
-              <div className="flex items-center gap-2 mb-5">
+              <div className="flex items-center gap-2 mb-4">
                 <span
                   className="w-4 h-4 rounded-full flex-shrink-0"
                   style={{ background: teamColor(battle.team_colour) }}
@@ -136,6 +158,11 @@ export default function TeamBattlePage() {
                     style={{ background: `${teamColor(battle.team_colour)}20` }}
                   >
                     <span className="font-bold text-base">{d1}</span>
+                    {d1Stats && (
+                      <span className="block text-xs text-muted-foreground mt-0.5">
+                        {d1Stats.points} pts
+                      </span>
+                    )}
                   </div>
                 )}
                 {d2 && (
@@ -144,9 +171,79 @@ export default function TeamBattlePage() {
                     style={{ background: `${teamColor(battle.team_colour)}20` }}
                   >
                     <span className="font-bold text-base">{d2}</span>
+                    {d2Stats && (
+                      <span className="block text-xs text-muted-foreground mt-0.5">
+                        {d2Stats.points} pts
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
+
+              {/* Head-to-Head Summary */}
+              {d1 && d2 && d1Stats && d2Stats && (
+                <div className="grid grid-cols-2 gap-3 mb-5">
+                  <Card className="p-3 text-center">
+                    <Zap className="h-4 w-4 text-yellow-500 mx-auto mb-1" />
+                    <div className="text-lg font-bold">
+                      {d1Stats.qualWins} - {d2Stats.qualWins}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Qualifying H2H</p>
+                  </Card>
+                  <Card className="p-3 text-center">
+                    <TrendingUp className="h-4 w-4 text-green-500 mx-auto mb-1" />
+                    <div className="text-lg font-bold">
+                      {d1Stats.raceWins} - {d2Stats.raceWins}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Race H2H</p>
+                  </Card>
+                </div>
+              )}
+
+              {/* Points Bar */}
+              {d1Stats && d2Stats && (
+                <div className="mb-4">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Trophy className="h-3.5 w-3.5 text-orange-500" />
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Points
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-semibold text-right min-w-[32px]" style={{ color: teamColor(battle.team_colour) }}>
+                      {d1}
+                    </span>
+                    <div className="flex-1 flex rounded-full overflow-hidden h-6 bg-secondary">
+                      <div
+                        className="flex items-center justify-center text-[11px] font-bold text-white transition-all"
+                        style={{
+                          width: `${(d1Stats.points / Math.max(d1Stats.points + d2Stats.points, 1)) * 100}%`,
+                          background: teamColor(battle.team_colour),
+                        }}
+                      >
+                        {d1Stats.points}
+                      </div>
+                      <div
+                        className="flex items-center justify-center text-[11px] font-bold text-white transition-all ml-[1px]"
+                        style={{
+                          width: `${(d2Stats.points / Math.max(d1Stats.points + d2Stats.points, 1)) * 100}%`,
+                          background: teamColor(battle.team_colour),
+                          opacity: 0.5,
+                        }}
+                      >
+                        {d2Stats.points}
+                      </div>
+                    </div>
+                    <span className="text-xs font-semibold min-w-[32px]" style={{ color: teamColor(battle.team_colour), opacity: 0.7 }}>
+                      {d2}
+                    </span>
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-xs text-muted-foreground">{d1Stats.points} pts</span>
+                    <span className="text-xs text-muted-foreground">{d2Stats.points} pts</span>
+                  </div>
+                </div>
+              )}
 
               {/* Qualifying Battle */}
               {d1Stats && d2Stats && (
