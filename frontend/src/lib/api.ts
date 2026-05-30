@@ -10,6 +10,8 @@ export interface Meeting {
   country_code: string;
   country_name: string;
   circuit_name: string;
+  circuit_image?: string;
+  country_flag?: string;
   date_start: string;
   date_end: string;
   circuit_type?: string;

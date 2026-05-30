@@ -189,6 +189,7 @@ def _store_meeting(engine, meeting_data: dict) -> int:
                     year = :y, name = :n, official_name = :off,
                     location = :loc, country_code = :cc, country_name = :cn,
                     circuit_name = :circuit, circuit_type = :ctype,
+                    circuit_image = :cimg, country_flag = :cflag,
                     date_start = :ds, date_end = :de, gmt_offset = :gmt
                 WHERE id = :id
             """), {
@@ -201,6 +202,8 @@ def _store_meeting(engine, meeting_data: dict) -> int:
                 "cn": meeting_data.get("country_name", ""),
                 "circuit": meeting_data.get("circuit_short_name", ""),
                 "ctype": meeting_data.get("circuit_type", ""),
+                "cimg": meeting_data.get("circuit_image", ""),
+                "cflag": meeting_data.get("country_flag", ""),
                 "ds": date_start,
                 "de": date_end,
                 "gmt": meeting_data.get("gmt_offset", ""),
@@ -210,9 +213,10 @@ def _store_meeting(engine, meeting_data: dict) -> int:
             result = session.execute(text("""
                 INSERT INTO meetings (meeting_key, year, name, official_name,
                     location, country_code, country_name, circuit_name,
-                    circuit_type, date_start, date_end, gmt_offset)
+                    circuit_type, circuit_image, country_flag,
+                    date_start, date_end, gmt_offset)
                 VALUES (:mk, :y, :n, :off, :loc, :cc, :cn, :circuit,
-                    :ctype, :ds, :de, :gmt)
+                    :ctype, :cimg, :cflag, :ds, :de, :gmt)
                 RETURNING id
             """), {
                 "mk": meeting_key,
@@ -224,6 +228,8 @@ def _store_meeting(engine, meeting_data: dict) -> int:
                 "cn": meeting_data.get("country_name", ""),
                 "circuit": meeting_data.get("circuit_short_name", ""),
                 "ctype": meeting_data.get("circuit_type", ""),
+                "cimg": meeting_data.get("circuit_image", ""),
+                "cflag": meeting_data.get("country_flag", ""),
                 "ds": date_start,
                 "de": date_end,
                 "gmt": meeting_data.get("gmt_offset", ""),

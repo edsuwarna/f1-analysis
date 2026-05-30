@@ -28,6 +28,8 @@ class Meeting(Base):
     country_name = Column(String(100))
     circuit_name = Column(String(100))
     circuit_type = Column(String(50))
+    circuit_image = Column(String(500), comment="Official F1 circuit map image URL")
+    country_flag = Column(String(500), comment="Official F1 country flag URL")
     date_start = Column(DateTime)
     date_end = Column(DateTime)
     gmt_offset = Column(String(10))
