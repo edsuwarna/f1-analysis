@@ -11,7 +11,7 @@ import DriverStatsPage from '@/pages/DriverStatsPage';
 import PitStopsPage from '@/pages/PitStopsPage';
 import RacePacePage from '@/pages/RacePacePage';
 import SeasonAnalysisPage from '@/pages/SeasonAnalysisPage';
-import TeamBattlePage from '@/pages/TeamBattlePage';
+import HeadToHeadPage from '@/pages/HeadToHeadPage';
 import TeamsPage from '@/pages/TeamsPage';
 import NewsPage from '@/pages/NewsPage';
 import GuidePage from '@/pages/GuidePage';
@@ -39,7 +39,7 @@ const mainNavItems: NavItem[] = [
   { icon: UserCircle, label: 'Drivers', path: '/drivers' },
   { icon: Building2, label: 'Teams', path: '/teams' },
   { icon: BarChart3, label: 'Season Analysis', path: '/season' },
-  { icon: Swords, label: 'Team Battle', path: '/team-battle' },
+  { icon: Swords, label: 'Head to Head', path: '/head-to-head' },
   { icon: Gauge, label: 'Driver Stats', path: '/stats/drivers' },
   { icon: Activity, label: 'Consistency', path: '/consistency' },
   { icon: Flame, label: 'Race Pace', path: '/race-pace' },
@@ -169,12 +169,12 @@ function AppLayoutContent() {
             <Route path="/session/:meetingId/:sessionId" element={<SessionDetailPage />} />
             <Route path="/standings" element={<StandingsPage />} />
             <Route path="/stats/drivers" element={<DriverStatsPage />} />
-            <Route path="/head-to-head" element={<Navigate to="/team-battle" replace />} />
+            <Route path="/head-to-head" element={<HeadToHeadPage />} />
+            <Route path="/team-battle" element={<Navigate to="/head-to-head" replace />} />
             <Route path="/consistency" element={<ConsistencyPage />} />
             <Route path="/race-pace" element={<RacePacePage />} />
             <Route path="/pit-stops" element={<PitStopsPage />} />
             <Route path="/season" element={<SeasonAnalysisPage />} />
-            <Route path="/team-battle" element={<TeamBattlePage />} />
             <Route path="/teams" element={<TeamsPage />} />
             <Route path="/news" element={<NewsPage />} />
             <Route path="/guide" element={<GuidePage />} />
@@ -218,7 +218,7 @@ function getPageTitle(pathname: string): string {
     '/race-pace': 'Race Pace',
     '/pit-stops': 'Pit Stops',
     '/season': 'Season Analysis',
-    '/team-battle': 'Team Battle',
+    '/head-to-head': 'Head to Head',
     '/teams': 'Teams',
     '/news': 'News',
     '/guide': 'Guide',

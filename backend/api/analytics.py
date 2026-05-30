@@ -2109,3 +2109,200 @@ async def get_gear_analysis(
     }
     set_cache("gear-analysis", session_id, result)
     return result
+
+
+@router.get("/team-h2h")
+async def team_h2h(
+    year: int = Query(2026),
+    team1: str = Query(...),
+    team2: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Head-to-head comparison between two constructors across a season.
+
+    For each race round returns which team outperformed the other based on
+    the best-placed driver from each team. Includes points, qualifying,
+    finishing positions, podiums, and DNFs.
+    """
+    RACE_POINTS = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10,
+                   6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
+    SPRINT_POINTS = {1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1}
+
+    query = text("""
+        SELECT
+            m.id AS meeting_id,
+            m.name AS race_name,
+            m.date_start,
+            s.session_name,
+            l.driver_number,
+            l.position,
+            l.lap_duration,
+            sd.name_acronym,
+            sd.team_name,
+            sd.team_colour
+        FROM meetings m
+        JOIN sessions s ON s.meeting_id = m.id
+        JOIN laps l ON l.session_id = s.id
+        LEFT JOIN session_drivers sd
+            ON sd.session_id = s.id AND sd.driver_number = l.driver_number
+        WHERE m.year = :year
+          AND sd.team_name IN (:team1, :team2)
+          AND s.session_name IN ('Race', 'Sprint', 'Qualifying')
+          AND l.position IS NOT NULL AND l.position > 0
+          AND l.position <= 20
+          AND l.lap_number = (
+              SELECT MAX(l2.lap_number)
+              FROM laps l2
+              WHERE l2.session_id = l.session_id
+                AND l2.driver_number = l.driver_number
+          )
+        ORDER BY m.date_start, s.date_start, l.position
+    """)
+    result = await db.execute(query, {"year": year, "team1": team1, "team2": team2})
+    rows = result.fetchall()
+
+    if not rows:
+        return {
+            "year": year,
+            "team1": {"name": team1, "colour": "", "total_points": 0, "avg_finish": None, "best_finish": None, "podiums": 0, "wins": 0, "dnfs": 0},
+            "team2": {"name": team2, "colour": "", "total_points": 0, "avg_finish": None, "best_finish": None, "podiums": 0, "wins": 0, "dnfs": 0},
+            "rounds": [],
+        }
+
+    from collections import defaultdict, OrderedDict
+
+    # Gather colours
+    colours = {}
+    for r in rows:
+        colours[r.team_name] = r.team_colour or ""
+
+    # Build per-meeting, per-team data
+    meetings = OrderedDict()
+    for r in rows:
+        mid = r.meeting_id
+        if mid not in meetings:
+            meetings[mid] = {
+                "race_name": r.race_name,
+                "date": str(r.date_start) if r.date_start else "",
+                "teams": defaultdict(lambda: {
+                    "finishes": [], "qual_positions": [],
+                    "race_pts": 0, "sprint_pts": 0, "dnf": False,
+                }),
+            }
+        team = r.team_name or "Unknown"
+        session = r.session_name
+        pos = r.position
+        dn = r.driver_number
+
+        if session == "Qualifying":
+            meetings[mid]["teams"][team]["qual_positions"].append(pos)
+        elif session == "Sprint":
+            pts = SPRINT_POINTS.get(pos, 0)
+            meetings[mid]["teams"][team]["sprint_pts"] += pts
+            meetings[mid]["teams"][team]["finishes"].append(pos)
+        elif session == "Race":
+            pts = RACE_POINTS.get(pos, 0)
+            meetings[mid]["teams"][team]["race_pts"] += pts
+            meetings[mid]["teams"][team]["finishes"].append(pos)
+
+    # Build rounds output
+    team1_colour = colours.get(team1, "")
+    team2_colour = colours.get(team2, "")
+    t1_total = {"points": 0, "finishes": [], "podiums": 0, "wins": 0, "dnfs": 0}
+    t2_total = {"points": 0, "finishes": [], "podiums": 0, "wins": 0, "dnfs": 0}
+
+    rounds_output = []
+    for mid, rd in meetings.items():
+        t1 = rd["teams"].get(team1, {"finishes": [], "qual_positions": [], "race_pts": 0, "sprint_pts": 0})
+        t2 = rd["teams"].get(team2, {"finishes": [], "qual_positions": [], "race_pts": 0, "sprint_pts": 0})
+
+        t1_round_pts = t1["race_pts"] + t1["sprint_pts"]
+        t2_round_pts = t2["race_pts"] + t2["sprint_pts"]
+
+        best_t1_finish = min(t1["finishes"]) if t1["finishes"] else None
+        best_t2_finish = min(t2["finishes"]) if t2["finishes"] else None
+        best_t1_qual = min(t1["qual_positions"]) if t1["qual_positions"] else None
+        best_t2_qual = min(t2["qual_positions"]) if t2["qual_positions"] else None
+
+        # Determine round winner (best finish across both drivers)
+        if best_t1_finish is not None and best_t2_finish is not None:
+            if best_t1_finish < best_t2_finish:
+                round_winner = team1
+            elif best_t2_finish < best_t1_finish:
+                round_winner = team2
+            else:
+                round_winner = "tie"
+        elif best_t1_finish is not None:
+            round_winner = team1
+        elif best_t2_finish is not None:
+            round_winner = team2
+        else:
+            round_winner = "dnf"
+
+        # Track totals
+        t1_total["points"] += t1_round_pts
+        t2_total["points"] += t2_round_pts
+        if best_t1_finish is not None:
+            t1_total["finishes"].append(best_t1_finish)
+            if best_t1_finish <= 3:
+                t1_total["podiums"] += 1
+            if best_t1_finish == 1:
+                t1_total["wins"] += 1
+        else:
+            t1_total["dnfs"] += 1
+
+        if best_t2_finish is not None:
+            t2_total["finishes"].append(best_t2_finish)
+            if best_t2_finish <= 3:
+                t2_total["podiums"] += 1
+            if best_t2_finish == 1:
+                t2_total["wins"] += 1
+        else:
+            t2_total["dnfs"] += 1
+
+        rounds_output.append({
+            "meeting_id": mid,
+            "race_name": rd["race_name"],
+            "date": rd["date"],
+            "winner": round_winner,
+            team1: {
+                "points": t1_round_pts,
+                "best_finish": best_t1_finish,
+                "best_qual": best_t1_qual,
+            },
+            team2: {
+                "points": t2_round_pts,
+                "best_finish": best_t2_finish,
+                "best_qual": best_t2_qual,
+            },
+        })
+
+    def avg(lst):
+        return round(sum(lst) / len(lst), 1) if lst else None
+
+    return {
+        "year": year,
+        "team1": {
+            "name": team1,
+            "colour": team1_colour,
+            "total_points": t1_total["points"],
+            "avg_finish": avg(t1_total["finishes"]),
+            "best_finish": min(t1_total["finishes"]) if t1_total["finishes"] else None,
+            "podiums": t1_total["podiums"],
+            "wins": t1_total["wins"],
+            "dnfs": t1_total["dnfs"],
+            "rounds_raced": len(t1_total["finishes"]) + t1_total["dnfs"],
+        },
+        "team2": {
+            "name": team2,
+            "colour": team2_colour,
+            "total_points": t2_total["points"],
+            "avg_finish": avg(t2_total["finishes"]),
+            "best_finish": min(t2_total["finishes"]) if t2_total["finishes"] else None,
+            "podiums": t2_total["podiums"],
+            "wins": t2_total["wins"],
+            "dnfs": t2_total["dnfs"],
+            "rounds_raced": len(t2_total["finishes"]) + t2_total["dnfs"],
+        },
+        "rounds": rounds_output,
+    }

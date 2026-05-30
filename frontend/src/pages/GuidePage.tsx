@@ -104,18 +104,28 @@ const GUIDE_DATA: GuideCategory[] = [
     ],
   },
   {
-    title: 'Team Battle Page',
-    icon: '⚔️',
+    title: 'Head to Head',
+    icon: '🥊',
     sections: [
       {
         title: 'Constructor vs Constructor',
-        description: 'Head-to-head comparison of two constructors across the entire season. Shows total points, race-by-race points, podium counts, and average finishing position.',
+        description: 'Select any two constructors and compare their full season performance. Total points, average finish, podium count, wins, and a round-by-round breakdown showing who won each race weekend.',
         lookFor: 'Which team is more consistent? Which team peaks at specific circuits? Head-to-head qualifying pace tells you who has the fastest car over one lap.',
       },
       {
-        title: 'Driver Pairing Comparison',
+        title: 'Teammate Battle',
         description: 'Compares teammates within each team. Points gap, qualifying head-to-head, race head-to-head, average finish position, and retirement rates.',
         lookFor: 'A lopsided intra-team battle suggests one driver is outperforming the car — or the other is underperforming.',
+      },
+      {
+        title: 'Driver vs Driver',
+        description: 'Select any two drivers and compare their full season stats: total points, average finish, qualifying gap, race pace, sector strengths, and head-to-head win/loss record.',
+        lookFor: 'The qualifying gap tells you the raw pace difference. The race pace gap tells you who manages tyres and traffic better.',
+      },
+      {
+        title: 'Sector Strength Comparison',
+        description: 'Compare each driver\'s sector performance across the season. Highlights which driver is faster in each sector type — S1 (top speed), S2 (downforce), S3 (traction).',
+        lookFor: 'A driver consistently faster in S3 (usually traction-dependent) vs S1 (usually top-speed dependent) reveals driving style bias.',
       },
     ],
   },
@@ -132,22 +142,6 @@ const GUIDE_DATA: GuideCategory[] = [
         title: 'Technical Development',
         description: 'Teams bring upgrades throughout the season. This section logs when upgrades were introduced and how track performance changed afterwards.',
         lookFor: 'Correlation between upgrade packages and performance jumps. Some teams\' upgrades work immediately, others take a race or two to optimise.',
-      },
-    ],
-  },
-  {
-    title: 'Head to Head Page',
-    icon: '🥊',
-    sections: [
-      {
-        title: 'Driver vs Driver',
-        description: 'Select any two drivers and compare their full season stats: total points, average finish, qualifying gap, race pace, sector strengths, and head-to-head win/loss record.',
-        lookFor: 'The qualifying gap tells you the raw pace difference. The race pace gap tells you who manages tyres and traffic better.',
-      },
-      {
-        title: 'Sector Strength Comparison',
-        description: 'Radar chart and bar chart comparing each driver\'s sector performance across the season. Highlights which driver is faster in each sector type.',
-        lookFor: 'A driver consistently faster in S3 (usually traction-dependent) vs S1 (usually top-speed dependent) reveals driving style bias.',
       },
     ],
   },
