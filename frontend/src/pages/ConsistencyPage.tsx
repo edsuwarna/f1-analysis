@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getDriverForm, getDriverStandings, type StandingRow } from '@/lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ResponsiveTabs } from '@/components/ui/responsive-tabs';
 import { teamColor, flagEmoji } from '@/lib/formatters';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -305,266 +305,271 @@ export default function ConsistencyPage() {
         Consistency Analysis
       </h1>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="overflow-x-auto flex-nowrap w-full justify-start">
-          <TabsTrigger value="race" className="flex items-center gap-1.5 whitespace-nowrap">
-            <TrendingUp className="h-4 w-4" />
-            Race Consistency
-          </TabsTrigger>
-          <TabsTrigger value="sprint" className="flex items-center gap-1.5 whitespace-nowrap">
-            <Gauge className="h-4 w-4" />
-            Sprint Consistency
-          </TabsTrigger>
-          <TabsTrigger value="table" className="flex items-center gap-1.5 whitespace-nowrap">
-            <Table2 className="h-4 w-4" />
-            Full Table
-          </TabsTrigger>
-        </TabsList>
-
-        {/* ── Race Consistency Tab ── */}
-        <TabsContent value="race" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <TrendingUp className="h-5 w-5 text-emerald-500" />
-                Average Race Finishing Position
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {raceChartData.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">No race data available</p>
-              ) : (
-                <ResponsiveContainer width="100%" height={Math.max(300, raceChartData.length * 40)}>
-                  <BarChart
-                    data={raceChartData}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis
-                      type="number"
-                      domain={[0, 'dataMax + 2']}
-                      stroke="hsl(var(--muted-foreground))"
-                      tick={{ fontSize: 12 }}
-                      label={{
-                        value: 'Avg Finish Position',
-                        position: 'insideBottomRight',
-                        offset: -5,
-                        style: { fill: 'hsl(var(--muted-foreground))', fontSize: 12 },
-                      }}
-                    />
-                    <YAxis
-                      dataKey="full_name"
-                      type="category"
-                      width={110}
-                      stroke="hsl(var(--muted-foreground))"
-                      tick={{ fontSize: 12 }}
-                      tickFormatter={(val: string) => {
-                        const driver = raceChartData.find(d => d.full_name === val);
-                        return driver ? `${driver.acronym} ${val.split(' ').pop() || ''}` : val;
-                      }}
-                    />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="avg_pos" name="Avg Position" radius={[0, 4, 4, 0]}>
-                      {raceChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <div className="text-2xl font-bold text-emerald-400">
-                  {metrics.filter(m => m.consistency_score >= 80).length}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Highly Consistent (≥80)</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <div className="text-2xl font-bold text-amber-400">
-                  {(metrics.reduce((sum, m) => sum + m.consistency_score, 0) / metrics.length).toFixed(0)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Average Consistency</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <div className="text-2xl font-bold text-blue-400">
-                  {(metrics.reduce((sum, m) => sum + (m.reliability || 0), 0) / metrics.length).toFixed(0)}%
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Average Reliability</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <div className="text-2xl font-bold text-purple-400">
-                  {metrics.filter(m => m.avg_race_pos != null && m.avg_race_pos <= 10).length}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Top-10 Avg Finish</p>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* ── Sprint Consistency Tab ── */}
-        <TabsContent value="sprint" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Gauge className="h-5 w-5 text-orange-500" />
-                Average Sprint Finishing Position
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {sprintChartData.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">No sprint data available</p>
-              ) : (
-                <ResponsiveContainer width="100%" height={Math.max(300, sprintChartData.length * 40)}>
-                  <BarChart
-                    data={sprintChartData}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis
-                      type="number"
-                      domain={[0, 'dataMax + 2']}
-                      stroke="hsl(var(--muted-foreground))"
-                      tick={{ fontSize: 12 }}
-                      label={{
-                        value: 'Avg Sprint Position',
-                        position: 'insideBottomRight',
-                        offset: -5,
-                        style: { fill: 'hsl(var(--muted-foreground))', fontSize: 12 },
-                      }}
-                    />
-                    <YAxis
-                      dataKey="full_name"
-                      type="category"
-                      width={110}
-                      stroke="hsl(var(--muted-foreground))"
-                      tick={{ fontSize: 12 }}
-                      tickFormatter={(val: string) => {
-                        const driver = sprintChartData.find(d => d.full_name === val);
-                        return driver ? `${driver.acronym} ${val.split(' ').pop() || ''}` : val;
-                      }}
-                    />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar dataKey="avg_pos" name="Avg Sprint Position" radius={[0, 4, 4, 0]}>
-                      {sprintChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ── Full Table Tab ── */}
-        <TabsContent value="table" className="space-y-4">
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border bg-muted/50">
-                    <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase w-12">#</th>
-                    <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase">Driver</th>
-                    <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase">Team</th>
-                    <th className="text-right p-3 text-xs font-medium text-muted-foreground uppercase">Avg Race Pos</th>
-                    <th className="text-right p-3 text-xs font-medium text-muted-foreground uppercase">Avg Sprint Pos</th>
-                    <th className="text-right p-3 text-xs font-medium text-muted-foreground uppercase">Consistency</th>
-                    <th className="text-right p-3 text-xs font-medium text-muted-foreground uppercase">Reliability</th>
-                    <th className="text-right p-3 text-xs font-medium text-muted-foreground uppercase">Pts/Race</th>
-                    <th className="text-right p-3 text-xs font-medium text-muted-foreground uppercase">Total Pts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {metrics.map((m, i) => (
-                    <tr
-                      key={m.driver_number}
-                      className={`border-b border-border hover:bg-muted/30 transition-colors ${
-                        i % 2 === 1 ? 'bg-muted/10' : ''
-                      }`}
-                    >
-                      <td className="p-3">
-                        <span className={`font-bold text-sm ${posClass(i + 1)}`}>
-                          {posEmoji(i + 1)}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-3">
-                          <span
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ background: teamColor(m.team_colour) }}
-                          />
-                          <div>
-                            <div className="font-semibold text-sm">{m.acronym}</div>
-                            <div className="text-xs text-muted-foreground">{m.full_name}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                            style={{ background: teamColor(m.team_colour) }}
-                          />
-                          <span className="text-sm text-muted-foreground">{m.team_name}</span>
-                        </div>
-                      </td>
-                      <td className="p-3 text-right">
-                        <span className="font-mono text-sm font-medium">
-                          {m.avg_race_pos != null ? m.avg_race_pos.toFixed(1) : '-'}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right">
-                        <span className="font-mono text-sm text-muted-foreground">
-                          {m.avg_sprint_pos != null ? m.avg_sprint_pos.toFixed(1) : '-'}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right">
-                        <Badge
-                          variant="outline"
-                          className={`font-mono text-xs ${
-                            m.consistency_score >= 80
-                              ? 'border-green-500/50 text-green-400'
-                              : m.consistency_score >= 60
-                              ? 'border-yellow-500/50 text-yellow-400'
-                              : 'border-red-500/50 text-red-400'
-                          }`}
+      <ResponsiveTabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        tabs={[
+          {
+            value: 'race',
+            icon: <TrendingUp className="h-4 w-4" />,
+            label: 'Race Consistency',
+            content: (
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <TrendingUp className="h-5 w-5 text-emerald-500" />
+                      Average Race Finishing Position
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {raceChartData.length === 0 ? (
+                      <p className="text-center py-8 text-muted-foreground">No race data available</p>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={Math.max(300, raceChartData.length * 40)}>
+                        <BarChart
+                          data={raceChartData}
+                          layout="vertical"
+                          margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
                         >
-                          {m.consistency_score}
-                        </Badge>
-                      </td>
-                      <td className="p-3 text-right">
-                        <span className="font-mono text-sm">
-                          {m.reliability.toFixed(0)}%
-                        </span>
-                      </td>
-                      <td className="p-3 text-right">
-                        <span className="font-mono text-sm text-muted-foreground">
-                          {m.points_per_race.toFixed(1)}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right">
-                        <span className="font-bold text-sm">{m.total_points}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis
+                            type="number"
+                            domain={[0, 'dataMax + 2']}
+                            stroke="hsl(var(--muted-foreground))"
+                            tick={{ fontSize: 12 }}
+                            label={{
+                              value: 'Avg Finish Position',
+                              position: 'insideBottomRight',
+                              offset: -5,
+                              style: { fill: 'hsl(var(--muted-foreground))', fontSize: 12 },
+                            }}
+                          />
+                          <YAxis
+                            dataKey="full_name"
+                            type="category"
+                            width={110}
+                            stroke="hsl(var(--muted-foreground))"
+                            tick={{ fontSize: 12 }}
+                            tickFormatter={(val: string) => {
+                              const driver = raceChartData.find(d => d.full_name === val);
+                              return driver ? `${driver.acronym} ${val.split(' ').pop() || ''}` : val;
+                            }}
+                          />
+                          <Tooltip content={<ChartTooltip />} />
+                          <Bar dataKey="avg_pos" name="Avg Position" radius={[0, 4, 4, 0]}>
+                            {raceChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.fill} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <div className="text-2xl font-bold text-emerald-400">
+                        {metrics.filter(m => m.consistency_score >= 80).length}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">Highly Consistent (≥80)</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <div className="text-2xl font-bold text-amber-400">
+                        {(metrics.reduce((sum, m) => sum + m.consistency_score, 0) / metrics.length).toFixed(0)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">Average Consistency</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <div className="text-2xl font-bold text-blue-400">
+                        {(metrics.reduce((sum, m) => sum + (m.reliability || 0), 0) / metrics.length).toFixed(0)}%
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">Average Reliability</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <div className="text-2xl font-bold text-purple-400">
+                        {metrics.filter(m => m.avg_race_pos != null && m.avg_race_pos <= 10).length}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">Top-10 Avg Finish</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            ),
+          },
+          {
+            value: 'sprint',
+            icon: <Gauge className="h-4 w-4" />,
+            label: 'Sprint Consistency',
+            content: (
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Gauge className="h-5 w-5 text-orange-500" />
+                      Average Sprint Finishing Position
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {sprintChartData.length === 0 ? (
+                      <p className="text-center py-8 text-muted-foreground">No sprint data available</p>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={Math.max(300, sprintChartData.length * 40)}>
+                        <BarChart
+                          data={sprintChartData}
+                          layout="vertical"
+                          margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis
+                            type="number"
+                            domain={[0, 'dataMax + 2']}
+                            stroke="hsl(var(--muted-foreground))"
+                            tick={{ fontSize: 12 }}
+                            label={{
+                              value: 'Avg Sprint Position',
+                              position: 'insideBottomRight',
+                              offset: -5,
+                              style: { fill: 'hsl(var(--muted-foreground))', fontSize: 12 },
+                            }}
+                          />
+                          <YAxis
+                            dataKey="full_name"
+                            type="category"
+                            width={110}
+                            stroke="hsl(var(--muted-foreground))"
+                            tick={{ fontSize: 12 }}
+                            tickFormatter={(val: string) => {
+                              const driver = sprintChartData.find(d => d.full_name === val);
+                              return driver ? `${driver.acronym} ${val.split(' ').pop() || ''}` : val;
+                            }}
+                          />
+                          <Tooltip content={<ChartTooltip />} />
+                          <Bar dataKey="avg_pos" name="Avg Sprint Position" radius={[0, 4, 4, 0]}>
+                            {sprintChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.fill} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            ),
+          },
+          {
+            value: 'table',
+            icon: <Table2 className="h-4 w-4" />,
+            label: 'Full Table',
+            content: (
+              <div className="space-y-4">
+                <Card className="overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/50">
+                          <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase w-12">#</th>
+                          <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase">Driver</th>
+                          <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase">Team</th>
+                          <th className="text-right p-3 text-xs font-medium text-muted-foreground uppercase">Avg Race Pos</th>
+                          <th className="text-right p-3 text-xs font-medium text-muted-foreground uppercase">Avg Sprint Pos</th>
+                          <th className="text-right p-3 text-xs font-medium text-muted-foreground uppercase">Consistency</th>
+                          <th className="text-right p-3 text-xs font-medium text-muted-foreground uppercase">Reliability</th>
+                          <th className="text-right p-3 text-xs font-medium text-muted-foreground uppercase">Pts/Race</th>
+                          <th className="text-right p-3 text-xs font-medium text-muted-foreground uppercase">Total Pts</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {metrics.map((m, i) => (
+                          <tr
+                            key={m.driver_number}
+                            className={`border-b border-border hover:bg-muted/30 transition-colors ${
+                              i % 2 === 1 ? 'bg-muted/10' : ''
+                            }`}
+                          >
+                            <td className="p-3">
+                              <span className={`font-bold text-sm ${posClass(i + 1)}`}>
+                                {posEmoji(i + 1)}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-3">
+                                <span
+                                  className="w-3 h-3 rounded-full flex-shrink-0"
+                                  style={{ background: teamColor(m.team_colour) }}
+                                />
+                                <div>
+                                  <div className="font-semibold text-sm">{m.acronym}</div>
+                                  <div className="text-xs text-muted-foreground">{m.full_name}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                  style={{ background: teamColor(m.team_colour) }}
+                                />
+                                <span className="text-sm text-muted-foreground">{m.team_name}</span>
+                              </div>
+                            </td>
+                            <td className="p-3 text-right">
+                              <span className="font-mono text-sm font-medium">
+                                {m.avg_race_pos != null ? m.avg_race_pos.toFixed(1) : '-'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right">
+                              <span className="font-mono text-sm text-muted-foreground">
+                                {m.avg_sprint_pos != null ? m.avg_sprint_pos.toFixed(1) : '-'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right">
+                              <Badge
+                                variant="outline"
+                                className={`font-mono text-xs ${
+                                  m.consistency_score >= 80
+                                    ? 'border-green-500/50 text-green-400'
+                                    : m.consistency_score >= 60
+                                    ? 'border-yellow-500/50 text-yellow-400'
+                                    : 'border-red-500/50 text-red-400'
+                                }`}
+                              >
+                                {m.consistency_score}
+                              </Badge>
+                            </td>
+                            <td className="p-3 text-right">
+                              <span className="font-mono text-sm">
+                                {m.reliability.toFixed(0)}%
+                              </span>
+                            </td>
+                            <td className="p-3 text-right">
+                              <span className="font-mono text-sm text-muted-foreground">
+                                {m.points_per_race.toFixed(1)}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right">
+                              <span className="font-bold text-sm">{m.total_points}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </div>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }
