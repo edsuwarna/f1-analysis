@@ -35,13 +35,15 @@ interface InteractiveCircuitMapProps {
 let circuitKeyCache: Record<string, number> | null = null;
 let circuitKeyLoading: Promise<Record<string, number>> | null = null;
 
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
 async function loadCircuitKeyMap(): Promise<Record<string, number>> {
   if (circuitKeyCache) return circuitKeyCache;
   if (circuitKeyLoading) return circuitKeyLoading;
 
   circuitKeyLoading = (async () => {
     try {
-      const res = await fetch('https://api.multiviewer.app/api/v1/circuits');
+      const res = await fetch(`${API_BASE}/circuits`);
       const data: Record<string, { name: string }> = await res.json();
       const map: Record<string, number> = {};
       for (const [keyStr, info] of Object.entries(data)) {
@@ -107,9 +109,9 @@ export default function InteractiveCircuitMap({
         throw new Error('Circuit not found in Multiviewer');
       }
 
-      // 2. Fetch track data
+      // 2. Fetch track data via backend proxy
       const res = await fetch(
-        `https://api.multiviewer.app/api/v1/circuits/${circuitKey}/${year}`
+        `${API_BASE}/circuits/${circuitKey}/multiviewer?year=${year}`
       );
 
       if (!res.ok) throw new Error(res.status === 404 ? 'Not found' : 'API error');
@@ -117,19 +119,19 @@ export default function InteractiveCircuitMap({
       const raw = await res.json();
 
       setData({
-        circuit_key: raw.circuitKey,
-        circuit_name: raw.circuitName,
+        circuit_key: raw.circuit_key,
+        circuit_name: raw.circuit_name,
         x: raw.x || [],
         y: raw.y || [],
         corners: (raw.corners || [])
-          .filter((c: any) => c?.trackPosition)
+          .filter((c: any) => c.x != null && c.y != null)
           .map((c: any) => ({
             number: c.number,
             angle: c.angle || 0,
-            x: c.trackPosition.x,
-            y: c.trackPosition.y,
+            x: c.x,
+            y: c.y,
           })),
-        mini_sectors: raw.miniSectorsIndexes || [],
+        mini_sectors: raw.mini_sectors || [],
         rotation: raw.rotation || 0,
       });
     } catch (err) {
