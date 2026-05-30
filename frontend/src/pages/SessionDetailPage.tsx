@@ -1453,18 +1453,70 @@ export default function SessionDetailPage() {
           <LoadableCard title="Corner Performance" subtitle="Min corner & exit speeds" icon={<Radar className="h-4 w-4 text-purple-500" />}
             loading={cornerLoading} loaded={cornerLoaded} onLoad={loadCorner}>
             {corner?.drivers?.length ? (
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              <div className="space-y-3">
+                {/* Note from backend */}
+                {corner.note && (
+                  <p className="text-[10px] text-muted-foreground/60 italic leading-relaxed">{corner.note}</p>
+                )}
+
+                {/* ── Avg Min Corner Speed ── */}
                 <BarChart
-                  data={corner.drivers.map(d => ({ key: d.acronym, value: Math.round(d.avg_min_speed) }))}
-                  maxValue={Math.max(...corner.drivers.map(d => d.avg_min_speed), 1)}
+                  data={corner.drivers.map(d => ({ key: d.acronym, value: Math.round(d.avg_min_corner_speed) }))}
+                  maxValue={Math.max(...corner.drivers.map(d => d.avg_min_corner_speed), 1)}
                   color={(v) => v > 160 ? '#22c55e' : v > 130 ? '#eab308' : '#e11d48'}
-                  height={20}
+                  height={18}
                   label="Avg Min Corner Speed (km/h)" />
-                <div className="text-xs text-muted-foreground">
-                  <span>Best min speed: </span>
-                  {corner.drivers.filter(d => d.best_corner_min_speed > 0).sort((a, b) => b.best_corner_min_speed - a.best_corner_min_speed).slice(0, 1).map(d => (
-                    <span key={d.driver_number} className="font-medium text-foreground">{d.acronym} ({d.best_corner_min_speed.toFixed(0)} km/h)</span>
-                  ))}
+                {/* Color legend */}
+                <div className="flex gap-3 text-[10px] text-muted-foreground -mt-1">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#22c55e' }} /> &gt;160</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#eab308' }} /> 130–160</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: '#e11d48' }} /> &lt;130</span>
+                </div>
+
+                {/* ── Avg Exit Speed ── */}
+                <BarChart
+                  data={corner.drivers.map(d => ({ key: d.acronym, value: Math.round(d.avg_exit_speed) }))}
+                  maxValue={Math.max(...corner.drivers.map(d => d.avg_exit_speed), 1)}
+                  color={'#6366f1'}
+                  height={18}
+                  label="Avg Exit Speed (km/h)" />
+
+                {/* ── Top Stats Row ── */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  {/* Best min speed (top 3) */}
+                  <div className="text-xs text-muted-foreground">
+                    <p className="text-[10px] font-medium mb-1 uppercase tracking-wider">Best Corner Entry</p>
+                    {corner.drivers
+                      .filter(d => d.best_min_corner_speed > 0)
+                      .sort((a, b) => b.best_min_corner_speed - a.best_min_corner_speed)
+                      .slice(0, 3)
+                      .map((d, i) => (
+                        <div key={d.driver_number} className="flex justify-between items-center py-0.5">
+                          <span className="flex items-center gap-1">
+                            {i === 0 && <span className="text-[10px]">🥇</span>}
+                            <span style={{ color: d.team_colour || undefined }}>{d.acronym}</span>
+                          </span>
+                          <span className="font-mono">{d.best_min_corner_speed.toFixed(0)} km/h</span>
+                        </div>
+                      ))}
+                  </div>
+
+                  {/* Speed loss / corners detected */}
+                  <div className="text-xs text-muted-foreground">
+                    <p className="text-[10px] font-medium mb-1 uppercase tracking-wider">Avg Speed Loss</p>
+                    {corner.drivers
+                      .sort((a, b) => b.avg_speed_loss_in_corner - a.avg_speed_loss_in_corner)
+                      .slice(0, 3)
+                      .map((d) => (
+                        <div key={d.driver_number} className="flex justify-between items-center py-0.5">
+                          <span style={{ color: d.team_colour || undefined }}>{d.acronym}</span>
+                          <span className="font-mono">{d.avg_speed_loss_in_corner.toFixed(1)} km/h</span>
+                        </div>
+                      ))}
+                    <p className="text-[10px] text-muted-foreground/50 mt-1.5 border-t border-border/30 pt-1">
+                      {corner.drivers.length} drivers · {corner.drivers[0]?.corners_detected || '-'} corners avg
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : (

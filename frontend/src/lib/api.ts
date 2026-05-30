@@ -590,6 +590,7 @@ export interface CornerData {
   session_id: number;
   corners: boolean;
   message?: string;
+  note?: string;
   drivers: Array<{
     driver_number: number;
     acronym: string;
@@ -597,10 +598,12 @@ export interface CornerData {
     team_name: string;
     team_colour: string;
     corners_detected: number;
-    avg_min_speed: number;
+    avg_min_corner_speed: number;
     avg_exit_speed: number;
-    avg_entry_brake: number;
-    best_corner_min_speed: number;
+    avg_speed_loss_in_corner: number;
+    best_min_corner_speed: number;
+    best_exit_speed: number;
+    avg_brake_on_entry: number;
   }>;
 }
 
